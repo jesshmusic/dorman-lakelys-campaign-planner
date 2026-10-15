@@ -1,0 +1,37 @@
+{
+  "id": "dorman-lakelys-campaign-planner",
+  "title": "Dorman Lakely's Campaign Planner",
+  "description": "Brings your Dungeon Master Guru campaign plan into Foundry: the cast, places, threats, quests, secrets and sessions as journals, plus a Campaign Dashboard for clocks, secrets, quests and the session log that syncs back to Dungeon Master Guru.",
+  "version": "0.1.0",
+  "url": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner",
+  "manifest": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner/releases/latest/download/module.json",
+  "download": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner/releases/download/v0.1.0/module.zip",
+  "license": "LICENSE",
+  "readme": "README.md",
+  "bugs": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues",
+  "changelog": "CHANGELOG.md",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Dorman Lakely",
+      "url": "https://github.com/jesshmusic"
+    }
+  ],
+  "esmodules": [
+    "scripts/campaign-planner.mjs"
+  ],
+  "styles": [
+    "styles/campaign-planner.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "flags": {}
+}

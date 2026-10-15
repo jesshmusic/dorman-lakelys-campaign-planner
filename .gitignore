@@ -1,0 +1,14 @@
+# Dependencies
+/node_modules
+npm-debug.log*
+
+# IDE
+.vscode/*
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files (regenerated in CI)
+package-lock.json

@@ -1,0 +1,146 @@
+/* Dorman Lakely's Campaign Planner */
+
+.dlcp-app .window-content {
+  padding: 0.5rem 0.75rem;
+}
+
+.dlcp-dashboard,
+.dlcp-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dlcp-dashboard h2 {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.dlcp-dashboard textarea {
+  min-height: 5rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.dlcp-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dlcp-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.dlcp-buttons button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-muted {
+  color: var(--color-text-subtle, #7a7971);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.dlcp-notice {
+  border-left: 4px solid #c9ad6a;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.dlcp-notice--error {
+  border-left-color: #992e2e;
+}
+
+.dlcp-notice--warning {
+  border-left-color: #dd9529;
+}
+
+.dlcp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dlcp-list li {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dlcp-list li button,
+.dlcp-quests select {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-quests li {
+  justify-content: space-between;
+}
+
+.dlcp-front {
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+}
+
+.dlcp-front-clock {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+}
+
+.dlcp-front-clock button {
+  border-radius: 50%;
+  height: 1.75rem;
+  line-height: 1;
+  padding: 0;
+  width: 1.75rem;
+}
+
+.dlcp-portent {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.dlcp-clock path {
+  stroke: #571a10;
+  stroke-width: 1.5;
+}
+
+.dlcp-clock .dlcp-clock-filled {
+  fill: #972c1d;
+}
+
+.dlcp-clock .dlcp-clock-empty {
+  fill: #fdf1dc;
+}
+
+.dlcp-badge {
+  background: #7a853b;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0 0.4rem;
+  text-transform: uppercase;
+}
+
+.dlcp-link-button {
+  background: none;
+  border: none;
+  color: var(--color-text-hyperlink, #972c1d);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  width: auto;
+}

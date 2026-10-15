@@ -1,0 +1,25 @@
+{
+  "name": "dorman-lakelys-campaign-planner",
+  "version": "0.1.0",
+  "description": "FoundryVTT module that syncs a Dungeon Master Guru campaign plan into Foundry journals and a Campaign Dashboard",
+  "type": "module",
+  "main": "scripts/campaign-planner.mjs",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "release:patch": "node tools/release.cjs patch",
+    "release:minor": "node tools/release.cjs minor",
+    "release:major": "node tools/release.cjs major"
+  },
+  "author": "Jess Music (Dorman Lakely)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
