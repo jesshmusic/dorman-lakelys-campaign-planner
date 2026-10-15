@@ -99,9 +99,15 @@
 }
 
 .dlcp-front-clock button {
+  align-items: center;
   border-radius: 50%;
+  display: flex;
+  flex: 0 0 1.75rem;
+  font-size: 1rem;
   height: 1.75rem;
+  justify-content: center;
   line-height: 1;
+  min-width: 1.75rem;
   padding: 0;
   width: 1.75rem;
 }

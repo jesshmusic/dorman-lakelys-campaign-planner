@@ -1,5 +1,5 @@
 import { DmGuruApi, DEFAULT_BASE_URL } from "./api.mjs";
-import { renderRecord } from "./render.mjs";
+import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
@@ -148,7 +148,7 @@ export class CampaignSync {
     if (clashes.length) {
       const keepMine = await foundry.applications.api.DialogV2.confirm({
         window: { title: "Changed on Dungeon Master Guru too" },
-        content: `<p>This was also changed on Dungeon Master Guru (${clashes.join(", ")}).</p>
+        content: `<p>${escapeHtml(pageName(collection, record))}: ${describeFields(clashes)} also changed on Dungeon Master Guru.</p>
                   <p>Keep the change you just made in Foundry?</p>`,
       });
       toSend = keepMine ? comparable(attributes) : retry;
@@ -261,6 +261,18 @@ export class CampaignSync {
     Hooks.callAll(SYNCED_HOOK);
   }
 }
+
+// How each field Foundry can change is named when asking the DM about a clash
+export const FIELD_LABELS = {
+  clockFilled: "the clock",
+  portents: "the grim portents",
+  status: "the status",
+  log: "the session log",
+  recap: "the recap",
+  revealed: "whether it's revealed",
+};
+
+export const describeFields = (keys) => keys.map((key) => FIELD_LABELS[key] ?? key).join(", ");
 
 // The push payload names a revealed secret's session by uuid; the record has
 // its id. Compare only the fields both share.
