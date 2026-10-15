@@ -55,6 +55,16 @@ export class DmGuruApi {
     return this.#request("POST", `/v1/foundry/campaigns/${encodeURIComponent(campaignUuid)}/changes`, { changes });
   }
 
+  /** The compendium packs Dungeon Master Guru has: { packs: { [packId]: { version, count } } } */
+  compendiumStatus() {
+    return this.#request("GET", "/v1/foundry/compendium");
+  }
+
+  /** Replaces one pack's index: { pack, count, skipped } */
+  sendCompendiumPack(pack, version, entries) {
+    return this.#request("POST", "/v1/foundry/compendium", { pack, version, entries });
+  }
+
   async #request(method, path, body) {
     let response;
     try {

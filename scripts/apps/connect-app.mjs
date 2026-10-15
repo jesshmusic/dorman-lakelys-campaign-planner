@@ -15,6 +15,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     actions: {
       checkToken: ConnectApp.#onCheckToken,
       linkCampaign: ConnectApp.#onLinkCampaign,
+      sendIndex: ConnectApp.#onSendIndex,
       disconnect: ConnectApp.#onDisconnect,
     },
   };
@@ -23,6 +24,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
   #campaigns = null;
   #error = null;
   #busy = false;
+  #indexResult = null;
 
   get sync() {
     return game.modules.get(MODULE_ID).api.sync;
@@ -59,6 +61,20 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     content.replaceChildren(result);
   }
 
+  // Compendium index: lets planner searches on Dungeon Master Guru link to these compendiums
+  #renderIndex() {
+    const result = this.#indexResult;
+    return `
+      <h3>Compendiums</h3>
+      <p class="hint">Sends the names, CRs and IDs (never stat blocks) of your SRD and 2024 core book compendiums,
+        so monsters and items picked on Dungeon Master Guru become links you can drag onto a scene. Sent automatically
+        when a book module updates.</p>
+      ${result ? `<p class="dlcp-notice">Sent ${result.entries.toLocaleString()} entries from ${result.packs} compendiums.</p>` : ""}
+      <div class="dlcp-buttons">
+        <button type="button" data-action="sendIndex" ${this.#busy ? "disabled" : ""}><i class="fas fa-book"></i> Send compendium index</button>
+      </div>`;
+  }
+
   #renderAccount() {
     if (!this.#account) return "";
     const { user, premium } = this.#account;
@@ -69,7 +85,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
         then link it in your Dungeon Master Guru dashboard.</p>`;
     }
     if (!this.#campaigns?.length) {
-      return `${header}<p>You don't have any campaigns yet. <a href="${escapeHtml(this.sync.baseUrl)}/app/campaigns/new" target="_blank" rel="noopener">Create one on Dungeon Master Guru</a>.</p>`;
+      return `${header}${this.#renderIndex()}<p>You don't have any campaigns yet. <a href="${escapeHtml(this.sync.baseUrl)}/app/campaigns/new" target="_blank" rel="noopener">Create one on Dungeon Master Guru</a>.</p>`;
     }
     const current = this.sync.linked?.uuid;
     const options = this.#campaigns
@@ -86,7 +102,8 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       <p class="hint">Linking creates a journal folder for the campaign and keeps it in sync.</p>
       <div class="dlcp-buttons">
         <button type="button" data-action="linkCampaign" ${this.#busy ? "disabled" : ""}><i class="fas fa-link"></i> Link campaign</button>
-      </div>`;
+      </div>
+      ${this.#renderIndex()}`;
   }
 
   static async #onCheckToken() {
@@ -127,6 +144,20 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       game.modules.get(MODULE_ID).api.openDashboard();
     } catch (error) {
       this.#error = error.message;
+      this.#busy = false;
+      this.render();
+    }
+  }
+
+  static async #onSendIndex() {
+    this.#busy = true;
+    this.#error = null;
+    await this.render();
+    try {
+      this.#indexResult = await this.sync.sendCompendiumIndex({ force: true });
+    } catch (error) {
+      this.#error = error.message;
+    } finally {
       this.#busy = false;
       this.render();
     }

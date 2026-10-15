@@ -1,9 +1,20 @@
 import { DmGuruApi, DEFAULT_BASE_URL } from "./api.mjs";
 import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
+import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
+
+// Changes when the pack's package updates, or when what the module sends changes
+function packVersion(pack) {
+  const { packageName, packageType } = pack.metadata;
+  const version = packageType === "system" ? game.system.version : game.modules.get(packageName)?.version;
+  return `${packageName}@${version ?? "unknown"}+${INDEX_FORMAT}`;
+}
+
+// dnd5e's config values may be plain strings or { label }
+const configLabel = (value) => (typeof value === "string" ? value : value?.label);
 
 // Page title for a record
 function pageName(collection, record) {
@@ -175,9 +186,53 @@ export class CampaignSync {
     return true;
   }
 
+  /**
+   * Sends the index of this world's SRD and core book compendiums to Dungeon
+   * Master Guru, so planner searches can link to their entries. Only packs
+   * whose package changed since the last send, unless `force`.
+   * @returns {Promise<{ packs: number, entries: number }>}
+   */
+  async sendCompendiumIndex({ force = false } = {}) {
+    const api = this.api();
+    const { packs: saved } = await api.compendiumStatus();
+    const sent = { packs: 0, entries: 0 };
+    const labels = {
+      schoolLabel: (key) => configLabel(CONFIG.DND5E?.spellSchools?.[key]) ?? key,
+      rarityLabel: (key) => configLabel(CONFIG.DND5E?.itemRarity?.[key]) ?? key,
+    };
+    for (const id of COMPENDIUM_PACKS) {
+      const pack = game.packs.get(id);
+      if (!pack) continue;
+      const version = packVersion(pack);
+      if (!force && saved?.[id]?.version === version) continue;
+
+      const index = await pack.getIndex({ fields: INDEX_FIELDS });
+      const folderName = (folderId) => pack.folders?.get(folderId)?.name ?? null;
+      const entries = index.contents
+        .map((entry) => entryFromIndex(id, pack.documentName, entry, { ...labels, folderName }))
+        .filter(Boolean);
+      const result = await api.sendCompendiumPack(id, version, entries);
+      sent.packs += 1;
+      sent.entries += result.count;
+    }
+    return sent;
+  }
+
+  // Finds compendium entries by name in the packs the campaign uses
+  #compendiumLookup(store) {
+    const campaign = [...store.campaign.values()][0];
+    const excluded = campaign?.excludedCompendiumPacks ?? [];
+    const packs = COMPENDIUM_PACKS.filter((id) => !excluded.includes(id))
+      .map((id) => game.packs.get(id))
+      .filter(Boolean)
+      .map((pack) => ({ id: pack.collection, documentName: pack.documentName, index: pack.index.contents }));
+    return compendiumLookup(packs);
+  }
+
   #renderContext(store) {
     return {
       baseUrl: this.baseUrl,
+      compendiumUuid: this.#compendiumLookup(store),
       references: [...store.references.values()],
       nameOf: (collection, id) => {
         if (id === null || id === undefined) return null;

@@ -36,9 +36,8 @@ const SESSION_STATUSES = { planned: "Planned", prepped: "Prepped", played: "Play
  * @param {{ name: string, citation?: string, foundryUuid?: string|null }} reference
  */
 export function referenceLink(reference) {
-  if (reference.foundryUuid && SAFE_UUID.test(reference.foundryUuid)) {
-    return `@UUID[${reference.foundryUuid}]{${escapeHtml(reference.name).replaceAll("}", "")}}`;
-  }
+  const link = compendiumLink(reference.foundryUuid, reference.name);
+  if (link) return link;
   return reference.citation
     ? `${escapeHtml(reference.name)} (${escapeHtml(reference.citation)})`
     : escapeHtml(reference.name);
@@ -47,14 +46,20 @@ export function referenceLink(reference) {
 // Compendium UUIDs look like Compendium.dnd-monster-manual.actors.Actor.abc123
 const SAFE_UUID = /^[\w.-]+$/;
 
+/** A Foundry content link: it opens the entry, or drag it onto a scene to place a token */
+export function compendiumLink(uuid, name) {
+  if (!uuid || !SAFE_UUID.test(uuid)) return null;
+  return `@UUID[${uuid}]{${escapeHtml(name).replaceAll("}", "")}}`;
+}
+
 const MONSTER_CATEGORIES = ["monster"];
-const TREASURE_CATEGORIES = ["magic_item", "table"];
+const TREASURE_CATEGORIES = ["magic_item", "equipment", "table"];
 
 /**
  * Renders a record as journal page HTML.
  * @param {string} collection e.g. "npcs"
  * @param {object} record the record JSON from the API
- * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[] }} context
+ * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[], compendiumUuid?: (kind: "monster"|"item", name: string) => string|null }} context
  */
 export function renderRecord(collection, record, context) {
   const renderer = RENDERERS[collection];
@@ -72,10 +77,13 @@ const RENDERERS = {
       section("Setting notes", para(c.settingNotes)),
     ].join(""),
 
-  npcs: (npc, { baseUrl, nameOf }) => {
+  npcs: (npc, { baseUrl, nameOf, compendiumUuid }) => {
     const statBlocks = [];
     if (npc.statBlockReference) statBlocks.push(referenceLink(npc.statBlockReference));
-    if (npc.monster) {
+    const monsterLink = npc.monster && compendiumLink(compendiumUuid?.("monster", npc.monster.name), npc.monster.name);
+    if (monsterLink) {
+      statBlocks.push(`${monsterLink} (CR ${escapeHtml(npc.monster.challengeRating)})`);
+    } else if (npc.monster) {
       const url = `${baseUrl}/app/2024/monsters/${encodeURIComponent(npc.monster.slug)}`;
       statBlocks.push(
         `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(npc.monster.name)} (CR ${escapeHtml(
@@ -150,13 +158,18 @@ const RENDERERS = {
       `<p><em>${secret.revealed ? `Revealed${secret.revealedSessionId ? ` in ${escapeHtml(nameOf("sessions", secret.revealedSessionId) ?? "a session")}` : ""}` : "Not revealed yet"}</em></p>`,
     ].join(""),
 
-  sessions: (session, { references }) => {
+  sessions: (session, { references, compendiumUuid }) => {
+    const withDetail = (html, detail) => (detail ? `${html} (${escapeHtml(detail)})` : html);
     const linkLine = (link) => {
       if (link.linkableType === "CampaignReference") {
         const reference = references.find((r) => r.id === link.linkableId);
-        return reference ? referenceLink(reference) : text(link.name);
+        if (!reference) return text(link.name);
+        return withDetail(referenceLink(reference), reference.challengeRating && `CR ${reference.challengeRating}`);
       }
-      return text(link.detail ? `${link.name} (${link.detail})` : link.name);
+      // Monsters and items from Dungeon Master Guru's SRD link to the compendium entry of the same name
+      const kind = { Monster: "monster", Item: "item" }[link.linkableType];
+      const uuid = kind && compendiumUuid?.(kind, link.name);
+      return withDetail(compendiumLink(uuid, link.name) ?? escapeHtml(link.name), link.detail);
     };
     const linksOf = (...types) => session.links.filter((link) => types.includes(link.linkableType));
     const bookLinks = (categories) =>

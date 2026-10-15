@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clockSvg, escapeHtml, referenceLink, renderRecord } from "../scripts/render.mjs";
+import { clockSvg, compendiumLink, escapeHtml, referenceLink, renderRecord } from "../scripts/render.mjs";
 
 const names = {
   factions: { 3: "The Cult" },
@@ -118,6 +118,74 @@ test("renders a session's eight prep steps with links grouped by step", () => {
   assert.match(step("7. Relevant monsters"), /Cult Fanatic \(Monster Manual p\. 92\)/);
   assert.doesNotMatch(step("7. Relevant monsters"), /Bag of Holding/);
   assert.match(step("8. Treasure"), /@UUID\[Compendium\.dnd-dungeon-masters-guide\.equipment\.Item\.abc123\]\{Bag of Holding\}/);
+});
+
+test("links SRD monsters and items to the compendium entry of the same name", () => {
+  const uuids = { "monster:zombie": "Compendium.dnd-monster-manual.actors.Actor.mmZombie00000000", "item:rope": "Compendium.dnd5e.equipment24.Item.rope" };
+  const lookup = { ...context, compendiumUuid: (kind, name) => uuids[`${kind}:${name.toLowerCase()}`] ?? null };
+  const html = renderRecord(
+    "sessions",
+    {
+      number: 1,
+      status: "planned",
+      scenes: [],
+      links: [
+        { linkableType: "Monster", linkableId: "4", name: "Zombie", detail: "CR 1/4" },
+        { linkableType: "Monster", linkableId: "5", name: "Homebrew Horror", detail: "CR 3" },
+        { linkableType: "Item", linkableId: "6", name: "Rope" },
+      ],
+    },
+    lookup,
+  );
+
+  assert.match(html, /@UUID\[Compendium\.dnd-monster-manual\.actors\.Actor\.mmZombie00000000\]\{Zombie\} \(CR 1\/4\)/);
+  assert.match(html, /<li>Homebrew Horror \(CR 3\)<\/li>/);
+  assert.match(html, /@UUID\[Compendium\.dnd5e\.equipment24\.Item\.rope\]\{Rope\}/);
+});
+
+test("shows a book monster's CR next to its link in session prep", () => {
+  const withCr = {
+    ...context,
+    references: [{ id: "11", name: "Ghoul", category: "monster", challengeRating: "1", foundryUuid: "Compendium.x.Actor.ghoul" }],
+  };
+  const html = renderRecord(
+    "sessions",
+    { number: 1, status: "planned", scenes: [], links: [{ linkableType: "CampaignReference", linkableId: "11", name: "Ghoul" }] },
+    withCr,
+  );
+
+  assert.match(html, /@UUID\[Compendium\.x\.Actor\.ghoul\]\{Ghoul\} \(CR 1\)/);
+});
+
+test("lists book equipment with the treasure", () => {
+  const withGear = {
+    ...context,
+    references: [{ id: "12", name: "Spyglass", category: "equipment", foundryUuid: "Compendium.x.Item.spyglass" }],
+  };
+  const html = renderRecord(
+    "sessions",
+    { number: 1, status: "planned", scenes: [], links: [{ linkableType: "CampaignReference", linkableId: "12", name: "Spyglass" }] },
+    withGear,
+  );
+
+  assert.match(html.split("<h3>8. Treasure</h3>")[1], /\{Spyglass\}/);
+});
+
+test("links an NPC's SRD stat block to the compendium when it can", () => {
+  const html = renderRecord(
+    "npcs",
+    { name: "Gate guard", role: "neutral", monster: { name: "Guard", slug: "guard", challengeRating: "1/8" } },
+    { ...context, compendiumUuid: () => "Compendium.dnd5e.actors24.Actor.guard" },
+  );
+
+  assert.match(html, /@UUID\[Compendium\.dnd5e\.actors24\.Actor\.guard\]\{Guard\} \(CR 1\/8\)/);
+  assert.doesNotMatch(html, /dungeonmaster\.guru/);
+});
+
+test("makes no compendium link from an unsafe uuid", () => {
+  assert.equal(compendiumLink("x]{y}", "Evil"), null);
+  assert.equal(compendiumLink(null, "Nothing"), null);
+  assert.equal(compendiumLink("Compendium.x.Actor.a", "Odd}Name"), "@UUID[Compendium.x.Actor.a]{OddName}");
 });
 
 test("renders a revealed secret with its session", () => {

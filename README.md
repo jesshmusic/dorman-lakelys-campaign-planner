@@ -11,7 +11,7 @@ This module brings a Dungeon Master Guru campaign into your world and keeps it i
   - Secrets to reveal.
   - Open quests with their status.
 - **Two-way sync:** changes you make on Dungeon Master Guru come into Foundry automatically, and changes you make in the dashboard go back. If the same thing was changed in both places, you choose which to keep.
-- **Your own books:** Dungeon Master Guru stores only the names and page numbers of things in the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual. When a book reference is linked to your licensed Foundry compendium, its journal entry links straight to the stat block or item in your world.
+- **Your compendiums on Dungeon Master Guru:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and compendium IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in the session journals. Drag one onto a scene to place a token, or click it to open the stat block or item.
 
 Campaign sync is a [Patreon](https://www.patreon.com/c/DormanLakely) premium feature.
 
@@ -21,6 +21,8 @@ Campaign sync is a [Patreon](https://www.patreon.com/c/DormanLakely) premium fea
 2. In Foundry, enable the module, then open **Settings → Module Settings → Dorman Lakely's Campaign Planner → Connect**.
 3. Paste the token, choose a campaign, and click **Link campaign**.
 4. Open the **Campaign Dashboard** from the Journal Notes scene controls.
+
+The compendium index is sent when the GM loads the world, and again whenever a book module updates. To send it now, click **Send compendium index** in the Connect window. Each campaign on Dungeon Master Guru can turn compendiums off in its **Compendiums** list.
 
 The token is saved in your browser only. It is never stored in the world, so your players never receive it.
 

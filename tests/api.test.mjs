@@ -61,6 +61,26 @@ test("turns error responses into DmGuruApiError with the server's message and co
   });
 });
 
+test("reads which compendium packs Dungeon Master Guru has", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { packs: {} } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  assert.deepEqual(await api.compendiumStatus(), { packs: {} });
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/compendium");
+  assert.equal(calls[0].init.method, "GET");
+});
+
+test("sends one compendium pack's index", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { pack: "dnd5e.actors24", count: 1, skipped: 0 } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const entries = [{ uuid: "u", name: "Zombie", category: "monster", challengeRating: "1/4", detail: "Undead" }];
+
+  assert.equal((await api.sendCompendiumPack("dnd5e.actors24", "dnd5e@6.0.6+1", entries)).count, 1);
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/compendium");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { pack: "dnd5e.actors24", version: "dnd5e@6.0.6+1", entries });
+});
+
 test("flags an invalid token", async () => {
   const { fetchImpl } = fakeFetch([{ status: 401, body: { errors: ["Invalid API token"] } }]);
   const api = new DmGuruApi({ token: "bad", fetchImpl });

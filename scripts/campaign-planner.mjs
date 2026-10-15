@@ -112,12 +112,25 @@ Hooks.once("init", () => {
   });
 });
 
+// Keeps Dungeon Master Guru's copy of the compendium index current. Quiet:
+// it only matters once the DM searches on Dungeon Master Guru.
+async function sendCompendiumIndex() {
+  if (!game.user.isGM || !sync.token) return;
+  try {
+    const { packs } = await sync.sendCompendiumIndex();
+    if (packs) console.log(`${MODULE_TITLE} | Sent the index of ${packs} compendiums to Dungeon Master Guru`);
+  } catch (error) {
+    console.warn(`${MODULE_TITLE} | Could not send the compendium index`, error);
+  }
+}
+
 Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect };
   if (!game.user.isGM) return;
 
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
   scheduleAutoSync();
+  sendCompendiumIndex();
 });
 
 // Foundry v13+ scene controls: groups and tools are objects keyed by name
