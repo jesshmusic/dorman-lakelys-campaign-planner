@@ -150,3 +150,143 @@
   text-decoration: underline;
   width: auto;
 }
+
+/* New campaign guide */
+
+.dlcp-setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dlcp-setup-body h2 {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  font-size: 1.2rem;
+  margin: 0.25rem 0 0;
+}
+
+.dlcp-setup-body h2:focus {
+  outline: none;
+}
+
+.dlcp-setup-body h3 {
+  font-size: 1rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.dlcp-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dlcp-steps button {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 0.1rem 0.7rem;
+  width: auto;
+}
+
+.dlcp-steps button[aria-current="step"] {
+  border-color: #972c1d;
+  font-weight: bold;
+}
+
+.dlcp-kinds {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dlcp-kind {
+  border: 2px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+}
+
+.dlcp-kind--selected {
+  border-color: #972c1d;
+}
+
+.dlcp-step .form-group.stacked textarea {
+  min-height: 4rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.dlcp-why {
+  border-left: 4px solid #c9ad6a;
+  padding: 0.25rem 0.75rem;
+}
+
+.dlcp-why h3,
+.dlcp-why h4 {
+  font-size: 0.95rem;
+  margin: 0.25rem 0;
+}
+
+.dlcp-example {
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.dlcp-party {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.dlcp-party td:first-child,
+.dlcp-party th:first-child {
+  width: 2rem;
+}
+
+.dlcp-books {
+  border: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.dlcp-books legend {
+  font-weight: bold;
+  padding: 0;
+}
+
+.dlcp-check {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.dlcp-summary {
+  border-bottom: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  padding-bottom: 0.4rem;
+}
+
+.dlcp-summary header {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dlcp-summary p {
+  margin: 0.2rem 0;
+}
+
+.dlcp-setup-nav {
+  justify-content: flex-end;
+}
+
+.dlcp-setup-body a.button {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0 0.6rem;
+}

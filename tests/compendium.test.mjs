@@ -1,9 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COMPENDIUM_PACKS, compendiumLookup, entryFromIndex, formatCr } from "../scripts/compendium.mjs";
+import { COMPENDIUM_PACKS, PACK_NAMES, compendiumLookup, entryFromIndex, formatCr } from "../scripts/compendium.mjs";
 
 test("indexes the core books before the SRD", () => {
   assert.ok(COMPENDIUM_PACKS.indexOf("dnd-monster-manual.actors") < COMPENDIUM_PACKS.indexOf("dnd5e.actors24"));
+});
+
+test("names every indexed pack the way Dungeon Master Guru does", () => {
+  assert.deepEqual(Object.keys(PACK_NAMES).sort(), [...COMPENDIUM_PACKS].sort());
+  assert.deepEqual(PACK_NAMES["dnd-monster-manual.actors"], { book: "Monster Manual", label: "Monsters" });
 });
 
 test("writes challenge ratings the way Dungeon Master Guru does", () => {

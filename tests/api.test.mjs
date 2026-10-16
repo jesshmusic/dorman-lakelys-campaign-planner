@@ -93,6 +93,32 @@ test("sends one compendium pack's index", async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), { pack: "dnd5e.actors24", version: "dnd5e@6.0.6+1", entries });
 });
 
+test("creates a campaign", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ status: 201, body: { uuid: "u", name: "Zombie Siege" } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const body = { template: "blank", campaign: { name: "Zombie Siege" } };
+
+  assert.equal((await api.createCampaign(body)).name, "Zombie Siege");
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/campaigns");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), body);
+});
+
+test("says which fields a rejected campaign got wrong", async () => {
+  const { fetchImpl } = fakeFetch([
+    { status: 422, body: { errors: ["Target level can't be lower than the starting level"], fields: ["target_level"] } },
+  ]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  await assert.rejects(
+    api.createCampaign({}),
+    (error) =>
+      error.status === 422 &&
+      error.message === "Target level can't be lower than the starting level" &&
+      error.fields.join() === "target_level",
+  );
+});
+
 test("flags an invalid token", async () => {
   const { fetchImpl } = fakeFetch([{ status: 401, body: { errors: ["Invalid API token"] } }]);
   const api = new DmGuruApi({ token: "bad", fetchImpl });

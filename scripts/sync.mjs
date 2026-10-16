@@ -2,7 +2,7 @@ import { DmGuruApi, DEFAULT_BASE_URL } from "./api.mjs";
 import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
 import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
-import { characterPayload, isPlayerCharacter } from "./characters.mjs";
+import { characterPayload, isPlayerCharacter, partyOption } from "./characters.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -274,6 +274,27 @@ export class CampaignSync {
     const result = await this.api().sendCharacters({ id: game.world.id, title: game.world.title }, characters);
     this.#sentCharacters = json;
     return result;
+  }
+
+  /** The world's player characters, for choosing a party: [{ uuid, name, classes, level, playerName }] */
+  partyOptions() {
+    const users = game.users.contents;
+    return game.actors.filter((actor) => isPlayerCharacter(actor)).map((actor) => partyOption(actor, users));
+  }
+
+  /** The full character payloads for these actors, as POST /v1/foundry/characters takes them */
+  characterPayloads(actorUuids) {
+    const users = game.users.contents;
+    const labels = characterLabels();
+    return game.actors
+      .filter((actor) => isPlayerCharacter(actor) && actorUuids.includes(actor.uuid))
+      .map((actor) => characterPayload(actor, { users, labels, toText: htmlToText }));
+  }
+
+  /** Links this world to a campaign and pulls it into the journals */
+  async link(campaign) {
+    await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, cursor: 0 });
+    return this.pull({ full: true });
   }
 
   // Finds compendium entries by name in the packs the campaign uses

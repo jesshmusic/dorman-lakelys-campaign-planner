@@ -19,6 +19,22 @@ export const COMPENDIUM_PACKS = [
   "dnd5e.tables24",
 ];
 
+// How Dungeon Master Guru names each pack, in the order it lists them
+export const PACK_NAMES = {
+  "dnd-players-handbook.spells": { book: "Player's Handbook", label: "Spells" },
+  "dnd-players-handbook.equipment": { book: "Player's Handbook", label: "Equipment" },
+  "dnd-players-handbook.actors": { book: "Player's Handbook", label: "Creatures" },
+  "dnd-dungeon-masters-guide.equipment": { book: "Dungeon Master's Guide", label: "Magic items" },
+  "dnd-dungeon-masters-guide.tables": { book: "Dungeon Master's Guide", label: "Tables" },
+  "dnd-dungeon-masters-guide.actors": { book: "Dungeon Master's Guide", label: "Creatures" },
+  "dnd-monster-manual.actors": { book: "Monster Manual", label: "Monsters" },
+  "dnd-monster-manual.tables": { book: "Monster Manual", label: "Tables" },
+  "dnd5e.actors24": { book: "SRD 5.2", label: "Monsters" },
+  "dnd5e.spells24": { book: "SRD 5.2", label: "Spells" },
+  "dnd5e.equipment24": { book: "SRD 5.2", label: "Equipment and magic items" },
+  "dnd5e.tables24": { book: "SRD 5.2", label: "Tables" },
+};
+
 // Index fields read from each pack. Names, CRs and types only: stat blocks
 // and book text never leave Foundry.
 export const INDEX_FIELDS = [

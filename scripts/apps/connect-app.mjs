@@ -15,6 +15,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     actions: {
       checkToken: ConnectApp.#onCheckToken,
       linkCampaign: ConnectApp.#onLinkCampaign,
+      newCampaign: ConnectApp.#onNewCampaign,
       sendIndex: ConnectApp.#onSendIndex,
       disconnect: ConnectApp.#onDisconnect,
     },
@@ -79,13 +80,17 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     if (!this.#account) return "";
     const { user, premium } = this.#account;
     const header = `<p>Signed in as <strong>${escapeHtml(user.name ?? user.username)}</strong>.</p>`;
+    const newCampaign = `<button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>`;
     if (!premium) {
       return `${header}<p class="dlcp-notice dlcp-notice--warning">Campaign sync needs a premium Patreon membership linked to
         your Dungeon Master Guru account. <a href="https://www.patreon.com/c/DormanLakely" target="_blank" rel="noopener">Join on Patreon</a>,
-        then link it in your Dungeon Master Guru dashboard.</p>`;
+        then link it in your Dungeon Master Guru dashboard.</p>
+        <p>You can still plan a campaign: it's free, and it's saved on Dungeon Master Guru.</p>
+        <div class="dlcp-buttons">${newCampaign}</div>`;
     }
     if (!this.#campaigns?.length) {
-      return `${header}${this.#renderIndex()}<p>You don't have any campaigns yet. <a href="${escapeHtml(this.sync.baseUrl)}/app/campaigns/new" target="_blank" rel="noopener">Create one on Dungeon Master Guru</a>.</p>`;
+      return `${header}${this.#renderIndex()}<p>You don't have any campaigns yet. Start one here, step by step.</p>
+        <div class="dlcp-buttons">${newCampaign}</div>`;
     }
     const current = this.sync.linked?.uuid;
     const options = this.#campaigns
@@ -102,6 +107,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       <p class="hint">Linking creates a journal folder for the campaign and keeps it in sync.</p>
       <div class="dlcp-buttons">
         <button type="button" data-action="linkCampaign" ${this.#busy ? "disabled" : ""}><i class="fas fa-link"></i> Link campaign</button>
+        ${newCampaign}
       </div>
       ${this.#renderIndex()}`;
   }
@@ -137,8 +143,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     this.#busy = true;
     await this.render();
     try {
-      await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, cursor: 0 });
-      await this.sync.pull({ full: true });
+      await this.sync.link(campaign);
       ui.notifications.info(`Linked to ${campaign.name}. Its journals are in the "${campaign.name} (DM Guru)" folder.`);
       this.close();
       game.modules.get(MODULE_ID).api.openDashboard();
@@ -147,6 +152,11 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       this.#busy = false;
       this.render();
     }
+  }
+
+  static #onNewCampaign() {
+    this.close();
+    game.modules.get(MODULE_ID).api.openNewCampaign();
   }
 
   static async #onSendIndex() {

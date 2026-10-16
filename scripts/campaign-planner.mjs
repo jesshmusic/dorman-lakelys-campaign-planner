@@ -2,6 +2,7 @@ import { DEFAULT_BASE_URL } from "./api.mjs";
 import { CampaignSync } from "./sync.mjs";
 import { ConnectApp } from "./apps/connect-app.mjs";
 import { DashboardApp } from "./apps/dashboard-app.mjs";
+import { NewCampaignApp } from "./apps/new-campaign-app.mjs";
 import { DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
@@ -18,6 +19,13 @@ function openDashboard() {
 function openConnect() {
   connect ??= new ConnectApp();
   connect.render({ force: true });
+}
+
+let newCampaign = null;
+
+function openNewCampaign() {
+  newCampaign ??= new NewCampaignApp();
+  newCampaign.render({ force: true });
 }
 
 async function autoSync({ notifyErrors = false } = {}) {
@@ -53,6 +61,14 @@ Hooks.once("init", () => {
     config: false,
     type: String,
     default: "",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.setupDraft, {
+    name: "New campaign drafts",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
   });
 
   game.settings.register(MODULE_ID, SETTINGS.campaign, {
@@ -143,7 +159,7 @@ function watchCharacters() {
 }
 
 Hooks.once("ready", () => {
-  game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect };
+  game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect, openNewCampaign };
   if (!game.user.isGM) return;
 
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();

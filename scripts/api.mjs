@@ -7,12 +7,14 @@ export class DmGuruApiError extends Error {
    * @param {string} message
    * @param {number} status HTTP status, or 0 when the request never reached the server
    * @param {string|null} code e.g. "premium_required"
+   * @param {string[]} fields the fields a 422 says are wrong, e.g. ["target_level"]
    */
-  constructor(message, status, code = null) {
+  constructor(message, status, code = null, fields = []) {
     super(message);
     this.name = "DmGuruApiError";
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 
   get unauthorized() {
@@ -37,6 +39,14 @@ export class DmGuruApi {
   /** The account the token belongs to: { user, premium, patreon } */
   me() {
     return this.#request("GET", "/v1/foundry/me");
+  }
+
+  /**
+   * Creates a campaign from the setup guide (free, unlike sync):
+   * { uuid, name, slug, mode, status, syncVersion, url, party }
+   */
+  createCampaign(body) {
+    return this.#request("POST", "/v1/foundry/campaigns", body);
   }
 
   /** The DM's campaigns: [{ uuid, name, slug, mode, status, syncVersion }] */
@@ -89,7 +99,8 @@ export class DmGuruApi {
     const data = await response.json().catch(() => null);
     if (!response.ok) {
       const message = Array.isArray(data?.errors) ? data.errors.join(", ") : `Request failed (${response.status})`;
-      throw new DmGuruApiError(message, response.status, data?.code ?? null);
+      const fields = Array.isArray(data?.fields) ? data.fields : [];
+      throw new DmGuruApiError(message, response.status, data?.code ?? null, fields);
     }
     return data;
   }

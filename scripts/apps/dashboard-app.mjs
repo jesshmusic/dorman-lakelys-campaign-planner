@@ -18,6 +18,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     actions: {
       sync: DashboardApp.#onSync,
       connect: DashboardApp.#onConnect,
+      newCampaign: DashboardApp.#onNewCampaign,
       openJournals: DashboardApp.#onOpenJournals,
       advanceClock: DashboardApp.#onAdvanceClock,
       windBackClock: DashboardApp.#onWindBackClock,
@@ -42,7 +43,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   async _onFirstRender(context, options) {
     await super._onFirstRender?.(context, options);
-    this.#hookId = Hooks.on(SYNCED_HOOK, () => this.render());
+    // The linked campaign may have changed, so refresh the title too
+    this.#hookId = Hooks.on(SYNCED_HOOK, () => this.render({ window: { title: this.title } }));
   }
 
   async _onClose(options) {
@@ -66,7 +68,11 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   #renderUnlinked() {
     return `<p>Link this world to a Dungeon Master Guru campaign to see its sessions, threats, secrets and quests here.</p>
-      <div class="dlcp-buttons"><button type="button" data-action="connect"><i class="fas fa-link"></i> Connect</button></div>`;
+      <p>No campaign yet? Start one step by step: what kind of game, the pitch, the party, the world and your books.</p>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="connect"><i class="fas fa-link"></i> Connect</button>
+        <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>
+      </div>`;
   }
 
   #renderLinked() {
@@ -216,6 +222,10 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       this.#busy = false;
       this.render();
     }
+  }
+
+  static #onNewCampaign() {
+    game.modules.get(MODULE_ID).api.openNewCampaign();
   }
 
   static #onConnect() {

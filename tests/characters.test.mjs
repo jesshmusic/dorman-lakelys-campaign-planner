@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { characterPayload, isPlayerCharacter, playersOf } from "../scripts/characters.mjs";
+import { characterPayload, isPlayerCharacter, partyOption, playersOf } from "../scripts/characters.mjs";
 
 const gm = { id: "gm", name: "Gamemaster", isGM: true, character: null };
 const sam = { id: "sam", name: "Sam", isGM: false, character: { id: "akra" } };
@@ -116,6 +116,25 @@ test("sends only Player Character actors", () => {
   assert.equal(isPlayerCharacter({ type: "npc", ownership: { kim: 3 } }), false);
   assert.equal(isPlayerCharacter({ type: "vehicle" }), false);
   assert.equal(isPlayerCharacter({ type: "group" }), false);
+});
+
+test("lists a character for the party picker", () => {
+  assert.deepEqual(partyOption(akra, users), {
+    uuid: "Actor.akra000000000000",
+    name: "Akra",
+    classes: "Cleric",
+    level: 5,
+    playerName: "Sam",
+  });
+
+  const multiclass = {
+    ...akra,
+    id: "x",
+    ownership: {},
+    items: [item("class", "Fighter", { levels: 3 }), item("class", "Wizard", { levels: 2 })],
+  };
+  assert.equal(partyOption(multiclass, users).classes, "Fighter 3 / Wizard 2");
+  assert.equal(partyOption(multiclass, users).playerName, null);
 });
 
 test("sends who the character is and who plays it", () => {

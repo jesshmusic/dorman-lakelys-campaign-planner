@@ -57,6 +57,26 @@ export function isPlayerCharacter(actor) {
 }
 
 /**
+ * A line for the party list: who the character is and who plays them.
+ * @returns {{ uuid: string, name: string, classes: string, level: number|null, playerName: string|null }}
+ */
+export function partyOption(actor, users) {
+  const classes = list(actor.items).filter((item) => item.type === "class");
+  return {
+    uuid: actor.uuid,
+    name: actor.name,
+    classes: classes
+      .map((item) => `${item.name}${classes.length > 1 && item.system?.levels ? ` ${item.system.levels}` : ""}`)
+      .join(" / "),
+    level: number(actor.system?.details?.level),
+    playerName:
+      playersOf(actor, users)
+        .map((user) => user.name)
+        .join(", ") || null,
+  };
+}
+
+/**
  * What the module sends for one character.
  * @param {object} actor a dnd5e actor
  * @param {{ users?: object[], labels?: object, toText?: (html: string) => string }} options
