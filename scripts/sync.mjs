@@ -2,6 +2,7 @@ import { DmGuruApi, DEFAULT_BASE_URL } from "./api.mjs";
 import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
 import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
+import { characterPayload, isPlayerCharacter } from "./characters.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -15,6 +16,37 @@ function packVersion(pack) {
 
 // dnd5e's config values may be plain strings or { label }
 const configLabel = (value) => (typeof value === "string" ? value : value?.label);
+
+// Readable names for a character sheet's keys, e.g. "draconic" -> "Draconic"
+function characterLabels() {
+  const config = CONFIG.DND5E ?? {};
+  const label = (group) => (key) => configLabel(config[group]?.[key]) ?? key;
+  return {
+    ability: label("abilities"),
+    skill: label("skills"),
+    school: label("spellSchools"),
+    size: label("actorSizes"),
+    rarity: label("itemRarity"),
+    sense: label("senses"),
+    trait: (trait, key) => {
+      try {
+        return globalThis.dnd5e?.documents?.Trait?.keyLabel?.(key, { trait }) ?? key;
+      } catch {
+        return key;
+      }
+    },
+  };
+}
+
+// Plain text from a biography's HTML, keeping paragraph breaks. DOMParser
+// documents are inert: no scripts run, nothing loads.
+function htmlToText(html) {
+  if (!html) return "";
+  const body = new DOMParser().parseFromString(String(html), "text/html").body;
+  for (const br of body.querySelectorAll("br")) br.replaceWith("\n");
+  for (const block of body.querySelectorAll("p, div, li, h1, h2, h3, h4, h5, h6, blockquote")) block.append("\n\n");
+  return (body.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+}
 
 // Page title for a record
 function pageName(collection, record) {
@@ -34,6 +66,7 @@ function pageName(collection, record) {
  */
 export class CampaignSync {
   #pulling = null;
+  #sentCharacters = null;
 
   get linked() {
     const campaign = game.settings.get(MODULE_ID, SETTINGS.campaign);
@@ -132,6 +165,11 @@ export class CampaignSync {
       lastSynced: Date.now(),
     });
     Hooks.callAll(SYNCED_HOOK);
+    try {
+      await this.sendCharacters({ force: full });
+    } catch (error) {
+      console.warn("Dorman Lakely's Campaign Planner | Could not send the player characters", error);
+    }
     return changes;
   }
 
@@ -216,6 +254,26 @@ export class CampaignSync {
       sent.entries += result.count;
     }
     return sent;
+  }
+
+  /**
+   * Sends this world's player characters to Dungeon Master Guru, where
+   * campaigns pick their party from them. Only when they changed since the
+   * last send, unless `force`. Returns null when nothing was sent.
+   */
+  async sendCharacters({ force = false } = {}) {
+    if (!this.token) return null;
+    const users = game.users.contents;
+    const labels = characterLabels();
+    const characters = game.actors
+      .filter((actor) => isPlayerCharacter(actor))
+      .map((actor) => characterPayload(actor, { users, labels, toText: htmlToText }));
+    const json = JSON.stringify(characters);
+    if (!force && json === this.#sentCharacters) return null;
+
+    const result = await this.api().sendCharacters({ id: game.world.id, title: game.world.title }, characters);
+    this.#sentCharacters = json;
+    return result;
   }
 
   // Finds compendium entries by name in the packs the campaign uses

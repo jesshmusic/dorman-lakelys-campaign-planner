@@ -55,6 +55,11 @@ export class DmGuruApi {
     return this.#request("POST", `/v1/foundry/campaigns/${encodeURIComponent(campaignUuid)}/changes`, { changes });
   }
 
+  /** Replaces this world's player characters: { count, skipped } */
+  sendCharacters(world, characters) {
+    return this.#request("POST", "/v1/foundry/characters", { world, characters });
+  }
+
   /** The compendium packs Dungeon Master Guru has: { packs: { [packId]: { version, count } } } */
   compendiumStatus() {
     return this.#request("GET", "/v1/foundry/compendium");

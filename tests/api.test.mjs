@@ -61,6 +61,18 @@ test("turns error responses into DmGuruApiError with the server's message and co
   });
 });
 
+test("sends this world's player characters", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { count: 1, skipped: 0 } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const world = { id: "greyhawk", title: "Greyhawk" };
+  const characters = [{ uuid: "Actor.a", name: "Akra", sheet: {} }];
+
+  assert.equal((await api.sendCharacters(world, characters)).count, 1);
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/characters");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { world, characters });
+});
+
 test("reads which compendium packs Dungeon Master Guru has", async () => {
   const { calls, fetchImpl } = fakeFetch([{ body: { packs: {} } }]);
   const api = new DmGuruApi({ token: "t", fetchImpl });

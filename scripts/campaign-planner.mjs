@@ -124,6 +124,24 @@ async function sendCompendiumIndex() {
   }
 }
 
+// Player characters go to Dungeon Master Guru a few seconds after they change
+// (a level up, new gear), batched so a burst of edits is one send
+const sendCharactersSoon = foundry.utils.debounce(async () => {
+  if (!game.user.isGM || !sync.token) return;
+  try {
+    await sync.sendCharacters();
+  } catch (error) {
+    console.warn(`${MODULE_TITLE} | Could not send the player characters`, error);
+  }
+}, 5000);
+
+function watchCharacters() {
+  const actorChanged = (actor) => actor && sendCharactersSoon();
+  for (const hook of ["createActor", "updateActor", "deleteActor"]) Hooks.on(hook, actorChanged);
+  for (const hook of ["createItem", "updateItem", "deleteItem"]) Hooks.on(hook, (item) => actorChanged(item.parent));
+  Hooks.on("updateUser", () => sendCharactersSoon());
+}
+
 Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect };
   if (!game.user.isGM) return;
@@ -131,6 +149,8 @@ Hooks.once("ready", () => {
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
   scheduleAutoSync();
   sendCompendiumIndex();
+  sendCharactersSoon();
+  watchCharacters();
 });
 
 // Foundry v13+ scene controls: groups and tools are objects keyed by name
