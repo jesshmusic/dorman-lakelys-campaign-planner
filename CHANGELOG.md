@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **Campaign Planner:** a full planner in Foundry for campaigns in the world, with the same tabs as Dungeon Master Guru: Overview with Getting started, Party, Story (threats and factions), Quests, Cast, Places, Secrets with the Three Clue Rule check, and Sessions with the eight steps of prep. Add, edit and delete everything; deleting clears anything that pointed to it. Drag monsters, items and roll tables in from your compendiums. Dungeon Master Guru campaigns show read-only.
+- The Journal sidebar's buttons are now Plan, Run, New, Open and help.
 - **Plan in your world, no account needed:** the New campaign guide can create the campaign right in this world, with the same journals and template structure. The Campaign Dashboard works on it, and can add threats, secrets, quests, NPCs, places, factions and sessions.
 - **Easy to find:** Campaign, New, Open and help buttons at the top of the Journal sidebar. **Open** switches between campaigns in this world and on Dungeon Master Guru.
 - **How it works:** a help window that explains planning in Foundry and on Dungeon Master Guru, step by step. It opens once the first time a GM loads the module.

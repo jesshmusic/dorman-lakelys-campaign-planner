@@ -4,6 +4,7 @@ import { mergeChange } from "./merge.mjs";
 import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
 import { characterPayload, isPlayerCharacter, partyOption } from "./characters.mjs";
 import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
+import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -340,6 +341,58 @@ export class CampaignSync {
     if (record.error) return record;
     await this.#saveRecord(collection, record);
     return record;
+  }
+
+  /** Every record as { collection: record[] }, for the planner */
+  recordLists() {
+    return Object.fromEntries(Object.entries(this.records()).map(([collection, map]) => [collection, [...map.values()]]));
+  }
+
+  /** Saves a record of this world's campaign: a new one, or an edit */
+  async saveLocal(collection, record) {
+    if (!this.isLocal) throw new Error("Edit this campaign on Dungeon Master Guru; it syncs here.");
+    if (collection === "campaign") {
+      // The name is also the folder's and the setting's
+      await game.settings.set(MODULE_ID, SETTINGS.campaign, { ...this.linked, name: record.name });
+      if (this.folder && this.folder.name !== record.name) await this.folder.update({ name: record.name });
+    }
+    return this.#saveRecord(collection, record);
+  }
+
+  /** Deletes a record of this world's campaign, and every reference to it */
+  async deleteLocal(collection, id) {
+    if (!this.isLocal) throw new Error("Edit this campaign on Dungeon Master Guru; it syncs here.");
+    const { remove, updates } = planDelete(this.recordLists(), collection, id);
+    for (const { collection: target, id: targetId } of remove) {
+      const record = this.records()[target]?.get(String(targetId));
+      const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === target);
+      const page = record && entry?.pages.find((p) => flag(p, "uuid") === record.uuid);
+      if (page) await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
+    }
+    for (const update of updates) await this.#saveRecord(update.collection, update.record);
+    Hooks.callAll(SYNCED_HOOK);
+  }
+
+  /**
+   * A book reference for a compendium entry, actor, item or table dropped on
+   * the planner: the campaign's existing one, or a new one.
+   */
+  async referenceFor(document) {
+    const existing = [...this.records().references.values()].find((r) => r.foundryUuid === document.uuid);
+    if (existing) return existing;
+    const reference = referenceFromDocument(
+      {
+        uuid: document.uuid,
+        name: document.name,
+        documentName: document.documentName,
+        type: document.type,
+        system: document.system,
+        pack: document.pack ?? null,
+      },
+      () => foundry.utils.randomID(16),
+    );
+    await this.#saveRecord("references", reference);
+    return reference;
   }
 
   /** The campaigns that live in this world: [{ uuid, name }] */

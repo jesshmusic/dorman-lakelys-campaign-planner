@@ -18,6 +18,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
     actions: {
       newCampaign: HelpApp.#onNewCampaign,
       dashboard: HelpApp.#onDashboard,
+      plan: HelpApp.#onPlan,
       connect: HelpApp.#onConnect,
     },
   };
@@ -63,8 +64,22 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         the ones on Dungeon Master Guru when you're connected. The one you pick is the one the Dashboard shows; the others'
         journals stay where they are.</p>
 
+      <h2>Plan it with the Campaign Planner</h2>
+      <p>Click <strong>Plan</strong> in the Journal sidebar. The planner has a tab for each part of the campaign:</p>
+      <ul>
+        <li><strong>Overview:</strong> the brief, and a Getting started list of what to do next.</li>
+        <li><strong>Party:</strong> pick the player characters from this world.</li>
+        <li><strong>Story:</strong> threats, each with grim portents and a clock, and factions.</li>
+        <li><strong>Quests:</strong> main and side quests, who gives them, where, and the reward.</li>
+        <li><strong>Cast</strong> and <strong>Places:</strong> NPCs, and places inside other places.</li>
+        <li><strong>Secrets:</strong> clues grouped by what they reveal, with a warning when one has fewer than three.</li>
+        <li><strong>Sessions:</strong> prep each session with the Lazy Dungeon Master's eight steps. Drag monsters,
+          items and roll tables straight in from your compendiums; they become links in the session's journal page.</li>
+      </ul>
+      <p>Everything is saved to the campaign's journal pages, so you can also read and share them as journals.</p>
+
       <h2>Run it with the Campaign Dashboard</h2>
-      <p>Open it with the <strong>Campaign</strong> button in the Journal sidebar, or from the scene controls
+      <p>Click <strong>Run</strong> in the Journal sidebar, or open it from the scene controls
         (<i class="fas fa-bookmark"></i> Journal Notes, then <i class="fas fa-scroll"></i>).</p>
       <ul>
         <li><strong>Threats:</strong> click + when a threat moves closer to its goal, and tick its grim portents as they
@@ -74,6 +89,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Session log:</strong> jot down what happened, then click Mark played.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
+        <li><strong>On Dungeon Master Guru?</strong> The planner shows the campaign too; plan it on the website, and it
+          syncs here.</li>
       </ul>
 
       <h2>Plan on Dungeon Master Guru</h2>
@@ -102,6 +119,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
 
       <div class="dlcp-buttons">
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>
+        <button type="button" data-action="plan"><i class="fas fa-feather-alt"></i> Campaign Planner</button>
         <button type="button" data-action="dashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>
       </div>`;
     return container;
@@ -113,6 +131,10 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
 
   static #onNewCampaign() {
     game.modules.get(MODULE_ID).api.openNewCampaign();
+  }
+
+  static #onPlan() {
+    game.modules.get(MODULE_ID).api.openPlanner();
   }
 
   static #onDashboard() {

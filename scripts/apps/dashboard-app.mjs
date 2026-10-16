@@ -19,7 +19,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       icon: "fas fa-scroll",
       resizable: true,
       controls: [
-        { icon: "fas fa-feather-alt", label: "New campaign", action: "newCampaign" },
+        { icon: "fas fa-feather-alt", label: "Plan it (Campaign Planner)", action: "plan" },
+        { icon: "fas fa-plus", label: "New campaign", action: "newCampaign" },
         { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
         { icon: "fas fa-link", label: "Connect to Dungeon Master Guru", action: "connect" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
@@ -31,6 +32,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       connect: DashboardApp.#onConnect,
       newCampaign: DashboardApp.#onNewCampaign,
       help: DashboardApp.#onHelp,
+      plan: DashboardApp.#onPlan,
       openCampaign: DashboardApp.#onOpenCampaign,
       add: DashboardApp.#onAdd,
       openJournals: DashboardApp.#onOpenJournals,
@@ -120,6 +122,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       <header class="dlcp-toolbar">
         ${status}
         <span class="dlcp-buttons">
+          <button type="button" data-action="plan"><i class="fas fa-feather-alt"></i> Plan</button>
           <button type="button" data-action="openJournals"><i class="fas fa-book-open"></i> Journals</button>
           ${local ? "" : `<button type="button" data-action="sync" ${this.#busy ? "disabled" : ""}><i class="fas fa-sync"></i> Sync now</button>`}
         </span>
@@ -287,6 +290,10 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onNewCampaign() {
     game.modules.get(MODULE_ID).api.openNewCampaign();
+  }
+
+  static #onPlan() {
+    game.modules.get(MODULE_ID).api.openPlanner();
   }
 
   static #onOpenCampaign() {

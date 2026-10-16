@@ -41,6 +41,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       startOver: NewCampaignApp.#onStartOver,
       connect: NewCampaignApp.#onConnect,
       openDashboard: NewCampaignApp.#onOpenDashboard,
+      openPlanner: NewCampaignApp.#onOpenPlanner,
     },
   };
 
@@ -369,19 +370,16 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const { campaign } = this.#created;
     return `
       <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
-      <p>It lives in this world. Its journals are in the "${escapeHtml(campaign.name)}" folder, and the Campaign Dashboard
+      <p>It lives in this world. Its journals are in the "${escapeHtml(campaign.name)}" folder, and the Campaign Planner
         is open.</p>
       <h3>What to do next</h3>
-      <ol>
-        <li><strong>Give your villain a threat.</strong> On the Dashboard, add a threat with grim portents and a clock that
-          fills if the heroes do nothing.</li>
-        <li><strong>Add the cast and places.</strong> Use the Dashboard's Add button for NPCs, places and factions.</li>
-        <li><strong>Hide some secrets.</strong> Add clues the party could find, about three for each thing worth learning.</li>
-        <li><strong>Prep the first session.</strong> Open its journal page in the Sessions entry and write a strong start.</li>
-      </ol>
+      <p>Open the <strong>Campaign Planner</strong> to fill it in. Its Overview tab has a Getting started list: choose
+        the party, give your villain a threat, add the cast, hide some secrets, and prep the first session. Run it at
+        the table from the <strong>Campaign Dashboard</strong>.</p>
       <p class="dlcp-muted">Want AI help, or to plan from anywhere? You can move this campaign to Dungeon Master Guru later.
         <button type="button" class="dlcp-link-button" data-action="help">How it works</button></p>
       <div class="dlcp-buttons">
+        <button type="button" data-action="openPlanner"><i class="fas fa-feather-alt"></i> Campaign Planner</button>
         <button type="button" data-action="openDashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>
       </div>`;
   }
@@ -482,6 +480,10 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     game.modules.get(MODULE_ID).api.openConnect();
   }
 
+  static #onOpenPlanner() {
+    game.modules.get(MODULE_ID).api.openPlanner();
+  }
+
   static #onOpenDashboard() {
     game.modules.get(MODULE_ID).api.openDashboard();
   }
@@ -510,7 +512,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       await this.#writeDraft(null);
       this.#created = { campaign, local: true };
       this.#focusHeading = true;
-      game.modules.get(MODULE_ID).api.openDashboard();
+      game.modules.get(MODULE_ID).api.openPlanner({ tab: "overview", sessionId: null });
     } catch (error) {
       this.#error = `Couldn't create the campaign: ${error.message}`;
     } finally {

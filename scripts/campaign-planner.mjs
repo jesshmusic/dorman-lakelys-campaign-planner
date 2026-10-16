@@ -5,6 +5,7 @@ import { DashboardApp } from "./apps/dashboard-app.mjs";
 import { NewCampaignApp } from "./apps/new-campaign-app.mjs";
 import { HelpApp } from "./apps/help-app.mjs";
 import { openCampaignPicker } from "./apps/campaign-picker.mjs";
+import { PlannerApp } from "./apps/planner-app.mjs";
 import { DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
@@ -28,6 +29,14 @@ let newCampaign = null;
 function openNewCampaign() {
   newCampaign ??= new NewCampaignApp();
   newCampaign.render({ force: true });
+}
+
+let planner = null;
+
+// The Campaign Planner, optionally on a tab or a session's prep
+function openPlanner(options = {}) {
+  planner ??= new PlannerApp();
+  planner.show(options);
 }
 
 let help = null;
@@ -176,7 +185,15 @@ function watchCharacters() {
 }
 
 Hooks.once("ready", () => {
-  game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect, openNewCampaign, openHelp, openCampaignPicker };
+  game.modules.get(MODULE_ID).api = {
+    sync,
+    openDashboard,
+    openPlanner,
+    openConnect,
+    openNewCampaign,
+    openHelp,
+    openCampaignPicker,
+  };
   if (!game.user.isGM) return;
 
   // The first time a GM loads the module, show how it works
@@ -215,14 +232,16 @@ Hooks.on("renderJournalDirectory", (_app, html) => {
   const row = document.createElement("div");
   row.className = "dlcp-directory action-buttons flexrow";
   row.innerHTML = `
-    <button type="button" data-dlcp="dashboard"><i class="fas fa-scroll"></i> Campaign</button>
-    <button type="button" data-dlcp="new"><i class="fas fa-feather-alt"></i> New</button>
-    <button type="button" data-dlcp="open"><i class="fas fa-folder-open"></i> Open</button>
+    <button type="button" data-dlcp="plan" data-tooltip="Plan the campaign"><i class="fas fa-feather-alt"></i> Plan</button>
+    <button type="button" data-dlcp="dashboard" data-tooltip="Run it at the table"><i class="fas fa-scroll"></i> Run</button>
+    <button type="button" data-dlcp="new" data-tooltip="Start a new campaign"><i class="fas fa-plus"></i> New</button>
+    <button type="button" data-dlcp="open" data-tooltip="Open another campaign"><i class="fas fa-folder-open"></i> Open</button>
     <button type="button" data-dlcp="help" class="dlcp-icon-button" aria-label="Campaign Planner help" data-tooltip="Campaign Planner help">
       <i class="fas fa-circle-question"></i></button>`;
   row.addEventListener("click", (event) => {
     const action = event.target.closest("[data-dlcp]")?.dataset.dlcp;
-    if (action === "dashboard") openDashboard();
+    if (action === "plan") openPlanner();
+    else if (action === "dashboard") openDashboard();
     else if (action === "new") openNewCampaign();
     else if (action === "open") openCampaignPicker();
     else if (action === "help") openHelp();

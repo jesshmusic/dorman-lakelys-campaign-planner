@@ -7,6 +7,7 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 **In your world (free, no account).** Click **New** in the Journal sidebar. A step-by-step guide walks you through what kind of game, the pitch, your table (party, levels, sessions), the world and its truths, and your books, explaining why each step matters. Click **Create in this world**, and you get:
 
 - **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it. A story arc starts with its sessions, three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.
+- **Campaign Planner:** a tab for each part of the campaign, with editing, a Three Clue Rule check, and eight-step session prep. Drag monsters, items and roll tables in from your compendiums.
 - **Campaign Dashboard:** your at-the-table view.
   - The next session and its log.
   - Threat clocks you can advance, and grim portents you can tick off.
@@ -29,7 +30,8 @@ The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 
 | Button | What it does |
 |---|---|
-| **Campaign** | Opens the Campaign Dashboard. Also in the scene controls, under Journal Notes. |
+| **Plan** | Opens the Campaign Planner: Overview, Party, Story, Quests, Cast, Places, Secrets and Sessions, with the Lazy Dungeon Master's eight steps of session prep. Drag monsters, items and roll tables in from your compendiums. |
+| **Run** | Opens the Campaign Dashboard, for the table. Also in the scene controls, under Journal Notes. |
 | **New** | Starts a new campaign, step by step. Your answers are kept as you go. |
 | **Open** | Opens another campaign: one in this world, or one on Dungeon Master Guru when you're connected. |
 | **?** | How it works. |

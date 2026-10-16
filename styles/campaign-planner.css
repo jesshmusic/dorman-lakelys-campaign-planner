@@ -368,3 +368,173 @@
 .dlcp-picker .dlcp-check {
   margin: 0.2rem 0;
 }
+
+/* Campaign Planner */
+
+.dlcp-planner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dlcp-planner-body h2 {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  font-size: 1.1rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.dlcp-planner-body h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.dlcp-tabs {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-bottom: 0.35rem;
+}
+
+.dlcp-tabs button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-tabs button[aria-current="page"] {
+  border-color: #972c1d;
+  font-weight: bold;
+}
+
+.dlcp-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dlcp-card {
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+
+.dlcp-card p {
+  margin: 0.25rem 0;
+}
+
+.dlcp-card-header {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.dlcp-record-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.15rem;
+}
+
+.dlcp-icon-button {
+  flex: 0 0 auto;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  width: auto;
+}
+
+.dlcp-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dlcp-lanes {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dlcp-lane h2 {
+  margin-top: 0.25rem;
+}
+
+.dlcp-quest-meta {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dlcp-quest-meta select {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dlcp-tree .dlcp-tree {
+  border-left: 2px solid var(--color-border-light-tertiary, #b5b3a4);
+  margin: 0.4rem 0 0 1rem;
+  padding-left: 0.6rem;
+}
+
+.dlcp-tree > li {
+  margin-bottom: 0.4rem;
+}
+
+.dlcp-grid {
+  display: grid;
+  gap: 0 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dlcp-planner-body .form-group.stacked textarea,
+.dlcp-prep-step textarea {
+  min-height: 3.5rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.dlcp-prep-step {
+  margin-top: 0.5rem;
+}
+
+.dlcp-checks {
+  display: grid;
+  gap: 0.15rem 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dlcp-drop {
+  border: 2px dashed var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  margin-top: 0.4rem;
+  padding: 0.6rem;
+  text-align: center;
+}
+
+.dlcp-drop:hover {
+  border-color: #972c1d;
+}
+
+.dlcp-sessions,
+.dlcp-planner-body .dlcp-party {
+  width: 100%;
+}
+
+.dlcp-steps-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.dlcp-sticky {
+  background: var(--color-cool-5, rgba(0, 0, 0, 0.6));
+  bottom: 0;
+  padding: 0.4rem 0;
+  position: sticky;
+}
