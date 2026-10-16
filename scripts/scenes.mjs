@@ -1,5 +1,6 @@
-// Scene thumbnails sent to Dungeon Master Guru, so a campaign's maps show
-// there while Foundry is closed. No Foundry globals, so it can be tested in Node.
+// Scene thumbnails sent to Dungeon Master Guru, so the DM can pick maps there
+// and see them while Foundry is closed. No Foundry globals, so it can be
+// tested in Node.
 
 // What Scene#createThumbnail makes: about 30-70 KB a scene
 export const THUMBNAIL = { width: 640, height: 360, format: "image/webp", quality: 0.8 };
@@ -10,14 +11,15 @@ const THUMBNAIL_FORMAT = 1;
 const SCENE_UUID = /^Scene\.[A-Za-z0-9]{16}$/;
 
 /**
- * The scenes a campaign uses: each place's map and each session's maps, once each.
- * @param {{ locations?: object[], sessions?: object[] }} records
+ * The scenes a campaign uses: each place's map, and each session's and
+ * quest's maps, once each.
+ * @param {{ locations?: object[], sessions?: object[], quests?: object[] }} records
  * @returns {string[]} scene UUIDs
  */
-export function campaignSceneUuids({ locations = [], sessions = [] }) {
+export function campaignSceneUuids({ locations = [], sessions = [], quests = [] }) {
   const uuids = [
     ...locations.map((location) => location.foundrySceneUuid),
-    ...sessions.flatMap((session) => (session.foundryScenes ?? []).map((scene) => scene.uuid)),
+    ...[...sessions, ...quests].flatMap((owner) => (owner.foundryScenes ?? []).map((scene) => scene.uuid)),
   ];
   return [...new Set(uuids.filter((uuid) => SCENE_UUID.test(uuid ?? "")))];
 }

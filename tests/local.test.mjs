@@ -169,6 +169,11 @@ test("adds records from the forms", () => {
   ]);
 
   assert.equal(newRecord("quests", { name: "Find the crypt", kind: "nonsense" }, { id }).kind, "side");
+  const quest = newRecord("quests", { name: "Find the crypt" }, { id });
+  assert.deepEqual(
+    [quest.foundryScenes, quest.links, quest.rewardCurrency, quest.rewardXp, quest.milestone],
+    [[], [], {}, null, false],
+  );
   assert.equal(newRecord("npcs", { name: "Kalvar", role: "bbeg" }, { id }).role, "bbeg");
   assert.equal(newRecord("npcs", { name: "Kalvar", role: "dragon" }, { id }).role, "neutral");
   assert.deepEqual(newRecord("locations", { name: "Crypt", features: "Cold\nDark" }, { id }).features, [
@@ -208,6 +213,28 @@ test("saves Dashboard changes to local records", () => {
 
   assert.equal(applyLocalChange("fronts", { clockFilled: 1 }, { clockFilled: 2 }, { now }).clockFilled, 2);
   assert.equal(applyLocalChange("quests", { status: "available" }, { status: "active" }, { now }).status, "active");
+  assert.deepEqual(
+    applyLocalChange(
+      "quests",
+      { name: "Find the crypt", status: "active" },
+      {
+        foundryScenes: [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Crypt" }],
+        rewardCurrency: { gp: 50 },
+        rewardXp: 300,
+        milestone: true,
+        name: "Changed",
+      },
+      { now },
+    ),
+    {
+      name: "Find the crypt",
+      status: "active",
+      foundryScenes: [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Crypt" }],
+      rewardCurrency: { gp: 50 },
+      rewardXp: 300,
+      milestone: true,
+    },
+  );
   assert.deepEqual(
     applyLocalChange(
       "sessions",

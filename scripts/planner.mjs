@@ -1,7 +1,7 @@
 // Editing a campaign that lives in this world: forms for each kind of record,
 // checks that match Dungeon Master Guru's, deleting without leaving dangling
-// references, and session prep links. No Foundry globals, so it can be
-// tested in Node.
+// references, and the links that session prep and quest plans make. No
+// Foundry globals, so it can be tested in Node.
 
 import { formatCr, PACK_NAMES } from "./compendium.mjs";
 import { NPC_ROLES } from "./local.mjs";
@@ -13,6 +13,7 @@ export const THREE_CLUES = 3;
 const MAX_NAME = 120;
 const MAX_SCENES = 20;
 const MAX_COINS = 1000000;
+const MAX_XP = 1000000;
 const MAX_QUANTITY = 9999;
 export const COINS = ["pp", "gp", "ep", "sp", "cp"];
 // Foundry ids, as Dungeon Master Guru checks them
@@ -28,7 +29,8 @@ const ROLE_LABELS = {
   neutral: "Neutral",
 };
 
-// The session link type for each collection, as Dungeon Master Guru names them
+// The link type for each collection, as Dungeon Master Guru names them. Sessions
+// link to any of them; quests to NPCs and references (monsters and reward items).
 export const LINK_TYPES = {
   secrets: "CampaignSecret",
   locations: "CampaignLocation",
@@ -110,7 +112,6 @@ export const EDIT_FORMS = {
       },
       { name: "act", label: "Act", type: "number", min: 1, max: 20 },
       { name: "description", label: "What it's about", type: "textarea" },
-      { name: "reward", label: "Reward", type: "text" },
       { name: "giverNpcId", label: "Given by", type: "records", collection: "npcs", blank: "No one" },
       { name: "locationId", label: "Where", type: "records", collection: "locations", blank: "Anywhere" },
       { name: "parentId", label: "Part of", type: "records", collection: "quests", blank: "Nothing (its own quest)" },
@@ -317,11 +318,14 @@ export function actorChange(uuid, name) {
   return { foundryActorUuid: uuid, foundryActorName: String(name ?? "Stat block").slice(0, MAX_NAME) };
 }
 
-/** A session's maps with one added (once), or { error } */
-export function addSessionScene(scenes, uuid, name) {
+/**
+ * A session's or quest's maps with one added (once), or { error }.
+ * @param {string} noun what the maps are for, for the error: "session" or "quest"
+ */
+export function addScene(scenes, uuid, name, noun = "session") {
   if (!SCENE_UUID.test(uuid ?? "")) return { error: "That isn't a scene from this world." };
   if ((scenes ?? []).some((scene) => scene.uuid === uuid)) return { scenes: scenes ?? [] };
-  if ((scenes ?? []).length >= MAX_SCENES) return { error: `Up to ${MAX_SCENES} maps a session.` };
+  if ((scenes ?? []).length >= MAX_SCENES) return { error: `Up to ${MAX_SCENES} maps a ${noun}.` };
   return { scenes: [...(scenes ?? []), { uuid, name: String(name ?? "Map").slice(0, MAX_NAME) }] };
 }
 
@@ -338,18 +342,40 @@ export function coinsFrom(values) {
   return { coins };
 }
 
-/** A session with one link's quantity set (1 or blank clears it), or { error } */
-export function setLinkQuantity(session, linkId, value) {
+/** A session or quest with one link's quantity set (1 or blank clears it), or { error } */
+export function setLinkQuantity(record, linkId, value) {
   const quantity = whole(value);
   if (Number.isNaN(quantity) || (quantity !== null && (quantity < 1 || quantity > MAX_QUANTITY))) {
     return { error: `Quantity must be a whole number from 1 to ${MAX_QUANTITY}.` };
   }
   return {
     record: {
-      ...session,
-      links: (session.links ?? []).map((link) =>
+      ...record,
+      links: (record.links ?? []).map((link) =>
         link.id === linkId ? { ...link, quantity: quantity && quantity > 1 ? quantity : null } : link,
       ),
+    },
+  };
+}
+
+/**
+ * A quest after its reward is saved: the reward notes, coins (coin_pp, ...),
+ * XP and milestone. Or { error }.
+ */
+export function applyQuestReward(quest, values) {
+  const { coins, error } = coinsFrom(values);
+  if (error) return { error };
+  const xp = whole(values.rewardXp);
+  if (Number.isNaN(xp) || (xp !== null && (xp < 0 || xp > MAX_XP))) {
+    return { error: `XP must be a whole number from 0 to ${MAX_XP.toLocaleString("en")}.` };
+  }
+  return {
+    record: {
+      ...quest,
+      reward: text(values.reward),
+      rewardCurrency: coins,
+      rewardXp: xp,
+      milestone: values.milestone === "on" || values.milestone === true,
     },
   };
 }
@@ -419,20 +445,20 @@ function linkDetail(collection, record) {
 const linkName = (collection, record) => (collection === "secrets" ? record.text : record.name);
 
 /**
- * A session with its links of one kind set to these records, keeping the
- * links it already had to them.
- * @param {object} session
+ * A session or quest with its links of one kind set to these records,
+ * keeping the links it already had to them.
+ * @param {object} owner the session or quest
  * @param {string} collection e.g. "secrets"
  * @param {string[]} ids the records to link, in order
  * @param {object[]} records the collection's records
  * @param {() => string} id makes a new link id
  */
-export function setSessionLinks(session, collection, ids, records, id) {
+export function setLinks(owner, collection, ids, records, id) {
   const type = LINK_TYPES[collection];
   const byId = new Map(records.map((record) => [record.id, record]));
-  const keep = (session.links ?? []).filter((link) => link.linkableType !== type);
+  const keep = (owner.links ?? []).filter((link) => link.linkableType !== type);
   const existing = new Map(
-    (session.links ?? []).filter((link) => link.linkableType === type).map((link) => [link.linkableId, link]),
+    (owner.links ?? []).filter((link) => link.linkableType === type).map((link) => [link.linkableId, link]),
   );
   const wanted = ids
     .filter((linkableId) => byId.has(linkableId))
@@ -452,12 +478,12 @@ export function setSessionLinks(session, collection, ids, records, id) {
         quantity: before?.quantity ?? null,
       };
     });
-  return { ...session, links: [...keep, ...wanted].map((link, position) => ({ ...link, position })) };
+  return { ...owner, links: [...keep, ...wanted].map((link, position) => ({ ...link, position })) };
 }
 
-/** The ids a session links to, for one collection */
-export const linkedIds = (session, collection) =>
-  (session.links ?? []).filter((link) => link.linkableType === LINK_TYPES[collection]).map((link) => link.linkableId);
+/** The ids a session or quest links to, for one collection */
+export const linkedIds = (owner, collection) =>
+  (owner.links ?? []).filter((link) => link.linkableType === LINK_TYPES[collection]).map((link) => link.linkableId);
 
 /**
  * A book reference for something dragged in from a compendium or the world:
@@ -524,15 +550,18 @@ export function planDelete(store, collection, id) {
   } else if (collection === "references") {
     clear("npcs", ["statBlockReferenceId"]);
   }
+  // Sessions and quests drop their links to it
   const type = LINK_TYPES[collection];
   if (type) {
-    for (const session of store.sessions ?? []) {
-      if (session.id === id) continue;
-      const links = (session.links ?? []).filter((link) => !(link.linkableType === type && link.linkableId === id));
-      if (links.length !== (session.links ?? []).length) {
-        const already = updates.find((u) => u.collection === "sessions" && u.record.id === session.id);
-        if (already) already.record.links = links;
-        else updates.push({ collection: "sessions", record: { ...session, links } });
+    for (const owners of ["sessions", "quests"]) {
+      for (const owner of store[owners] ?? []) {
+        if (owners === collection && owner.id === id) continue;
+        const links = (owner.links ?? []).filter((link) => !(link.linkableType === type && link.linkableId === id));
+        if (links.length !== (owner.links ?? []).length) {
+          const already = updates.find((u) => u.collection === owners && u.record.id === owner.id);
+          if (already) already.record.links = links;
+          else updates.push({ collection: owners, record: { ...owner, links } });
+        }
       }
     }
   }

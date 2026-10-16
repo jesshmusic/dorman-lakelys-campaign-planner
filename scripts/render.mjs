@@ -65,7 +65,54 @@ export function currencyText(currency) {
 const linkFact = (label, html) => (html ? `<p><strong>${escapeHtml(label)}:</strong> ${html}</p>` : "");
 
 const MONSTER_CATEGORIES = ["monster"];
-const TREASURE_CATEGORIES = ["magic_item", "equipment", "table"];
+// Anything that isn't a monster: what session prep and quest plans list as treasure
+const TREASURE_CATEGORIES = ["magic_item", "equipment", "table", "spell", "other"];
+
+/**
+ * Lists a session's or quest's links: a book entry links to its compendium
+ * entry (with how many), a place shows its map, an NPC their actor, and
+ * Dungeon Master Guru's SRD monsters and items link to the compendium entry
+ * of the same name.
+ */
+function linkLists(owner, { references = [], compendiumUuid, recordOf }) {
+  const withDetail = (html, detail) => (detail ? `${html} (${escapeHtml(detail)})` : html);
+  const line = (link) => {
+    if (link.linkableType === "CampaignReference") {
+      const reference = references.find((r) => r.id === link.linkableId);
+      if (!reference) return text(link.name);
+      const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
+      return withDetail(`${referenceLink(reference)}${quantity}`, reference.challengeRating && `CR ${reference.challengeRating}`);
+    }
+    if (link.linkableType === "CampaignLocation" || link.linkableType === "CampaignNpc") {
+      const record = recordOf?.(link.linkableType === "CampaignLocation" ? "locations" : "npcs", link.linkableId);
+      const extra =
+        link.linkableType === "CampaignLocation"
+          ? compendiumLink(record?.foundrySceneUuid, record?.foundrySceneName ?? "Map")
+          : compendiumLink(record?.foundryActorUuid, record?.foundryActorName ?? link.name);
+      return `${withDetail(escapeHtml(link.name), link.detail)}${extra ? ` · ${extra}` : ""}`;
+    }
+    const kind = { Monster: "monster", Item: "item" }[link.linkableType];
+    const uuid = kind && compendiumUuid?.(kind, link.name);
+    const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
+    return withDetail(`${compendiumLink(uuid, link.name) ?? escapeHtml(link.name)}${quantity}`, link.detail);
+  };
+  const of = (...types) => (owner.links ?? []).filter((link) => types.includes(link.linkableType));
+  const books = (categories) =>
+    of("CampaignReference").filter((link) => categories.includes(references.find((r) => r.id === link.linkableId)?.category));
+  const list = (links) => (links.length ? `<ul>${links.map((l) => `<li>${line(l)}</li>`).join("")}</ul>` : "");
+  return {
+    of: (...types) => list(of(...types)),
+    monsters: () => list([...of("Monster"), ...books(MONSTER_CATEGORIES)]),
+    treasure: () => list([...of("Item"), ...books(TREASURE_CATEGORIES)]),
+  };
+}
+
+// Scenes as content links: click one to view it, or drag it
+const mapLinks = (scenes) =>
+  (scenes ?? [])
+    .map((scene) => compendiumLink(scene.uuid, scene.name))
+    .filter(Boolean)
+    .join(", ");
 
 /**
  * Renders a record as journal page HTML.
@@ -157,8 +204,11 @@ const RENDERERS = {
       section("Notes", para(front.description)),
     ].join(""),
 
-  quests: (quest, { nameOf }) =>
-    [
+  quests: (quest, context) => {
+    const { nameOf } = context;
+    const links = linkLists(quest, context);
+    const maps = mapLinks(quest.foundryScenes);
+    return [
       fact("Type", quest.kind === "main" ? "Main quest" : "Side quest"),
       fact("Status", QUEST_STATUSES[quest.status] ?? quest.status),
       fact("Act", quest.act),
@@ -170,9 +220,20 @@ const RENDERERS = {
       fact("Where", nameOf("locations", quest.locationId)),
       fact("Part of", nameOf("quests", quest.parentId)),
       para(quest.description),
-      fact("Reward", quest.reward),
+      section("Maps", maps ? `<p>${maps}</p>` : ""),
+      section("NPCs", links.of("CampaignNpc")),
+      section("Monsters", links.monsters()),
+      section(
+        "Reward",
+        para(quest.reward) +
+          fact("Coins", currencyText(quest.rewardCurrency)) +
+          fact("XP", quest.rewardXp) +
+          (quest.milestone ? "<p><strong>Milestone:</strong> the party levels up when it's done.</p>" : "") +
+          links.treasure(),
+      ),
       section("Notes", para(quest.notes)),
-    ].join(""),
+    ].join("");
+  },
 
   secrets: (secret, { nameOf }) =>
     [
@@ -181,39 +242,8 @@ const RENDERERS = {
       `<p><em>${secret.revealed ? `Revealed${secret.revealedSessionId ? ` in ${escapeHtml(nameOf("sessions", secret.revealedSessionId) ?? "a session")}` : ""}` : "Not revealed yet"}</em></p>`,
     ].join(""),
 
-  sessions: (session, { references, compendiumUuid, recordOf }) => {
-    const withDetail = (html, detail) => (detail ? `${html} (${escapeHtml(detail)})` : html);
-    const linkLine = (link) => {
-      if (link.linkableType === "CampaignReference") {
-        const reference = references.find((r) => r.id === link.linkableId);
-        if (!reference) return text(link.name);
-        const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
-        return withDetail(
-          `${referenceLink(reference)}${quantity}`,
-          reference.challengeRating && `CR ${reference.challengeRating}`,
-        );
-      }
-      // A place's map, or an NPC's actor, next to its name
-      if (link.linkableType === "CampaignLocation" || link.linkableType === "CampaignNpc") {
-        const record = recordOf?.(link.linkableType === "CampaignLocation" ? "locations" : "npcs", link.linkableId);
-        const extra =
-          link.linkableType === "CampaignLocation"
-            ? compendiumLink(record?.foundrySceneUuid, record?.foundrySceneName ?? "Map")
-            : compendiumLink(record?.foundryActorUuid, record?.foundryActorName ?? link.name);
-        return `${withDetail(escapeHtml(link.name), link.detail)}${extra ? ` · ${extra}` : ""}`;
-      }
-      // Monsters and items from Dungeon Master Guru's SRD link to the compendium entry of the same name
-      const kind = { Monster: "monster", Item: "item" }[link.linkableType];
-      const uuid = kind && compendiumUuid?.(kind, link.name);
-      return withDetail(compendiumLink(uuid, link.name) ?? escapeHtml(link.name), link.detail);
-    };
-    const linksOf = (...types) => session.links.filter((link) => types.includes(link.linkableType));
-    const bookLinks = (categories) =>
-      linksOf("CampaignReference").filter((link) =>
-        categories.includes(references.find((r) => r.id === link.linkableId)?.category),
-      );
-    const linkList = (links) =>
-      links.length ? `<ul>${links.map((l) => `<li>${linkLine(l)}</li>`).join("")}</ul>` : "";
+  sessions: (session, context) => {
+    const links = linkLists(session, context);
     return [
       fact("Status", SESSION_STATUSES[session.status] ?? session.status),
       fact("Date", session.scheduledOn),
@@ -221,25 +251,13 @@ const RENDERERS = {
       section("1. Review the characters", para(session.characterNotes)),
       section("2. Strong start", para(session.strongStart)),
       section("3. Potential scenes", list(session.scenes)),
-      section("4. Secrets and clues", linkList(linksOf("CampaignSecret"))),
-      section(
-        "5. Fantastic locations",
-        linkList(linksOf("CampaignLocation")) +
-          linkFact(
-            "Maps",
-            (session.foundryScenes ?? [])
-              .map((scene) => compendiumLink(scene.uuid, scene.name))
-              .filter(Boolean)
-              .join(", "),
-          ),
-      ),
-      section("6. Important NPCs", linkList(linksOf("CampaignNpc"))),
-      section("7. Relevant monsters", linkList([...linksOf("Monster"), ...bookLinks(MONSTER_CATEGORIES)])),
+      section("4. Secrets and clues", links.of("CampaignSecret")),
+      section("5. Fantastic locations", links.of("CampaignLocation") + linkFact("Maps", mapLinks(session.foundryScenes))),
+      section("6. Important NPCs", links.of("CampaignNpc")),
+      section("7. Relevant monsters", links.monsters()),
       section(
         "8. Treasure",
-        para(session.treasure) +
-          fact("Coins", currencyText(session.treasureCurrency)) +
-          linkList([...linksOf("Item"), ...bookLinks(TREASURE_CATEGORIES)]),
+        para(session.treasure) + fact("Coins", currencyText(session.treasureCurrency)) + links.treasure(),
       ),
       section("Session log", para(session.log)),
       section("Recap", para(session.recap)),

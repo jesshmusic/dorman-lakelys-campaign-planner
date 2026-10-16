@@ -85,6 +85,13 @@ const BLANKS = {
     parentId: null,
     giverNpcId: null,
     locationId: null,
+    // What the quest needs and gives: its maps ({ uuid, name }[]), links to its
+    // NPCs, monsters and reward items, its reward coins, and XP or a milestone
+    foundryScenes: [],
+    links: [],
+    rewardCurrency: {},
+    rewardXp: null,
+    milestone: false,
   }),
   secrets: (r) => ({
     text: r.text,
@@ -392,7 +399,7 @@ export function applyLocalChange(collection, record, attributes, { now }) {
   }
   const allowed = {
     fronts: ["clockFilled", "portents"],
-    quests: ["status"],
+    quests: ["status", "foundryScenes", "rewardCurrency", "rewardXp", "milestone"],
     sessions: ["log", "recap", "status", "foundryScenes", "treasureCurrency"],
     locations: ["foundrySceneUuid", "foundrySceneName"],
     npcs: ["foundryActorUuid", "foundryActorName"],

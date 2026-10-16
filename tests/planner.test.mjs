@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import {
   EDIT_FORMS,
   actorChange,
-  addSessionScene,
+  addScene,
   coinsFrom,
   sceneChange,
   setLinkQuantity,
   applyBrief,
   applyEdit,
+  applyQuestReward,
   applySessionPrep,
   formValues,
   gettingStarted,
@@ -16,7 +17,7 @@ import {
   planDelete,
   referenceFromDocument,
   revelationGroups,
-  setSessionLinks,
+  setLinks,
 } from "../scripts/planner.mjs";
 
 const ids = () => {
@@ -36,7 +37,15 @@ const store = {
   ],
   quests: [
     { id: "q1", name: "Act I", parentId: null, giverNpcId: "n2", locationId: "l2" },
-    { id: "q2", name: "Find the crypt", parentId: "q1" },
+    {
+      id: "q2",
+      name: "Find the crypt",
+      parentId: "q1",
+      links: [
+        { id: "k3", linkableType: "CampaignNpc", linkableId: "n1", name: "Kalvar" },
+        { id: "k4", linkableType: "CampaignReference", linkableId: "r1", name: "Ghoul" },
+      ],
+    },
   ],
   fronts: [
     {
@@ -208,7 +217,7 @@ test("groups secrets by what they reveal, for the Three Clue Rule", () => {
 });
 
 test("sets a session's links of one kind, keeping the others", () => {
-  const session = setSessionLinks(store.sessions[0], "secrets", ["s3", "s2", "missing"], store.secrets, ids());
+  const session = setLinks(store.sessions[0], "secrets", ["s3", "s2", "missing"], store.secrets, ids());
 
   assert.deepEqual(
     session.links.map((l) => [l.id, l.linkableType, l.linkableId, l.name, l.position]),
@@ -219,7 +228,7 @@ test("sets a session's links of one kind, keeping the others", () => {
     ],
   );
   assert.deepEqual(linkedIds(session, "secrets"), ["s3", "s2"]);
-  assert.deepEqual(linkedIds(setSessionLinks(session, "secrets", [], store.secrets, ids()), "secrets"), []);
+  assert.deepEqual(linkedIds(setLinks(session, "secrets", [], store.secrets, ids()), "secrets"), []);
 });
 
 test("makes a book reference from a dragged compendium entry", () => {
@@ -263,7 +272,7 @@ test("makes a book reference from a dragged compendium entry", () => {
   );
 });
 
-test("deleting an NPC clears who pointed at them, and session links", () => {
+test("deleting an NPC clears who pointed at them, and session and quest links", () => {
   const plan = planDelete(store, "npcs", "n1");
 
   assert.deepEqual(plan.remove, [{ collection: "npcs", id: "n1" }]);
@@ -272,6 +281,7 @@ test("deleting an NPC clears who pointed at them, and session links", () => {
     [
       ["fronts", "t1"],
       ["sessions", "sess1"],
+      ["quests", "q2"],
     ],
   );
   assert.equal(plan.updates[0].record.npcId, null);
@@ -279,6 +289,26 @@ test("deleting an NPC clears who pointed at them, and session links", () => {
     plan.updates[1].record.links.map((l) => l.linkableId),
     ["s2"],
   );
+  assert.deepEqual(
+    plan.updates[2].record.links.map((l) => l.linkableId),
+    ["r1"],
+  );
+});
+
+test("deleting a book reference drops it from quests", () => {
+  const plan = planDelete(store, "references", "r1");
+  const quest = plan.updates.find((u) => u.collection === "quests");
+
+  assert.deepEqual(
+    quest.record.links.map((l) => l.linkableId),
+    ["n1"],
+  );
+});
+
+test("deleting a quest clears its sub-quests without touching its own links", () => {
+  const plan = planDelete(store, "quests", "q2");
+
+  assert.deepEqual(plan.updates, []);
 });
 
 test("deleting other records clears what pointed at them", () => {
@@ -338,11 +368,63 @@ test("sets an NPC's actor from the world or a compendium", () => {
   assert.deepEqual(actorChange(""), { foundryActorUuid: null, foundryActorName: null });
 });
 
-test("adds a map to a session once", () => {
-  const first = addSessionScene([], "Scene.QdI6Ix83ypmPq4lc", "Mountain Pass").scenes;
+test("adds a map to a session or quest once", () => {
+  const first = addScene([], "Scene.QdI6Ix83ypmPq4lc", "Mountain Pass").scenes;
   assert.deepEqual(first, [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Mountain Pass" }]);
-  assert.equal(addSessionScene(first, "Scene.QdI6Ix83ypmPq4lc", "Again").scenes.length, 1);
-  assert.deepEqual(addSessionScene(first, "Actor.x"), { error: "That isn't a scene from this world." });
+  assert.equal(addScene(first, "Scene.QdI6Ix83ypmPq4lc", "Again").scenes.length, 1);
+  assert.deepEqual(addScene(first, "Actor.x"), { error: "That isn't a scene from this world." });
+
+  const full = Array.from({ length: 20 }, (_, i) => ({ uuid: `Scene.${String(i).padStart(16, "a")}`, name: "Map" }));
+  assert.deepEqual(addScene(full, "Scene.QdI6Ix83ypmPq4lc", "One more", "quest"), { error: "Up to 20 maps a quest." });
+});
+
+test("saves a quest's reward: notes, coins, XP and milestone", () => {
+  const quest = { id: "q", name: "Find the crypt", reward: null, rewardCurrency: {}, rewardXp: null, milestone: false };
+  const { record } = applyQuestReward(quest, {
+    reward: " The mayor's thanks ",
+    coin_gp: "250",
+    coin_sp: "",
+    rewardXp: "900",
+    milestone: "on",
+  });
+
+  assert.deepEqual(
+    [record.reward, record.rewardCurrency, record.rewardXp, record.milestone],
+    ["The mayor's thanks", { gp: 250 }, 900, true],
+  );
+  assert.equal(record.name, "Find the crypt");
+
+  const cleared = applyQuestReward(record, {}).record;
+  assert.deepEqual(
+    [cleared.reward, cleared.rewardCurrency, cleared.rewardXp, cleared.milestone],
+    [null, {}, null, false],
+  );
+});
+
+test("checks a quest's XP and coins", () => {
+  assert.deepEqual(applyQuestReward({}, { rewardXp: "-1" }), { error: "XP must be a whole number from 0 to 1,000,000." });
+  assert.deepEqual(applyQuestReward({}, { rewardXp: "lots" }), {
+    error: "XP must be a whole number from 0 to 1,000,000.",
+  });
+  assert.deepEqual(applyQuestReward({}, { coin_gp: "1.5" }), {
+    error: "Coins must be whole numbers from 0 to 1,000,000.",
+  });
+});
+
+test("links a quest's NPCs, keeping its monsters and items", () => {
+  const quest = {
+    links: [{ id: "k1", linkableType: "CampaignReference", linkableId: "r1", name: "Gem", quantity: 2 }],
+  };
+  const updated = setLinks(quest, "npcs", ["n2", "missing"], store.npcs, ids());
+
+  assert.deepEqual(
+    updated.links.map((l) => [l.linkableType, l.linkableId, l.name, l.detail, l.quantity]),
+    [
+      ["CampaignReference", "r1", "Gem", undefined, 2],
+      ["CampaignNpc", "n2", "Thorne", "Ally", null],
+    ],
+  );
+  assert.deepEqual(linkedIds(updated, "npcs"), ["n2"]);
 });
 
 test("reads coins, leaving out the empty ones", () => {
@@ -374,7 +456,7 @@ test("keeps an item's quantity when the session's links change", () => {
     { id: "r1", name: "Gem", citation: "SRD 5.2" },
     { id: "r2", name: "Rope", citation: "SRD 5.2" },
   ];
-  const updated = setSessionLinks(session, "references", ["r1", "r2"], references, ids());
+  const updated = setLinks(session, "references", ["r1", "r2"], references, ids());
 
   assert.deepEqual(
     updated.links.map((l) => [l.linkableId, l.quantity]),

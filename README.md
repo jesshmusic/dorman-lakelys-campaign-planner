@@ -7,12 +7,12 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 **In your world (free, no account).** Click **New** in the Journal sidebar. A step-by-step guide walks you through what kind of game, the pitch, your table (party, levels, sessions), the world and its truths, and your books, explaining why each step matters. Click **Create in this world**, and you get:
 
 - **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it. A story arc starts with its sessions, three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.
-- **Campaign Planner:** a tab for each part of the campaign, with editing, a Three Clue Rule check, and eight-step session prep. Drag monsters, items and roll tables in from your compendiums.
+- **Campaign Planner:** a tab for each part of the campaign, with editing, a Three Clue Rule check, eight-step session prep, and a plan for each quest: its maps, NPCs, monsters and reward. Drag monsters, items and roll tables in from your compendiums.
 - **Campaign Dashboard:** your at-the-table view.
   - The next session and its log.
   - Threat clocks you can advance, and grim portents you can tick off.
   - Secrets and clues to reveal.
-  - Quests and their status.
+  - Quests and their status, with an active quest's maps, monsters and reward.
   - Add threats, secrets, quests, NPCs, places, factions and sessions as you go.
 
 **On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
@@ -21,7 +21,7 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 - **Two-way sync** ([Patreon](https://www.patreon.com/c/DormanLakely) premium): the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
 - **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
 - **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
-- **Your maps** (with sync): a thumbnail of each scene your campaign uses as a map, so you can see them on the website while Foundry is closed.
+- **Your maps** (with sync): a thumbnail of each scene in your world, so you can pick maps on the website and see them while Foundry is closed.
 
 The **How it works** window (the **?** button in the Journal sidebar) explains both, step by step. It opens once the first time a GM loads the module.
 

@@ -164,8 +164,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         <h2>${escapeHtml(session.displayTitle)}${session.status === "played" ? " (played)" : ""}</h2>
         ${session.strongStart ? `<p><strong>Strong start:</strong> ${escapeHtml(session.strongStart)}</p>` : ""}
         ${scenes}
-        ${this.#renderMaps(session)}
-        ${this.#renderTreasure(session)}
+        ${this.#renderMaps(session.foundryScenes)}
+        ${this.#renderTreasure(session, { label: "Treasure", coins: session.treasureCurrency })}
         <label for="dlcp-log"><strong>Session log</strong></label>
         <textarea id="dlcp-log" rows="5" placeholder="What happened? Names you made up, promises, loose ends…">${escapeHtml(session.log ?? "")}</textarea>
         <div class="dlcp-buttons">
@@ -175,9 +175,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       </section>`;
   }
 
-  // The session's maps: view one yourself, or activate it for the players
-  #renderMaps(session) {
-    const maps = session.foundryScenes ?? [];
+  // A session's or quest's maps: view one yourself, or activate it for the players
+  #renderMaps(scenes) {
+    const maps = scenes ?? [];
     if (!maps.length) return "";
     return `<p class="dlcp-maps"><strong>Maps:</strong> ${maps
       .map(
@@ -190,22 +190,35 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       .join("")}</p>`;
   }
 
-  // Coins and items to hand out; drag an item onto a character sheet to give it
-  #renderTreasure(session) {
+  // A session's or quest's book references of some kind, as links you can drag
+  #referenceLinks(owner, wanted) {
     const references = this.sync.records().references;
-    const items = (session.links ?? [])
+    return (owner.links ?? [])
       .filter((link) => link.linkableType === "CampaignReference")
       .map((link) => ({ link, reference: references.get(String(link.linkableId)) }))
-      .filter(({ reference }) => reference && reference.category !== "monster");
-    const coins = currencyText(session.treasureCurrency);
-    if (!items.length && !coins) return "";
-    const item = ({ link, reference }) =>
-      `${
-        reference.foundryUuid
-          ? `<a class="content-link" draggable="true" data-uuid="${escapeHtml(reference.foundryUuid)}" data-link><i class="fas fa-suitcase"></i>${escapeHtml(reference.name)}</a>`
-          : escapeHtml(reference.name)
-      }${link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : ""}`;
-    return `<p><strong>Treasure:</strong> ${[coins && escapeHtml(coins), ...items.map(item)].filter(Boolean).join(", ")}</p>
+      .filter(({ reference }) => reference && wanted(reference.category))
+      .map(
+        ({ link, reference }) =>
+          `${
+            reference.foundryUuid
+              ? `<a class="content-link" draggable="true" data-uuid="${escapeHtml(reference.foundryUuid)}" data-link><i class="fas fa-${reference.category === "monster" ? "user" : "suitcase"}"></i>${escapeHtml(reference.name)}</a>`
+              : escapeHtml(reference.name)
+          }${link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : ""}`,
+      );
+  }
+
+  // Coins and items to hand out; drag an item onto a character sheet to give it.
+  // A quest's reward adds its XP or milestone.
+  #renderTreasure(owner, { label, coins, xp = null, milestone = false }) {
+    const items = this.#referenceLinks(owner, (category) => category !== "monster");
+    const parts = [
+      currencyText(coins) && escapeHtml(currencyText(coins)),
+      ...items,
+      xp && `${escapeHtml(xp)} XP`,
+      milestone && "level up (milestone)",
+    ].filter(Boolean);
+    if (!parts.length) return "";
+    return `<p><strong>${escapeHtml(label)}:</strong> ${parts.join(", ")}</p>
       ${items.length ? `<p class="dlcp-muted">Drag an item onto a character's sheet to give it to them.</p>` : ""}`;
   }
 
@@ -272,16 +285,34 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   #renderQuests(quests) {
     if (!quests.length && !this.sync.isLocal) return "";
+    // An active quest shows what it needs at the table: its maps, monsters to drag onto them, and its reward
+    const details = (quest) => {
+      if (quest.status !== "active") return "";
+      const monsters = this.#referenceLinks(quest, (category) => category === "monster");
+      return [
+        this.#renderMaps(quest.foundryScenes),
+        monsters.length ? `<p><strong>Monsters:</strong> ${monsters.join(", ")}</p>` : "",
+        this.#renderTreasure(quest, {
+          label: "Reward",
+          coins: quest.rewardCurrency,
+          xp: quest.rewardXp,
+          milestone: quest.milestone,
+        }),
+      ].join("");
+    };
     const items = quests
       .map(
         (quest) => `
-        <li>
-          <span>${escapeHtml(quest.name)}</span>
-          <select class="dlcp-quest-status" data-uuid="${escapeHtml(quest.uuid)}" aria-label="Status of ${escapeHtml(quest.name)}">
-            ${Object.entries(QUEST_STATUSES)
-              .map(([value, label]) => `<option value="${value}" ${quest.status === value ? "selected" : ""}>${label}</option>`)
-              .join("")}
-          </select>
+        <li class="dlcp-quest">
+          <div class="dlcp-quest-row">
+            <span>${escapeHtml(quest.name)}</span>
+            <select class="dlcp-quest-status" data-uuid="${escapeHtml(quest.uuid)}" aria-label="Status of ${escapeHtml(quest.name)}">
+              ${Object.entries(QUEST_STATUSES)
+                .map(([value, label]) => `<option value="${value}" ${quest.status === value ? "selected" : ""}>${label}</option>`)
+                .join("")}
+            </select>
+          </div>
+          ${details(quest)}
         </li>`,
       )
       .join("");

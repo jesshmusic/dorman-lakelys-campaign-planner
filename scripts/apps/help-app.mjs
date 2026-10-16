@@ -70,7 +70,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Overview:</strong> the brief, and a Getting started list of what to do next.</li>
         <li><strong>Party:</strong> pick the player characters from this world.</li>
         <li><strong>Story:</strong> threats, each with grim portents and a clock, and factions.</li>
-        <li><strong>Quests:</strong> main and side quests, who gives them, where, and the reward.</li>
+        <li><strong>Quests:</strong> main and side quests, who gives them and where. Click <strong>Plan the quest</strong>
+          to give it maps, the NPCs involved, monsters dragged in from your compendiums, and a reward: items (with how
+          many), coins, and XP or a milestone.</li>
         <li><strong>Cast</strong> and <strong>Places:</strong> NPCs, and places inside other places.</li>
         <li><strong>Secrets:</strong> clues grouped by what they reveal, with a warning when one has fewer than three.</li>
         <li><strong>Sessions:</strong> prep each session with the Lazy Dungeon Master's eight steps. Drag monsters,
@@ -88,7 +90,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Threats:</strong> click + when a threat moves closer to its goal, and tick its grim portents as they
           come true.</li>
         <li><strong>Secrets and clues:</strong> click Reveal when the party learns one.</li>
-        <li><strong>Quests:</strong> set each one's status as the party takes it on and finishes it.</li>
+        <li><strong>Quests:</strong> set each one's status as the party takes it on and finishes it. An active quest
+          shows its maps, its monsters to drag onto a map, and its reward to hand out.</li>
         <li><strong>Session log:</strong> jot down what happened, then click Mark played.</li>
         <li><strong>Maps and treasure:</strong> show the session's maps to yourself, or activate one for the players.
           Drag treasure items onto a character's sheet to hand them out.</li>
@@ -116,8 +119,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           Changes you make at the table, like clocks, secrets, quests and the session log, go back to the website.</li>
         <li><strong>Your books and your party:</strong> monsters and treasure you pick from your compendiums become links
           you can drag onto a scene, and your players' character sheets are there while you prep.</li>
-        <li><strong>Your maps</strong> (with sync): a thumbnail of each scene your campaign uses as a map goes to the
-          website, so you can see your maps there while Foundry is closed.</li>
+        <li><strong>Your maps</strong> (with sync): a thumbnail of each scene in this world goes to the website, so you
+          can pick a place's, session's or quest's maps there, and see them while Foundry is closed.</li>
       </ul>
 
       <h2>Your books</h2>

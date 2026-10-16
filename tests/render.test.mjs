@@ -299,3 +299,48 @@ test("shows a session's maps, coins and item quantities", () => {
   assert.match(html, /<strong>Coins:<\/strong> 150 gp/);
   assert.match(html, /\{Ruby\} ×3/);
 });
+
+test("renders a quest's maps, NPCs, monsters and reward", () => {
+  const quest = {
+    name: "Clear the crypt",
+    kind: "side",
+    status: "active",
+    giverNpcId: "7",
+    locationId: "2",
+    description: "Something stirs below the chapel.",
+    reward: "The temple's favour",
+    rewardCurrency: { gp: 250, sp: 40 },
+    rewardXp: 900,
+    milestone: true,
+    foundryScenes: [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "The Crypt" }],
+    links: [
+      { linkableType: "CampaignNpc", linkableId: "7", name: "Kalvar the Hollow", detail: "BBEG" },
+      { linkableType: "CampaignReference", linkableId: "9", name: "Cult Fanatic" },
+      { linkableType: "Monster", linkableId: "m1", name: "Ghoul", detail: "CR 1" },
+      { linkableType: "CampaignReference", linkableId: "10", name: "Bag of Holding", quantity: 2 },
+      { linkableType: "Item", linkableId: "i1", name: "Rope", quantity: 3 },
+    ],
+  };
+  const html = renderRecord("quests", quest, {
+    ...context,
+    compendiumUuid: (kind, name) => (kind === "monster" && name === "Ghoul" ? "Compendium.dnd5e.monsters.Actor.ghoul0000000000" : null),
+  });
+
+  assert.match(html, /<strong>Type:<\/strong> Side quest/);
+  assert.match(html, /<strong>Quest giver:<\/strong> Kalvar the Hollow/);
+  assert.match(html, /<h3>Maps<\/h3><p>@UUID\[Scene\.QdI6Ix83ypmPq4lc\]\{The Crypt\}<\/p>/);
+  assert.match(html, /<h3>NPCs<\/h3><ul><li>Kalvar the Hollow \(BBEG\)<\/li><\/ul>/);
+  assert.match(html, /<h3>Monsters<\/h3><ul><li>@UUID\[Compendium\.dnd5e\.monsters\.Actor\.ghoul0000000000\]\{Ghoul\} \(CR 1\)<\/li><li>Cult Fanatic \(Monster Manual p\. 92\)<\/li><\/ul>/);
+  assert.match(html, /<h3>Reward<\/h3><p>The temple&#39;s favour<\/p>/);
+  assert.match(html, /<strong>Coins:<\/strong> 250 gp, 40 sp/);
+  assert.match(html, /<strong>XP:<\/strong> 900/);
+  assert.match(html, /<strong>Milestone:<\/strong> the party levels up when it's done\./);
+  assert.match(html, /<li>Rope ×3<\/li>/);
+  assert.match(html, /@UUID\[Compendium\.dnd-dungeon-masters-guide\.equipment\.Item\.abc123\]\{Bag of Holding\} ×2/);
+});
+
+test("leaves out a quest's empty sections", () => {
+  const html = renderRecord("quests", { name: "Find the crypt", kind: "main", status: "available" }, context);
+
+  for (const heading of ["Maps", "NPCs", "Monsters", "Reward"]) assert.ok(!html.includes(`<h3>${heading}</h3>`), heading);
+});

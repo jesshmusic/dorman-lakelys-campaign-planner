@@ -94,6 +94,16 @@ test("sends a scene's thumbnail", async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), { world, scene });
 });
 
+test("removes a scene that's gone from the world", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: {} }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  await api.deleteScene("dev", "Scene.QdI6Ix83ypmPq4lc");
+
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/scenes?world=dev&uuid=Scene.QdI6Ix83ypmPq4lc");
+  assert.equal(calls[0].init.method, "DELETE");
+});
+
 test("reads which compendium packs Dungeon Master Guru has", async () => {
   const { calls, fetchImpl } = fakeFetch([{ body: { packs: {} } }]);
   const api = new DmGuruApi({ token: "t", fetchImpl });

@@ -10,6 +10,33 @@ import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTION
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
 
+// The cache key of an image Foundry has loaded, or null
+function loadedKey(src) {
+  if (PIXI.Assets.cache.has(src)) return src;
+  const busted = foundry.utils.getCacheBustURL(src);
+  return busted && PIXI.Assets.cache.has(busted) ? busted : null;
+}
+
+// Makes a scene's thumbnail, then unloads the images it loaded that weren't
+// already in use, so sending a whole world's scenes doesn't fill the memory
+async function sceneThumbnail(scene) {
+  const sources = [
+    ...new Set(
+      [
+        ...scene.levels.contents.flatMap((level) => [level.background?.src, level.foreground?.src]),
+        ...scene.tiles.contents.map((tile) => tile.texture?.src),
+      ].filter(Boolean),
+    ),
+  ];
+  const before = new Set(sources.filter((src) => loadedKey(src)));
+  try {
+    return (await scene.createThumbnail(THUMBNAIL)).thumb;
+  } finally {
+    const loaded = sources.filter((src) => !before.has(src)).map(loadedKey).filter(Boolean);
+    await Promise.allSettled(loaded.map((key) => PIXI.Assets.unload(key)));
+  }
+}
+
 // Changes when the pack's package updates, or when what the module sends changes
 function packVersion(pack) {
   const { packageName, packageType } = pack.metadata;
@@ -74,6 +101,8 @@ export class CampaignSync {
   #sentCharacters = null;
   // { uuid -> version } of the scene thumbnails Dungeon Master Guru has
   #sentScenes = null;
+  #sendingScenes = null;
+  #scenesAgain = false;
 
   get linked() {
     const campaign = game.settings.get(MODULE_ID, SETTINGS.campaign);
@@ -297,37 +326,58 @@ export class CampaignSync {
   }
 
   /**
-   * Sends a thumbnail of each scene the linked campaign uses (place maps and
-   * session maps) to Dungeon Master Guru, so they show there while Foundry is
-   * closed. Only scenes it doesn't have yet, or that changed since; asks it
-   * what it has the first time, or with `force`.
-   * @returns {Promise<{ sent: number }|null>} null when there's nothing to send to
+   * Sends Dungeon Master Guru a thumbnail of each scene in this world with a
+   * map image, so the DM can pick maps there and see them while Foundry is
+   * closed. Only scenes it doesn't have yet, or whose map changed, the
+   * campaign's own first; and removes the ones gone from the world. Asks what
+   * it has the first time, or with `force`. One send at a time: a call during
+   * a send runs again after it.
+   * @returns {Promise<{ sent: number, removed: number }|null>} null when not connected
    */
-  async sendSceneThumbnails({ force = false } = {}) {
-    if (!this.ready) return null;
-    const store = this.records();
-    const uuids = campaignSceneUuids({
-      locations: [...store.locations.values()],
-      sessions: [...store.sessions.values()],
+  sendSceneThumbnails({ force = false } = {}) {
+    if (!game.user.isGM || !this.token) return Promise.resolve(null);
+    if (this.#sendingScenes) {
+      this.#scenesAgain = true;
+      return this.#sendingScenes;
+    }
+    this.#sendingScenes = this.#sendScenes(force).finally(() => {
+      this.#sendingScenes = null;
+      if (this.#scenesAgain) {
+        this.#scenesAgain = false;
+        this.sendSceneThumbnails().catch((error) =>
+          console.warn("Dorman Lakely's Campaign Planner | Could not send the scene thumbnails", error),
+        );
+      }
     });
-    const scenes = uuids
-      .map((uuid) => game.scenes.get(uuid.split(".")[1]))
-      .filter((scene) => scene && hasThumbnail(scene.toObject()));
-    if (!scenes.length) return { sent: 0 };
+    return this.#sendingScenes;
+  }
 
+  async #sendScenes(force) {
     const api = this.api();
+    const worldId = game.world.id;
     if (force || !this.#sentScenes) {
-      const { scenes: saved } = await api.sceneStatus(game.world.id);
+      const { scenes: saved } = await api.sceneStatus(worldId);
       this.#sentScenes = new Map(Object.entries(saved ?? {}).map(([uuid, scene]) => [uuid, scene.version]));
     }
-    const world = { id: game.world.id, title: game.world.title };
+    const store = this.records();
+    const used = new Set(
+      campaignSceneUuids({ locations: [...store.locations.values()], sessions: [...store.sessions.values()], quests: [...store.quests.values()] }),
+    );
+    const scenes = game.scenes.contents.filter((scene) => hasThumbnail(scene._source));
+    const toSend = scenes
+      .map((scene) => ({ scene, version: sceneVersion(scene._source) }))
+      .filter(({ scene, version }) => this.#sentScenes.get(scene.uuid) !== version)
+      .sort((a, b) => Number(used.has(b.scene.uuid)) - Number(used.has(a.scene.uuid)));
+    if (toSend.length >= 5) {
+      ui.notifications.info(`Sending thumbnails of ${toSend.length} scenes to Dungeon Master Guru.`);
+    }
+
+    const world = { id: worldId, title: game.world.title };
     let sent = 0;
-    for (const scene of scenes) {
-      const version = sceneVersion(scene.toObject());
-      if (this.#sentScenes.get(scene.uuid) === version) continue;
+    for (const { scene, version } of toSend) {
       let thumbnail;
       try {
-        ({ thumb: thumbnail } = await scene.createThumbnail(THUMBNAIL));
+        thumbnail = await sceneThumbnail(scene);
       } catch (error) {
         console.warn(`Dorman Lakely's Campaign Planner | Could not make a thumbnail of ${scene.name}`, error);
         continue;
@@ -336,7 +386,20 @@ export class CampaignSync {
       this.#sentScenes.set(scene.uuid, version);
       sent += 1;
     }
-    return { sent };
+
+    // Scenes deleted from the world, or that no longer have a map image
+    const current = new Set(scenes.map((scene) => scene.uuid));
+    let removed = 0;
+    for (const uuid of [...this.#sentScenes.keys()].filter((key) => !current.has(key))) {
+      try {
+        await api.deleteScene(worldId, uuid);
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+      this.#sentScenes.delete(uuid);
+      removed += 1;
+    }
+    return { sent, removed };
   }
 
   /** The world's player characters, for choosing a party: [{ uuid, name, classes, level, playerName }] */

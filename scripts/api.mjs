@@ -85,6 +85,12 @@ export class DmGuruApi {
     return this.#request("POST", "/v1/foundry/scenes", { world, scene });
   }
 
+  /** Removes a scene that's gone from the world, with its thumbnail */
+  deleteScene(worldId, uuid) {
+    const query = new URLSearchParams({ world: worldId, uuid });
+    return this.#request("DELETE", `/v1/foundry/scenes?${query}`);
+  }
+
   /** The compendium packs Dungeon Master Guru has: { packs: { [packId]: { version, count } } } */
   compendiumStatus() {
     return this.#request("GET", "/v1/foundry/compendium");

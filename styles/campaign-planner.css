@@ -82,8 +82,21 @@
   width: auto;
 }
 
-.dlcp-quests li {
+.dlcp-quests li.dlcp-quest {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dlcp-quest-row {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
   justify-content: space-between;
+}
+
+.dlcp-quest p {
+  margin: 0 0 0 1rem;
 }
 
 .dlcp-front {
@@ -591,4 +604,16 @@
   align-items: center;
   display: inline-flex;
   gap: 0.15rem;
+}
+
+/* Quest plans */
+
+.dlcp-quest-plan > .dlcp-card-header h2 {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.dlcp-quest-plan > .dlcp-card-header select {
+  flex: 0 0 auto;
+  width: auto;
 }

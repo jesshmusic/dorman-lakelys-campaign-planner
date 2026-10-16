@@ -42,6 +42,15 @@ test("lists the scenes a campaign uses, once each", () => {
   assert.deepEqual(uuids, [PASS, MAP]);
 });
 
+test("includes the maps of quests", () => {
+  const uuids = campaignSceneUuids({
+    locations: [{ foundrySceneUuid: PASS }],
+    quests: [{ foundryScenes: [{ uuid: MAP }, { uuid: PASS }] }, {}],
+  });
+
+  assert.deepEqual(uuids, [PASS, MAP]);
+});
+
 test("lists nothing for a campaign without maps", () => {
   assert.deepEqual(campaignSceneUuids({}), []);
 });

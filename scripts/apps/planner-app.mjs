@@ -1,4 +1,4 @@
-import { clockSvg, escapeHtml } from "../render.mjs";
+import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { newRecord } from "../local.mjs";
 import {
@@ -6,18 +6,19 @@ import {
   COINS,
   EDIT_FORMS,
   actorChange,
-  addSessionScene,
+  addScene,
   sceneChange,
   setLinkQuantity,
   QUEST_STATUSES,
   applyBrief,
   applyEdit,
+  applyQuestReward,
   applySessionPrep,
   formValues,
   gettingStarted,
   linkedIds,
   revelationGroups,
-  setSessionLinks,
+  setLinks,
 } from "../planner.mjs";
 
 const TABS = [
@@ -37,6 +38,8 @@ const ROLE_LABELS = { bbeg: "BBEG", villain: "Villain", lieutenant: "Lieutenant"
 const STATUS_LABELS = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 const SESSION_STATUS_LABELS = { planned: "Planned", prepped: "Prepped", played: "Played" };
 const NOUNS = { fronts: "threat", quests: "quest", npcs: "NPC", locations: "place", factions: "faction", secrets: "secret" };
+// Book references that are treasure: anything but a monster
+const TREASURE = ["magic_item", "equipment", "table", "spell", "other"];
 
 // The Lazy DM's eight steps, as the website words them
 const PREP_STEPS = {
@@ -69,7 +72,8 @@ const field = (f, value) => {
  * The Campaign Planner: the whole campaign in one window, with the same tabs
  * as Dungeon Master Guru's planner. A campaign that lives in this world can
  * be edited here; one on Dungeon Master Guru is shown read-only, apart from
- * the at-the-table changes that sync (clocks, portents, secrets, quest status).
+ * what syncs from Foundry: clocks, portents, secrets, quest status, maps,
+ * actors, and coins and XP.
  */
 export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -103,6 +107,11 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       hideSecret: PlannerApp.#onHideSecret,
       openSession: PlannerApp.#onOpenSession,
       closeSession: PlannerApp.#onCloseSession,
+      openQuest: PlannerApp.#onOpenQuest,
+      closeQuest: PlannerApp.#onCloseQuest,
+      saveQuest: PlannerApp.#onSaveQuest,
+      removeQuestLink: PlannerApp.#onRemoveQuestLink,
+      removeQuestScene: PlannerApp.#onRemoveQuestScene,
       saveSession: PlannerApp.#onSaveSession,
       addSession: PlannerApp.#onAddSession,
       removeLink: PlannerApp.#onRemoveLink,
@@ -119,6 +128,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
 
   #tab = "overview";
   #sessionId = null;
+  #questId = null;
   #hookId = null;
 
   get sync() {
@@ -133,10 +143,11 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return this.sync.isLocal;
   }
 
-  /** Opens on a tab, or a session's prep */
-  show({ tab, sessionId } = {}) {
+  /** Opens on a tab, a session's prep, or a quest's plan */
+  show({ tab, sessionId, questId } = {}) {
     if (tab) this.#tab = tab;
     if (sessionId !== undefined) this.#sessionId = sessionId;
+    if (questId !== undefined) this.#questId = questId;
     return this.render({ force: true, window: { title: this.title } });
   }
 
@@ -202,7 +213,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         this.#editable
           ? ""
           : `<p class="dlcp-notice">This campaign is planned on Dungeon Master Guru, and changes there sync here. You can
-              advance clocks, reveal secrets and set quest status here.
+              advance clocks, reveal secrets and set quest status here, and add maps, actors, coins and XP.
               <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Plan it on Dungeon Master Guru</a></p>`
       }
       <nav class="dlcp-tabs" aria-label="Campaign sections">${nav}</nav>
@@ -216,7 +227,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       case "story":
         return this.#renderStory(store);
       case "quests":
-        return this.#renderQuests(store);
+        return this.#questId ? this.#renderQuestPlan(store) : this.#renderQuests(store);
       case "cast":
         return this.#renderCast(store);
       case "places":
@@ -376,11 +387,12 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         nameOf("quests", quest.parentId) && `Part of ${nameOf("quests", quest.parentId)}`,
         nameOf("npcs", quest.giverNpcId) && `Given by ${nameOf("npcs", quest.giverNpcId)}`,
         nameOf("locations", quest.locationId) && `At ${nameOf("locations", quest.locationId)}`,
-        quest.reward && `Reward: ${quest.reward}`,
       ]
         .filter(Boolean)
         .map((t) => `<p class="dlcp-muted">${escapeHtml(t)}</p>`)
         .join("")}
+      ${this.#questSummary(store, quest)}
+      <div class="dlcp-buttons"><button type="button" data-action="openQuest" data-id="${escapeHtml(quest.id)}"><i class="fas fa-map-signs"></i> Plan the quest</button></div>
     </li>`;
     const sorted = [...store.quests].sort(
       (a, b) => (a.act ?? 99) - (b.act ?? 99) || (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name),
@@ -389,8 +401,169 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       const quests = sorted.filter((quest) => (quest.kind ?? "main") === kind);
       return `<section class="dlcp-lane"><h2>${title}</h2>${quests.length ? `<ul class="dlcp-cards">${quests.map(card).join("")}</ul>` : this.#empty(`No ${title.toLowerCase()} yet.`)}</section>`;
     };
-    return `<div class="dlcp-lanes">${lane("main", "Main quests")}${lane("side", "Side quests")}</div>
+    return `<p class="dlcp-muted">Main and side quests. Plan each one's maps, NPCs, monsters and reward.</p>
+      <div class="dlcp-lanes">${lane("main", "Main quests")}${lane("side", "Side quests")}</div>
       <div class="dlcp-buttons">${this.#addButton("quests")}</div>`;
+  }
+
+  // What a quest needs and gives, in short, for its card
+  #questSummary(store, quest) {
+    const maps = (quest.foundryScenes ?? []).map((scene) => contentLink(scene.uuid, scene.name, "map"));
+    const npcs = (quest.links ?? [])
+      .filter((link) => link.linkableType === "CampaignNpc")
+      .map((link) => escapeHtml(store.npcs.find((npc) => npc.id === link.linkableId)?.name ?? link.name));
+    const monsters = this.#linkNames(store, quest, ["monster"], "Monster");
+    const reward = [
+      currencyText(quest.rewardCurrency) && escapeHtml(currencyText(quest.rewardCurrency)),
+      ...this.#linkNames(store, quest, TREASURE, "Item"),
+      quest.rewardXp && `${escapeHtml(quest.rewardXp)} XP`,
+      quest.milestone && "level up (milestone)",
+      quest.reward && escapeHtml(quest.reward),
+    ].filter(Boolean);
+    return [
+      ["Maps", maps],
+      ["NPCs", npcs],
+      ["Monsters", monsters],
+      ["Reward", reward],
+    ]
+      .filter(([, parts]) => parts.length)
+      .map(([label, parts]) => `<p><strong>${label}:</strong> ${parts.join(", ")}</p>`)
+      .join("");
+  }
+
+  // A session's or quest's monsters or treasure as links (with how many), from
+  // book references and, for Dungeon Master Guru campaigns, its own SRD entries
+  #linkNames(store, owner, categories, srdType) {
+    return (owner.links ?? []).flatMap((link) => {
+      const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
+      if (link.linkableType === srdType) return [`${escapeHtml(link.name)}${quantity}`];
+      if (link.linkableType !== "CampaignReference") return [];
+      const reference = store.references.find((r) => r.id === link.linkableId);
+      if (!reference || !categories.includes(reference.category)) return [];
+      const name = reference.foundryUuid
+        ? contentLink(reference.foundryUuid, reference.name, reference.category === "monster" ? "user" : "suitcase")
+        : escapeHtml(reference.name);
+      return [`${name}${quantity}`];
+    });
+  }
+
+  // A quest's plan: its maps, NPCs, monsters and reward. In this world it's all
+  // edited here; for a Dungeon Master Guru campaign, the maps, coins, XP and
+  // milestone are, and the rest is planned on the website.
+  #renderQuestPlan(store) {
+    const quest = store.quests.find((q) => q.id === this.#questId);
+    if (!quest) {
+      this.#questId = null;
+      return this.#renderQuests(store);
+    }
+    const editable = this.#editable;
+    const nameOf = (collection, id) => store[collection]?.find((r) => r.id === id)?.name;
+    const back = `<button type="button" class="dlcp-link-button" data-action="closeQuest"><i class="fas fa-arrow-left"></i> All quests</button>`;
+    const part = (title, hint, body) => `<section class="dlcp-card dlcp-prep-step"><h3>${escapeHtml(title)}</h3>
+      <p class="dlcp-muted">${escapeHtml(hint)}</p>${body}</section>`;
+    const facts = [
+      quest.kind === "side" ? "Side quest" : "Main quest",
+      quest.act && `Act ${quest.act}`,
+      nameOf("npcs", quest.giverNpcId) && `Given by ${nameOf("npcs", quest.giverNpcId)}`,
+      nameOf("locations", quest.locationId) && `At ${nameOf("locations", quest.locationId)}`,
+      nameOf("quests", quest.parentId) && `Part of ${nameOf("quests", quest.parentId)}`,
+    ].filter(Boolean);
+
+    const maps = `${
+      (quest.foundryScenes ?? []).length
+        ? `<ul class="dlcp-list">${quest.foundryScenes
+            .map(
+              (scene) => `<li><span class="dlcp-grow">${contentLink(scene.uuid, scene.name, "map")}</span>
+                <button type="button" class="dlcp-link-button" data-action="removeQuestScene" data-scene="${escapeHtml(scene.uuid)}" aria-label="Remove ${escapeHtml(scene.name)}">remove</button></li>`,
+            )
+            .join("")}</ul>`
+        : ""
+    }<div class="dlcp-drop" data-kind="questScene"><i class="fas fa-map"></i> Drag scenes here from the Scenes directory.</div>`;
+
+    const npcs = editable
+      ? this.#checklist(quest, "npcs", store.npcs, "NPCs")
+      : this.#readOnlyList((quest.links ?? []).filter((l) => l.linkableType === "CampaignNpc").map((l) => escapeHtml(l.name)), "No NPCs picked on Dungeon Master Guru.");
+
+    const monsters = editable
+      ? `${this.#referenceRows(quest, store, ["monster"], { remove: "removeQuestLink" })}
+         <div class="dlcp-drop" data-kind="questMonster"><i class="fas fa-dragon"></i> Drag monsters here from a compendium or the Actors directory.</div>`
+      : this.#readOnlyList(this.#linkNames(store, quest, ["monster"], "Monster"), "No monsters picked on Dungeon Master Guru.");
+
+    const items = editable
+      ? `${this.#referenceRows(quest, store, TREASURE, { quantities: true, remove: "removeQuestLink" })}
+         <div class="dlcp-drop" data-kind="questTreasure"><i class="fas fa-gem"></i> Drag items or roll tables here from a compendium or the sidebar.</div>`
+      : this.#readOnlyList(this.#linkNames(store, quest, TREASURE, "Item"), "");
+
+    const reward = `
+      ${editable
+        ? `<div class="form-group stacked"><label for="dlcp-quest-reward">Reward notes</label><textarea id="dlcp-quest-reward" name="reward" rows="2" placeholder="Favours, titles, land…">${escapeHtml(quest.reward ?? "")}</textarea></div>`
+        : quest.reward ? `<p>${escapeHtml(quest.reward)}</p>` : ""}
+      <h4>Coins</h4>
+      <div class="dlcp-coins">${COINS.map(
+        (coin) => `<label>${coin}<input type="number" min="0" name="coin_${coin}" value="${escapeHtml(quest.rewardCurrency?.[coin] ?? "")}" aria-label="${coin}"></label>`,
+      ).join("")}</div>
+      <div class="dlcp-grid">
+        <div class="form-group"><label for="dlcp-quest-xp">XP</label><input id="dlcp-quest-xp" name="rewardXp" type="number" min="0" value="${escapeHtml(quest.rewardXp ?? "")}"></div>
+        <label class="dlcp-check"><input type="checkbox" name="milestone" ${quest.milestone ? "checked" : ""}> Milestone: the party levels up when it's done</label>
+      </div>
+      <h4>Items</h4>
+      ${items}`;
+
+    return `${back}
+      <form data-form="quest" class="dlcp-quest-plan">
+        <header class="dlcp-card-header"><h2>${escapeHtml(quest.name)}</h2>
+          <select data-quest-status="${escapeHtml(quest.uuid)}" aria-label="Status of ${escapeHtml(quest.name)}">
+            ${QUEST_STATUSES.map((status) => `<option value="${status}" ${quest.status === status ? "selected" : ""}>${STATUS_LABELS[status]}</option>`).join("")}
+          </select></header>
+        <p class="dlcp-muted">${escapeHtml(facts.join(" · "))}</p>
+        ${quest.description ? `<p>${escapeHtml(quest.description)}</p>` : ""}
+        ${editable ? "" : `<p class="dlcp-notice">This quest is planned on Dungeon Master Guru. Add its maps, coins and XP here; they sync.</p>`}
+        ${part("Maps", "The scenes the quest plays out on. Click one to view it.", maps)}
+        ${part("NPCs involved", "Who helps, hinders or turns up along the way, beyond the quest giver.", npcs)}
+        ${part("Monsters", "Creatures the party could face. Drag one from here onto a map to place a token.", monsters)}
+        ${part("Reward", "What the party gets for finishing it.", reward)}
+        <div class="dlcp-buttons dlcp-sticky">
+          <button type="button" data-action="saveQuest"><i class="fas fa-save"></i> Save the quest</button>
+          ${editable ? `<button type="button" data-action="edit" data-collection="quests" data-id="${escapeHtml(quest.id)}"><i class="fas fa-pen"></i> Edit details</button>` : ""}
+          <button type="button" data-action="openPage" data-collection="quests" data-uuid="${escapeHtml(quest.uuid)}"><i class="fas fa-book-open"></i> Journal page</button>
+        </div>
+      </form>`;
+  }
+
+  #readOnlyList(items, emptyText) {
+    if (!items.length) return emptyText ? this.#empty(emptyText) : "";
+    return `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+  }
+
+  // Checkboxes for linking a session or quest to records of one kind
+  #checklist(owner, collection, records, label) {
+    const linked = new Set(linkedIds(owner, collection));
+    if (!records.length) return this.#empty(`No ${label} in the campaign yet. Add them on their tab.`);
+    return `<div class="dlcp-checks">${records
+      .map(
+        (record) => `<label class="dlcp-check"><input type="checkbox" data-link-collection="${collection}" value="${escapeHtml(record.id)}" ${linked.has(record.id) ? "checked" : ""}>
+          ${escapeHtml(collection === "secrets" ? record.text : record.name)}${collection === "secrets" && record.revelation ? ` <span class="dlcp-muted">(${escapeHtml(record.revelation)})</span>` : ""}${record.foundrySceneName ? ` <span class="dlcp-muted"><i class="fas fa-map"></i> ${escapeHtml(record.foundrySceneName)}</span>` : ""}${record.foundryActorName ? ` <span class="dlcp-muted"><i class="fas fa-user"></i> ${escapeHtml(record.foundryActorName)}</span>` : ""}</label>`,
+      )
+      .join("")}</div>`;
+  }
+
+  // A session's or quest's book references of some kinds, each with a remove
+  // button and, for treasure, how many
+  #referenceRows(owner, store, categories, { quantities = false, remove }) {
+    const rows = (owner.links ?? [])
+      .filter((link) => link.linkableType === "CampaignReference")
+      .map((link) => ({ link, r: store.references.find((ref) => ref.id === link.linkableId) }))
+      .filter(({ r }) => r && categories.includes(r.category));
+    return rows.length
+      ? `<ul class="dlcp-list">${rows
+          .map(
+            ({ link, r }) => `<li><span class="dlcp-grow">${r.foundryUuid ? contentLink(r.foundryUuid, r.name, r.category === "monster" ? "user" : "suitcase") : escapeHtml(r.name)}
+              ${r.challengeRating ? ` <span class="dlcp-muted">CR ${escapeHtml(r.challengeRating)}</span>` : ""} <span class="dlcp-muted">${escapeHtml(r.citation ?? "")}</span></span>
+              ${quantities ? `<input class="dlcp-quantity" type="number" min="1" max="9999" name="qty_${escapeHtml(link.id)}" value="${escapeHtml(link.quantity ?? 1)}" aria-label="How many ${escapeHtml(r.name)}">` : ""}
+              <button type="button" class="dlcp-link-button" data-action="${remove}" data-id="${escapeHtml(r.id)}" aria-label="Remove ${escapeHtml(r.name)}">remove</button></li>`,
+          )
+          .join("")}</ul>`
+      : "";
   }
 
   // Cast ----------------------------------------------------------------------
@@ -545,32 +718,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     }
     const step = (key, body) => `<section class="dlcp-card dlcp-prep-step"><h3>${escapeHtml(PREP_STEPS[key][0])}</h3>
       <p class="dlcp-muted">${escapeHtml(PREP_STEPS[key][1])}</p>${body}</section>`;
-    const checklist = (collection, records, label) => {
-      const linked = new Set(linkedIds(session, collection));
-      if (!records.length) return this.#empty(`No ${label} in the campaign yet. Add them on their tab.`);
-      return `<div class="dlcp-checks">${records
-        .map(
-          (record) => `<label class="dlcp-check"><input type="checkbox" data-link-collection="${collection}" value="${escapeHtml(record.id)}" ${linked.has(record.id) ? "checked" : ""}>
-            ${escapeHtml(collection === "secrets" ? record.text : record.name)}${collection === "secrets" && record.revelation ? ` <span class="dlcp-muted">(${escapeHtml(record.revelation)})</span>` : ""}${record.foundrySceneName ? ` <span class="dlcp-muted"><i class="fas fa-map"></i> ${escapeHtml(record.foundrySceneName)}</span>` : ""}${record.foundryActorName ? ` <span class="dlcp-muted"><i class="fas fa-user"></i> ${escapeHtml(record.foundryActorName)}</span>` : ""}</label>`,
-        )
-        .join("")}</div>`;
-    };
-    const references = (categories, { quantities = false } = {}) => {
-      const rows = (session.links ?? [])
-        .filter((link) => link.linkableType === "CampaignReference")
-        .map((link) => ({ link, r: store.references.find((ref) => ref.id === link.linkableId) }))
-        .filter(({ r }) => r && categories.includes(r.category));
-      return rows.length
-        ? `<ul class="dlcp-list">${rows
-            .map(
-              ({ link, r }) => `<li><span class="dlcp-grow">${r.foundryUuid ? contentLink(r.foundryUuid, r.name, r.category === "monster" ? "user" : "suitcase") : escapeHtml(r.name)}
-                ${r.challengeRating ? ` <span class="dlcp-muted">CR ${escapeHtml(r.challengeRating)}</span>` : ""} <span class="dlcp-muted">${escapeHtml(r.citation ?? "")}</span></span>
-                ${quantities ? `<input class="dlcp-quantity" type="number" min="1" max="9999" name="qty_${escapeHtml(link.id)}" value="${escapeHtml(link.quantity ?? 1)}" aria-label="How many ${escapeHtml(r.name)}">` : ""}
-                <button type="button" class="dlcp-link-button" data-action="removeLink" data-id="${escapeHtml(r.id)}" aria-label="Remove ${escapeHtml(r.name)}">remove</button></li>`,
-            )
-            .join("")}</ul>`
-        : "";
-    };
+    const checklist = (collection, records, label) => this.#checklist(session, collection, records, label);
+    const references = (categories, { quantities = false } = {}) =>
+      this.#referenceRows(session, store, categories, { quantities, remove: "removeLink" });
     const unrevealed = store.secrets.filter((s) => !s.revealed || linkedIds(session, "secrets").includes(s.id));
     const party = this.sync.partyOptions().filter((option) => (campaign.partyActorUuids ?? []).includes(option.uuid));
     const values = session;
@@ -604,7 +754,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           <div class="dlcp-coins">${COINS.map(
             (coin) => `<label>${coin}<input type="number" min="0" name="coin_${coin}" value="${escapeHtml(values.treasureCurrency?.[coin] ?? "")}" aria-label="${coin}"></label>`,
           ).join("")}</div>
-          ${references(["magic_item", "equipment", "table", "spell", "other"], { quantities: true })}
+          ${references(TREASURE, { quantities: true })}
           <div class="dlcp-drop" data-kind="treasure"><i class="fas fa-gem"></i> Drag items or roll tables here from a compendium or the sidebar.</div>`,
         )}
         <div class="dlcp-buttons dlcp-sticky">
@@ -747,7 +897,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   async #addSessionScene(scene) {
     const session = this.#record("sessions", this.#sessionId);
     if (!session) return;
-    const result = addSessionScene(session.foundryScenes, scene.uuid, scene.name);
+    const result = addScene(session.foundryScenes, scene.uuid, scene.name, "session");
     if (result.error) return ui.notifications.warn(result.error);
     return this.#saveSessionScenes(session, result.scenes);
   }
@@ -769,8 +919,14 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     let updated = result.record;
     for (const collection of ["secrets", "locations", "npcs"]) {
       const ids = [...form.querySelectorAll(`[data-link-collection="${collection}"]:checked`)].map((box) => box.value);
-      updated = setSessionLinks(updated, collection, ids, store[collection], () => foundry.utils.randomID(16));
+      updated = setLinks(updated, collection, ids, store[collection], () => foundry.utils.randomID(16));
     }
+    return this.#withQuantities(form, updated);
+  }
+
+  // Reads the treasure quantities typed into a form into the record's links
+  #withQuantities(form, record) {
+    let updated = record;
     for (const input of form.querySelectorAll('[name^="qty_"]')) {
       const result = setLinkQuantity(updated, input.name.slice(4), input.value);
       if (result.error) return result;
@@ -779,13 +935,67 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return { record: updated };
   }
 
+  // Reads the quest plan form into the quest: its reward, NPCs and quantities
+  #questFromForm(quest) {
+    const form = this.element.querySelector('[data-form="quest"]');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const result = applyQuestReward(quest, this.#editable ? values : { ...values, reward: quest.reward });
+    if (result.error) return result;
+    if (!this.#editable) return result;
+    const ids = [...form.querySelectorAll('[data-link-collection="npcs"]:checked')].map((box) => box.value);
+    const updated = setLinks(result.record, "npcs", ids, this.sync.recordLists().npcs, () => foundry.utils.randomID(16));
+    return this.#withQuantities(form, updated);
+  }
+
+  // Saves a quest's plan. For a Dungeon Master Guru campaign, only what syncs
+  // from Foundry: its maps, coins, XP and milestone.
+  async #saveQuest(quest, record) {
+    if (this.#editable) return this.#save("quests", record);
+    const { foundryScenes, rewardCurrency, rewardXp, milestone } = record;
+    try {
+      return await this.sync.update("quests", quest, { foundryScenes, rewardCurrency, rewardXp, milestone });
+    } catch (error) {
+      ui.notifications.error(`Couldn't save: ${error.message}`);
+      return false;
+    }
+  }
+
+  // Adds a map to the open quest, keeping anything typed in its plan
+  async #addQuestScene(scene) {
+    const quest = this.#record("quests", this.#questId);
+    if (!quest) return;
+    const result = addScene(quest.foundryScenes, scene.uuid, scene.name, "quest");
+    if (result.error) return ui.notifications.warn(result.error);
+    return this.#saveQuestScenes(quest, result.scenes);
+  }
+
+  async #saveQuestScenes(quest, scenes) {
+    const current = this.#questFromForm(quest);
+    if (current.error) return ui.notifications.warn(current.error);
+    return this.#saveQuest(quest, { ...current.record, foundryScenes: scenes });
+  }
+
+  // A monster or item dropped on a quest's plan becomes a linked book reference
+  async #addQuestReference(document) {
+    const quest = this.#record("quests", this.#questId);
+    const current = quest && this.#questFromForm(quest);
+    if (!current || current.error) {
+      if (current?.error) ui.notifications.warn(current.error);
+      return;
+    }
+    const reference = await this.sync.referenceFor(document);
+    const references = this.sync.recordLists().references;
+    const ids = [...new Set([...linkedIds(current.record, "references"), reference.id])];
+    await this.#save("quests", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
+  }
+
   // A monster, item or table dropped on session prep becomes a linked book reference
   async #onDrop(event, kind, recordUuid) {
     event.preventDefault();
     event.stopPropagation();
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     const document = data?.uuid ? await fromUuid(data.uuid) : null;
-    if (["scene", "sessionScene"].includes(kind) && document?.documentName !== "Scene") {
+    if (["scene", "sessionScene", "questScene"].includes(kind) && document?.documentName !== "Scene") {
       return ui.notifications.warn("Drop a scene here, from the Scenes directory.");
     }
     if (["actor", "newNpc"].includes(kind) && document?.documentName !== "Actor") {
@@ -802,31 +1012,32 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       return this.#save("npcs", npc);
     }
     if (kind === "sessionScene") return this.#addSessionScene(document);
-    const wanted = kind === "monster" ? ["Actor"] : ["Item", "RollTable"];
+    if (kind === "questScene") return this.#addQuestScene(document);
+    const monster = kind === "monster" || kind === "questMonster";
+    const wanted = monster ? ["Actor"] : ["Item", "RollTable"];
     if (!document || !wanted.includes(document.documentName)) {
-      ui.notifications.warn(kind === "monster" ? "Drop an actor here." : "Drop an item or a roll table here.");
+      ui.notifications.warn(monster ? "Drop an actor here." : "Drop an item or a roll table here.");
       return;
     }
-    const session = this.#record("sessions", this.#sessionId);
-    const current = session && this.#sessionFromForm(session);
-    if (!current || current.error) {
-      if (current?.error) ui.notifications.warn(current.error);
-      return;
-    }
-    const reference = await this.sync.referenceFor({
+    const dropped = {
       uuid: document.uuid,
       name: document.name,
       documentName: document.documentName,
       type: document.type,
       system: document.system,
       pack: document.pack ?? null,
-    });
+    };
+    if (kind === "questMonster" || kind === "questTreasure") return this.#addQuestReference(dropped);
+    const session = this.#record("sessions", this.#sessionId);
+    const current = session && this.#sessionFromForm(session);
+    if (!current || current.error) {
+      if (current?.error) ui.notifications.warn(current.error);
+      return;
+    }
+    const reference = await this.sync.referenceFor(dropped);
     const references = this.sync.recordLists().references;
     const ids = [...new Set([...linkedIds(current.record, "references"), reference.id])];
-    await this.#save(
-      "sessions",
-      setSessionLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)),
-    );
+    await this.#save("sessions", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
   }
 
   // Actions -------------------------------------------------------------------
@@ -834,6 +1045,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   static #onShowTab(_event, target) {
     this.#tab = target.dataset.tab;
     this.#sessionId = target.dataset.sessionId ?? null;
+    this.#questId = null;
     this.render();
   }
 
@@ -947,10 +1159,41 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (!current || current.error) return;
     const references = this.sync.recordLists().references;
     const ids = linkedIds(current.record, "references").filter((id) => id !== target.dataset.id);
-    await this.#save(
-      "sessions",
-      setSessionLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)),
-    );
+    await this.#save("sessions", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
+  }
+
+  static #onOpenQuest(_event, target) {
+    this.#questId = target.dataset.id;
+    this.render();
+  }
+
+  static #onCloseQuest() {
+    this.#questId = null;
+    this.render();
+  }
+
+  static async #onSaveQuest() {
+    const quest = this.#record("quests", this.#questId);
+    if (!quest) return;
+    const result = this.#questFromForm(quest);
+    if (result.error) return ui.notifications.warn(result.error);
+    if (await this.#saveQuest(quest, result.record)) ui.notifications.info(`Saved ${quest.name}.`);
+  }
+
+  static async #onRemoveQuestLink(_event, target) {
+    const quest = this.#record("quests", this.#questId);
+    const current = quest && this.#questFromForm(quest);
+    if (!current || current.error) return;
+    const references = this.sync.recordLists().references;
+    const ids = linkedIds(current.record, "references").filter((id) => id !== target.dataset.id);
+    await this.#save("quests", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
+  }
+
+  static #onRemoveQuestScene(_event, target) {
+    const quest = this.#record("quests", this.#questId);
+    if (!quest) return;
+    const scenes = (quest.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene);
+    return this.#saveQuestScenes(quest, scenes);
   }
 
   static #onClearScene(_event, target) {

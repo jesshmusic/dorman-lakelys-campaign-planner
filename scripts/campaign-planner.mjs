@@ -7,7 +7,7 @@ import { HelpApp } from "./apps/help-app.mjs";
 import { openCampaignPicker } from "./apps/campaign-picker.mjs";
 import { PlannerApp } from "./apps/planner-app.mjs";
 import { DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
-import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS, SYNCED_HOOK } from "./constants.mjs";
+import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
 const sync = new CampaignSync();
 let dashboard = null;
@@ -184,23 +184,23 @@ function watchCharacters() {
   Hooks.on("updateUser", () => sendCharactersSoon());
 }
 
-// Thumbnails of the campaign's maps go to Dungeon Master Guru after a sync,
-// and a few seconds after one of those scenes is edited. Only new or changed
-// scenes are sent, so most checks send nothing.
+// Thumbnails of the world's scenes go to Dungeon Master Guru when the GM loads
+// the world, and a few seconds after a scene is added, changed or deleted.
+// Only new or changed scenes are sent, so most checks send nothing.
 const sendScenesSoon = foundry.utils.debounce(async () => {
-  if (!sync.ready) return;
+  if (!game.user.isGM || !sync.token) return;
   try {
     const result = await sync.sendSceneThumbnails();
-    if (result?.sent) console.log(`${MODULE_TITLE} | Sent ${result.sent} scene thumbnails to Dungeon Master Guru`);
+    if (result?.sent || result?.removed) {
+      console.log(`${MODULE_TITLE} | Scene thumbnails on Dungeon Master Guru: ${result.sent} sent, ${result.removed} removed`);
+    }
   } catch (error) {
     console.warn(`${MODULE_TITLE} | Could not send the scene thumbnails`, error);
   }
 }, 5000);
 
 function watchScenes() {
-  Hooks.on(SYNCED_HOOK, () => sendScenesSoon());
-  Hooks.on("updateScene", () => sendScenesSoon());
-  for (const type of ["Tile", "Level"]) {
+  for (const type of ["Scene", "Tile", "Level"]) {
     for (const action of ["create", "update", "delete"]) Hooks.on(`${action}${type}`, () => sendScenesSoon());
   }
 }
