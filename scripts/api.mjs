@@ -70,6 +70,21 @@ export class DmGuruApi {
     return this.#request("POST", "/v1/foundry/characters", { world, characters });
   }
 
+  /** The scene thumbnails Dungeon Master Guru has from this world: { scenes: { [uuid]: { version, thumbnailUrl } } } */
+  sceneStatus(worldId) {
+    const query = new URLSearchParams({ world: worldId });
+    return this.#request("GET", `/v1/foundry/scenes?${query}`);
+  }
+
+  /**
+   * Saves a scene's thumbnail, sent as a data URL: { uuid, name, version, thumbnailUrl }
+   * @param {{ id: string, title: string }} world
+   * @param {{ uuid: string, name: string, version: string, thumbnail: string }} scene
+   */
+  sendScene(world, scene) {
+    return this.#request("POST", "/v1/foundry/scenes", { world, scene });
+  }
+
   /** The compendium packs Dungeon Master Guru has: { packs: { [packId]: { version, count } } } */
   compendiumStatus() {
     return this.#request("GET", "/v1/foundry/compendium");

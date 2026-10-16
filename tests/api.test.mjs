@@ -73,6 +73,27 @@ test("sends this world's player characters", async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), { world, characters });
 });
 
+test("asks which scene thumbnails Dungeon Master Guru has from this world", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { scenes: {} } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  assert.deepEqual(await api.sceneStatus("my world"), { scenes: {} });
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/scenes?world=my+world");
+  assert.equal(calls[0].init.method, "GET");
+});
+
+test("sends a scene's thumbnail", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { uuid: "Scene.a", thumbnailUrl: "https://x/a.webp" } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const world = { id: "dev", title: "Dev" };
+  const scene = { uuid: "Scene.a", name: "Pass", version: "1-abc", thumbnail: "data:image/webp;base64,AAAA" };
+
+  assert.equal((await api.sendScene(world, scene)).thumbnailUrl, "https://x/a.webp");
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/scenes");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { world, scene });
+});
+
 test("reads which compendium packs Dungeon Master Guru has", async () => {
   const { calls, fetchImpl } = fakeFetch([{ body: { packs: {} } }]);
   const api = new DmGuruApi({ token: "t", fetchImpl });

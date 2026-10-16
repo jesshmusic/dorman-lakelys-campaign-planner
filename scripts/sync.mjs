@@ -5,6 +5,7 @@ import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFr
 import { characterPayload, isPlayerCharacter, partyOption } from "./characters.mjs";
 import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
+import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -71,6 +72,8 @@ function pageName(collection, record) {
 export class CampaignSync {
   #pulling = null;
   #sentCharacters = null;
+  // { uuid -> version } of the scene thumbnails Dungeon Master Guru has
+  #sentScenes = null;
 
   get linked() {
     const campaign = game.settings.get(MODULE_ID, SETTINGS.campaign);
@@ -291,6 +294,49 @@ export class CampaignSync {
     const result = await this.api().sendCharacters({ id: game.world.id, title: game.world.title }, characters);
     this.#sentCharacters = json;
     return result;
+  }
+
+  /**
+   * Sends a thumbnail of each scene the linked campaign uses (place maps and
+   * session maps) to Dungeon Master Guru, so they show there while Foundry is
+   * closed. Only scenes it doesn't have yet, or that changed since; asks it
+   * what it has the first time, or with `force`.
+   * @returns {Promise<{ sent: number }|null>} null when there's nothing to send to
+   */
+  async sendSceneThumbnails({ force = false } = {}) {
+    if (!this.ready) return null;
+    const store = this.records();
+    const uuids = campaignSceneUuids({
+      locations: [...store.locations.values()],
+      sessions: [...store.sessions.values()],
+    });
+    const scenes = uuids
+      .map((uuid) => game.scenes.get(uuid.split(".")[1]))
+      .filter((scene) => scene && hasThumbnail(scene.toObject()));
+    if (!scenes.length) return { sent: 0 };
+
+    const api = this.api();
+    if (force || !this.#sentScenes) {
+      const { scenes: saved } = await api.sceneStatus(game.world.id);
+      this.#sentScenes = new Map(Object.entries(saved ?? {}).map(([uuid, scene]) => [uuid, scene.version]));
+    }
+    const world = { id: game.world.id, title: game.world.title };
+    let sent = 0;
+    for (const scene of scenes) {
+      const version = sceneVersion(scene.toObject());
+      if (this.#sentScenes.get(scene.uuid) === version) continue;
+      let thumbnail;
+      try {
+        ({ thumb: thumbnail } = await scene.createThumbnail(THUMBNAIL));
+      } catch (error) {
+        console.warn(`Dorman Lakely's Campaign Planner | Could not make a thumbnail of ${scene.name}`, error);
+        continue;
+      }
+      await api.sendScene(world, { uuid: scene.uuid, name: scene.name, version, thumbnail });
+      this.#sentScenes.set(scene.uuid, version);
+      sent += 1;
+    }
+    return { sent };
   }
 
   /** The world's player characters, for choosing a party: [{ uuid, name, classes, level, playerName }] */

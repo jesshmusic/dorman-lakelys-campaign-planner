@@ -116,6 +116,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           Changes you make at the table, like clocks, secrets, quests and the session log, go back to the website.</li>
         <li><strong>Your books and your party:</strong> monsters and treasure you pick from your compendiums become links
           you can drag onto a scene, and your players' character sheets are there while you prep.</li>
+        <li><strong>Your maps</strong> (with sync): a thumbnail of each scene your campaign uses as a map goes to the
+          website, so you can see your maps there while Foundry is closed.</li>
       </ul>
 
       <h2>Your books</h2>
