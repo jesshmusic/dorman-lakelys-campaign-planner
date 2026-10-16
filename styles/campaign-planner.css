@@ -290,3 +290,81 @@
   gap: 0.35rem;
   padding: 0 0.6rem;
 }
+
+/* Journal sidebar buttons */
+
+.dlcp-directory {
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.dlcp-directory .dlcp-icon-button {
+  flex: 0 0 2rem;
+}
+
+/* Dashboard additions for campaigns in this world */
+
+.dlcp-add {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* How it works */
+
+.dlcp-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.dlcp-help-body h2 {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  font-size: 1.1rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.dlcp-lead {
+  font-size: 1.05rem;
+}
+
+.dlcp-paths {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dlcp-paths section {
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.dlcp-paths h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.dlcp-paths button {
+  margin-top: auto;
+}
+
+.dlcp-where {
+  border-left: 4px solid #c9ad6a;
+  padding: 0.25rem 0.75rem;
+}
+
+/* Open a campaign */
+
+.dlcp-picker h3 {
+  border-bottom: 1px solid var(--color-border-light-primary, #c9ad6a);
+  font-size: 1rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.dlcp-picker .dlcp-check {
+  margin: 0.2rem 0;
+}

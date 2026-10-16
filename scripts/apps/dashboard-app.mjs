@@ -1,5 +1,6 @@
 import { clockSvg, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
+import { ADD_FORMS } from "../local.mjs";
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 
@@ -13,12 +14,25 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     id: "dlcp-dashboard",
     classes: ["dlcp-app"],
     tag: "div",
-    window: { title: "Campaign Dashboard", icon: "fas fa-scroll", resizable: true },
+    window: {
+      title: "Campaign Dashboard",
+      icon: "fas fa-scroll",
+      resizable: true,
+      controls: [
+        { icon: "fas fa-feather-alt", label: "New campaign", action: "newCampaign" },
+        { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
+        { icon: "fas fa-link", label: "Connect to Dungeon Master Guru", action: "connect" },
+        { icon: "fas fa-circle-question", label: "Help", action: "help" },
+      ],
+    },
     position: { width: 560, height: 720 },
     actions: {
       sync: DashboardApp.#onSync,
       connect: DashboardApp.#onConnect,
       newCampaign: DashboardApp.#onNewCampaign,
+      help: DashboardApp.#onHelp,
+      openCampaign: DashboardApp.#onOpenCampaign,
+      add: DashboardApp.#onAdd,
       openJournals: DashboardApp.#onOpenJournals,
       advanceClock: DashboardApp.#onAdvanceClock,
       windBackClock: DashboardApp.#onWindBackClock,
@@ -67,11 +81,16 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderUnlinked() {
-    return `<p>Link this world to a Dungeon Master Guru campaign to see its sessions, threats, secrets and quests here.</p>
-      <p>No campaign yet? Start one step by step: what kind of game, the pitch, the party, the world and your books.</p>
+    return `<p>This world doesn't have a campaign yet.</p>
+      <p><strong>Start one here</strong>, step by step: what kind of game, the pitch, the party, the world and your books.
+        It lives in this world; no account needed.</p>
+      <p>Or <strong>connect to Dungeon Master Guru</strong> to plan on the website too, with AI that drafts the plan and
+        writes recaps, and link a campaign you've made there.</p>
       <div class="dlcp-buttons">
-        <button type="button" data-action="connect"><i class="fas fa-link"></i> Connect</button>
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>
+        <button type="button" data-action="openCampaign"><i class="fas fa-folder-open"></i> Open a campaign</button>
+        <button type="button" data-action="connect"><i class="fas fa-link"></i> Connect to Dungeon Master Guru</button>
+        <button type="button" data-action="help"><i class="fas fa-circle-question"></i> How it works</button>
       </div>`;
   }
 
@@ -80,26 +99,58 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     const sessions = [...store.sessions.values()].sort((a, b) => a.number - b.number);
     const next = sessions.find((s) => s.status !== "played") ?? sessions.at(-1);
     const fronts = [...store.fronts.values()];
-    const quests = [...store.quests.values()].filter((q) => q.status === "active" || q.status === "available");
-    const secrets = [...store.secrets.values()];
+    // Main quests by act, then side quests, in the order they were added
+    const quests = [...store.quests.values()]
+      .filter((q) => q.status === "active" || q.status === "available")
+      .sort(
+        (a, b) =>
+          (a.kind === "main" ? 0 : 1) - (b.kind === "main" ? 0 : 1) ||
+          (a.act ?? 99) - (b.act ?? 99) ||
+          (a.position ?? 0) - (b.position ?? 0) ||
+          a.name.localeCompare(b.name),
+      );
+    const secrets = [...store.secrets.values()].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const local = this.sync.isLocal;
     const synced = this.sync.linked.lastSynced ? new Date(this.sync.linked.lastSynced).toLocaleTimeString() : "never";
+    const status = local
+      ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
+      : `<span class="dlcp-muted">Last synced ${escapeHtml(synced)}</span>`;
 
     return `
       <header class="dlcp-toolbar">
-        <span class="dlcp-muted">Last synced ${escapeHtml(synced)}</span>
+        ${status}
         <span class="dlcp-buttons">
           <button type="button" data-action="openJournals"><i class="fas fa-book-open"></i> Journals</button>
-          <button type="button" data-action="sync" ${this.#busy ? "disabled" : ""}><i class="fas fa-sync"></i> Sync now</button>
+          ${local ? "" : `<button type="button" data-action="sync" ${this.#busy ? "disabled" : ""}><i class="fas fa-sync"></i> Sync now</button>`}
         </span>
       </header>
       ${this.#renderSession(next)}
       ${this.#renderClocks(fronts)}
       ${this.#renderSecrets(secrets, next)}
-      ${this.#renderQuests(quests)}`;
+      ${this.#renderQuests(quests)}
+      ${local ? this.#renderAddMore() : ""}`;
+  }
+
+  // An "Add" button for a local campaign's section
+  #addButton(collection, label) {
+    return this.sync.isLocal
+      ? `<button type="button" class="dlcp-add" data-action="add" data-collection="${collection}"><i class="fas fa-plus"></i> ${label}</button>`
+      : "";
+  }
+
+  #renderAddMore() {
+    return `<section><h2>Add to the campaign</h2>
+      <p class="dlcp-muted">Each goes in its own journal page, ready to fill in and share.</p>
+      <div class="dlcp-buttons">
+        ${this.#addButton("npcs", "NPC")}${this.#addButton("locations", "Place")}${this.#addButton("factions", "Faction")}${this.#addButton("sessions", "Session")}
+      </div></section>`;
   }
 
   #renderSession(session) {
-    if (!session) return `<section><h2>Next session</h2><p class="dlcp-muted">No sessions yet.</p></section>`;
+    if (!session) {
+      return `<section><h2>Next session</h2><p class="dlcp-muted">No sessions yet.</p>
+        <div class="dlcp-buttons">${this.#addButton("sessions", "Add a session")}</div></section>`;
+    }
     const scenes = session.scenes?.length
       ? `<ul>${session.scenes.map((scene) => `<li>${escapeHtml(scene)}</li>`).join("")}</ul>`
       : "";
@@ -118,7 +169,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderClocks(fronts) {
-    if (!fronts.length) return "";
+    if (!fronts.length && !this.sync.isLocal) return "";
     const items = fronts
       .map((front) => {
         const portents = (front.portents ?? [])
@@ -145,11 +196,13 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
           </li>`;
       })
       .join("");
-    return `<section><h2>Threats</h2><ul class="dlcp-list">${items}</ul></section>`;
+    return `<section><h2>Threats</h2>
+      ${items ? `<ul class="dlcp-list">${items}</ul>` : `<p class="dlcp-muted">No threats yet. A threat is a villain or danger with a plan, and a clock that fills if no one stops it.</p>`}
+      <div class="dlcp-buttons">${this.#addButton("fronts", "Add a threat")}</div></section>`;
   }
 
   #renderSecrets(secrets, session) {
-    if (!secrets.length) return "";
+    if (!secrets.length && !this.sync.isLocal) return "";
     const picked = new Set(
       (session?.links ?? []).filter((l) => l.linkableType === "CampaignSecret").map((l) => l.linkableId),
     );
@@ -164,16 +217,20 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       </li>`;
     const forSession = secrets.filter((s) => picked.has(s.id));
     const others = secrets.filter((s) => !picked.has(s.id) && !s.revealed);
+    const revealed = secrets.filter((s) => !picked.has(s.id) && s.revealed);
     return `
       <section>
         <h2>Secrets and clues</h2>
         ${forSession.length ? `<ul class="dlcp-list">${forSession.map(row).join("")}</ul>` : ""}
-        ${others.length ? `<details><summary>Other unrevealed secrets (${others.length})</summary><ul class="dlcp-list">${others.map(row).join("")}</ul></details>` : ""}
+        ${others.length ? `<details ${forSession.length ? "" : "open"}><summary>${forSession.length ? "Other unrevealed secrets" : "Unrevealed secrets"} (${others.length})</summary><ul class="dlcp-list">${others.map(row).join("")}</ul></details>` : ""}
+        ${revealed.length ? `<details><summary>Revealed (${revealed.length})</summary><ul class="dlcp-list">${revealed.map(row).join("")}</ul></details>` : ""}
+        ${secrets.length ? "" : `<p class="dlcp-muted">No secrets yet. Add clues the party could find, about three for each thing worth learning.</p>`}
+        <div class="dlcp-buttons">${this.#addButton("secrets", "Add a secret")}</div>
       </section>`;
   }
 
   #renderQuests(quests) {
-    if (!quests.length) return "";
+    if (!quests.length && !this.sync.isLocal) return "";
     const items = quests
       .map(
         (quest) => `
@@ -187,7 +244,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         </li>`,
       )
       .join("");
-    return `<section><h2>Quests</h2><ul class="dlcp-list dlcp-quests">${items}</ul></section>`;
+    return `<section><h2>Quests</h2>
+      ${items ? `<ul class="dlcp-list dlcp-quests">${items}</ul>` : `<p class="dlcp-muted">No open quests.</p>`}
+      <div class="dlcp-buttons">${this.#addButton("quests", "Add a quest")}</div></section>`;
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -202,7 +261,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     try {
       await this.sync.update(collection, record, attributes);
     } catch (error) {
-      ui.notifications.error(`Couldn't save to Dungeon Master Guru: ${error.message}`);
+      ui.notifications.error(
+        this.sync.isLocal ? `Couldn't save: ${error.message}` : `Couldn't save to Dungeon Master Guru: ${error.message}`,
+      );
     }
   }
 
@@ -226,6 +287,49 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onNewCampaign() {
     game.modules.get(MODULE_ID).api.openNewCampaign();
+  }
+
+  static #onOpenCampaign() {
+    game.modules.get(MODULE_ID).api.openCampaignPicker();
+  }
+
+  static #onHelp() {
+    game.modules.get(MODULE_ID).api.openHelp();
+  }
+
+  // Asks for a new record's details, then adds it to the local campaign
+  static async #onAdd(_event, target) {
+    const collection = target.dataset.collection;
+    const form = ADD_FORMS[collection];
+    if (!form) return;
+    const field = (f) => {
+      const id = `dlcp-add-${f.name}`;
+      const hint = f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : "";
+      let control;
+      if (f.type === "textarea" || f.type === "lines") control = `<textarea id="${id}" name="${f.name}" rows="3"></textarea>`;
+      else if (f.type === "select")
+        control = `<select id="${id}" name="${f.name}">${f.options
+          .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
+          .join("")}</select>`;
+      else
+        control = `<input id="${id}" name="${f.name}" type="${f.type === "number" ? "number" : "text"}"
+          value="${escapeHtml(f.value ?? "")}" ${f.min ? `min="${f.min}" max="${f.max}"` : ""}>`;
+      return `<div class="form-group ${f.type === "textarea" || f.type === "lines" ? "stacked" : ""}">
+        <label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>${control}${hint}</div>`;
+    };
+    const values = await foundry.applications.api.DialogV2.prompt({
+      window: { title: form.title },
+      content: form.fields.map(field).join(""),
+      ok: {
+        label: "Add",
+        icon: "fas fa-plus",
+        callback: (_e, button) => Object.fromEntries(new FormData(button.form).entries()),
+      },
+      rejectClose: false,
+    });
+    if (!values) return;
+    const result = await this.sync.addLocal(collection, values);
+    if (result.error) ui.notifications.warn(result.error);
   }
 
   static #onConnect() {

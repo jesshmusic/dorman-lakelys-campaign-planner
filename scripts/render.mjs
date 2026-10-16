@@ -67,10 +67,18 @@ export function renderRecord(collection, record, context) {
 }
 
 const RENDERERS = {
-  campaign: (c) =>
+  campaign: (c, { actorName } = {}) =>
     [
       fact("Setting", c.settingName),
       fact("Tone", c.tone),
+      section(
+        "The party",
+        (c.partyActorUuids ?? []).length
+          ? `<ul>${c.partyActorUuids
+              .map((uuid) => `<li>${compendiumLink(uuid, actorName?.(uuid) ?? "Character") ?? ""}</li>`)
+              .join("")}</ul>`
+          : "",
+      ),
       section("Premise", para(c.premise)),
       section("Pitch for the players", para(c.pitch)),
       section("Truths of the setting", list(c.truths)),

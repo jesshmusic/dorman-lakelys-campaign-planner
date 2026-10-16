@@ -11,6 +11,8 @@ export const SETTINGS = {
   autoSync: "autoSync",
   // { [worldId]: draft } for the New campaign guide. Client scope, like the token.
   setupDraft: "setupDraft",
+  // Whether this GM has seen the "how it works" window
+  welcomed: "welcomed",
 };
 
 // Fired after every pull or push so open windows can re-render

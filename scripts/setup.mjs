@@ -103,14 +103,14 @@ export const STEPS = [
     id: "books",
     label: "Books",
     title: "Your books",
-    intro: "Choose the compendiums this campaign uses when you pick monsters and treasure for your sessions.",
-    why: "Picks from your compendiums become links in your session journals. Click one to open its stat block, or drag it onto a scene to place a token.",
+    intro: "Choose the compendiums this campaign uses for monsters, spells, items and tables.",
+    why: "On Dungeon Master Guru, monster and treasure searches use these, and each pick becomes a link in your session journals: click it to open the stat block, or drag it onto a scene to place a token. In this world, drag entries from these compendiums straight into your journals.",
   },
   {
     id: "review",
     label: "Review",
     title: "Review and create",
-    intro: "Check your brief. You can change all of it later on Dungeon Master Guru.",
+    intro: "Check your brief, then choose where the campaign lives. You can change any of it later.",
   },
 ];
 

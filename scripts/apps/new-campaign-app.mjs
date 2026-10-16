@@ -36,6 +36,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       next: NewCampaignApp.#onNext,
       goTo: NewCampaignApp.#onGoTo,
       create: NewCampaignApp.#onCreate,
+      createLocal: NewCampaignApp.#onCreateLocal,
+      help: NewCampaignApp.#onHelp,
       startOver: NewCampaignApp.#onStartOver,
       connect: NewCampaignApp.#onConnect,
       openDashboard: NewCampaignApp.#onOpenDashboard,
@@ -131,12 +133,17 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const forward =
       draft.step < LAST_STEP
         ? `<button type="button" data-action="next">Next: ${escapeHtml(STEPS[draft.step + 1].title)} <i class="fas fa-arrow-right"></i></button>`
-        : `<button type="button" data-action="create" ${this.#busy || !this.sync.token ? "disabled" : ""}>
-            <i class="fas fa-feather-alt"></i> ${this.#busy ? "Creating…" : "Create campaign"}</button>`;
+        : `${
+            this.sync.token
+              ? `<button type="button" data-action="create" ${this.#busy ? "disabled" : ""}>
+                  <i class="fas fa-globe"></i> Create on Dungeon Master Guru</button>`
+              : ""
+          }
+          <button type="button" data-action="createLocal" ${this.#busy ? "disabled" : ""}>
+            <i class="fas fa-feather-alt"></i> ${this.#busy ? "Creating…" : "Create in this world"}</button>`;
 
     return `
       ${this.#restored ? `<p class="dlcp-notice">Picking up where you left off. <button type="button" class="dlcp-link-button" data-action="startOver">Start over</button></p>` : ""}
-      ${this.sync.token ? "" : `<p class="dlcp-notice dlcp-notice--warning">To create the campaign, connect this world to Dungeon Master Guru first. You can fill in the steps now. <button type="button" class="dlcp-link-button" data-action="connect">Connect</button></p>`}
       <nav aria-label="Setup steps"><ol class="dlcp-steps">${progress}</ol></nav>
       <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
       <p class="dlcp-muted">${escapeHtml(step.intro)}</p>
@@ -218,8 +225,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       )
       .join("");
     return `<h3>Who's playing?</h3>
-      <p class="dlcp-muted">Pick the player characters in the party. Their character sheets go to Dungeon Master Guru
-      with the campaign: what the players built, never spell or item descriptions.</p>
+      <p class="dlcp-muted">Pick the player characters in the party. If you create the campaign on Dungeon Master Guru,
+      their character sheets go with it: what the players built, never spell or item descriptions.</p>
       <table class="dlcp-party">
         <thead><tr><th aria-label="In the party"></th><th>Name</th><th>Class</th><th>Level</th><th>Player</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -311,15 +318,31 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         "books",
         `<p>${!packs.length ? "No compendiums in this world." : on === packs.length ? "All compendiums" : `${on} of ${packs.length} compendiums`}</p>`,
       )}
+      <section class="dlcp-where">
+        <h3>Where should it live?</h3>
+        <p><strong>In this world:</strong> no account needed. Everything stays in Foundry: journals for the plan, and the
+          Campaign Dashboard to run it.</p>
+        <p><strong>On Dungeon Master Guru:</strong> plan on the website as well as here, with a free account. It adds AI
+          that drafts the plan, suggests prep and writes recaps (with your own OpenAI key or a Patreon membership), and
+          with premium Patreon it syncs into this world.</p>
+        ${
+          this.sync.token
+            ? ""
+            : `<p class="dlcp-muted">To create it on Dungeon Master Guru, connect first.
+                <button type="button" class="dlcp-link-button" data-action="connect">Connect</button> ·
+                <button type="button" class="dlcp-link-button" data-action="help">How the two compare</button></p>`
+        }
+      </section>
       ${
         linked
-          ? `<p class="dlcp-notice dlcp-notice--warning">This world is linked to <strong>${escapeHtml(linked.name)}</strong>.
-            With premium sync, creating this campaign links the world to it instead. ${escapeHtml(linked.name)}'s journals stay where they are.</p>`
+          ? `<p class="dlcp-notice dlcp-notice--warning">This world's campaign is <strong>${escapeHtml(linked.name)}</strong>.
+            The new campaign takes its place. ${escapeHtml(linked.name)}'s journals stay where they are.</p>`
           : ""
       }`;
   }
 
   #renderCreated() {
+    if (this.#created.local) return this.#renderCreatedLocal();
     const { campaign, linked, linkError } = this.#created;
     const url = `${this.sync.baseUrl}${campaign.url ?? ""}`;
     const sync = linked
@@ -339,6 +362,27 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       <div class="dlcp-buttons">
         <a class="button" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open on Dungeon Master Guru</a>
         ${linked ? `<button type="button" data-action="openDashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>` : ""}
+      </div>`;
+  }
+
+  #renderCreatedLocal() {
+    const { campaign } = this.#created;
+    return `
+      <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
+      <p>It lives in this world. Its journals are in the "${escapeHtml(campaign.name)}" folder, and the Campaign Dashboard
+        is open.</p>
+      <h3>What to do next</h3>
+      <ol>
+        <li><strong>Give your villain a threat.</strong> On the Dashboard, add a threat with grim portents and a clock that
+          fills if the heroes do nothing.</li>
+        <li><strong>Add the cast and places.</strong> Use the Dashboard's Add button for NPCs, places and factions.</li>
+        <li><strong>Hide some secrets.</strong> Add clues the party could find, about three for each thing worth learning.</li>
+        <li><strong>Prep the first session.</strong> Open its journal page in the Sessions entry and write a strong start.</li>
+      </ol>
+      <p class="dlcp-muted">Want AI help, or to plan from anywhere? You can move this campaign to Dungeon Master Guru later.
+        <button type="button" class="dlcp-link-button" data-action="help">How it works</button></p>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="openDashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>
       </div>`;
   }
 
@@ -442,18 +486,47 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     game.modules.get(MODULE_ID).api.openDashboard();
   }
 
+  // Asks before a new campaign takes the place of this world's campaign
+  async #confirmReplace() {
+    const linked = this.sync.linked;
+    if (!linked) return true;
+    return foundry.applications.api.DialogV2.confirm({
+      window: { title: "Create a new campaign" },
+      content: `<p>This world's campaign is <strong>${escapeHtml(linked.name)}</strong>. The new campaign takes its place;
+        ${escapeHtml(linked.name)}'s journals stay where they are. Create it?</p>`,
+    });
+  }
+
+  static async #onCreateLocal() {
+    const invalid = validateAll(this.#draft.values);
+    if (invalid) return this.#goTo(invalid.step, invalid.error);
+    if (!(await this.#confirmReplace())) return;
+
+    this.#busy = true;
+    this.#error = null;
+    await this.render();
+    try {
+      const campaign = await this.sync.createLocal(this.#draft);
+      await this.#writeDraft(null);
+      this.#created = { campaign, local: true };
+      this.#focusHeading = true;
+      game.modules.get(MODULE_ID).api.openDashboard();
+    } catch (error) {
+      this.#error = `Couldn't create the campaign: ${error.message}`;
+    } finally {
+      this.#busy = false;
+      this.render();
+    }
+  }
+
+  static #onHelp() {
+    game.modules.get(MODULE_ID).api.openHelp();
+  }
+
   static async #onCreate() {
     const invalid = validateAll(this.#draft.values);
     if (invalid) return this.#goTo(invalid.step, invalid.error);
-    const linked = this.sync.linked;
-    if (linked) {
-      const confirmed = await foundry.applications.api.DialogV2.confirm({
-        window: { title: "Create a new campaign" },
-        content: `<p>This world is linked to <strong>${escapeHtml(linked.name)}</strong>. With premium sync, the new
-          campaign takes its place; ${escapeHtml(linked.name)}'s journals stay where they are. Create it?</p>`,
-      });
-      if (!confirmed) return;
-    }
+    if (!(await this.#confirmReplace())) return;
 
     this.#busy = true;
     this.#error = null;

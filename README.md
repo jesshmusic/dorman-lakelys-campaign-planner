@@ -1,35 +1,48 @@
 # Dorman Lakely's Campaign Planner
 
-Plan your campaign on [Dungeon Master Guru](https://dungeonmaster.guru), then run it in Foundry VTT.
+Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at the table from the Campaign Dashboard. No account needed. When you want AI help, connect to [Dungeon Master Guru](https://dungeonmaster.guru) and plan there too.
 
-This module brings a Dungeon Master Guru campaign into your world and keeps it in sync:
+## Two ways to plan
 
-- **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it.
+**In your world (free, no account).** Click **New** in the Journal sidebar. A step-by-step guide walks you through what kind of game, the pitch, your table (party, levels, sessions), the world and its truths, and your books, explaining why each step matters. Click **Create in this world**, and you get:
+
+- **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it. A story arc starts with its sessions, three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.
 - **Campaign Dashboard:** your at-the-table view.
-  - The next session's strong start, scenes and log.
+  - The next session and its log.
   - Threat clocks you can advance, and grim portents you can tick off.
-  - Secrets to reveal.
-  - Open quests with their status.
-- **Two-way sync:** changes you make on Dungeon Master Guru come into Foundry automatically, and changes you make in the dashboard go back. If the same thing was changed in both places, you choose which to keep.
-- **Your compendiums on Dungeon Master Guru:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and compendium IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in the session journals. Drag one onto a scene to place a token, or click it to open the stat block or item.
+  - Secrets and clues to reveal.
+  - Quests and their status.
+  - Add threats, secrets, quests, NPCs, places, factions and sessions as you go.
 
-- **New campaign, step by step:** plan a campaign without leaving Foundry. The guide walks through what kind of game, the pitch, the party (from this world's player characters), the world and its truths, and your books, then creates it on Dungeon Master Guru. Creating a campaign is free; with premium sync, the world is linked to it straight away. Your answers are kept in this browser until you create it.
-- **Player characters:** your world's Player Character actors go to Dungeon Master Guru, where each campaign picks its party and shows their character sheets. The sheets update a few seconds after they change in Foundry. Spell, feature and item descriptions stay in Foundry; only their names are sent.
+**On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
 
-Campaign sync is a [Patreon](https://www.patreon.com/c/DormanLakely) premium feature.
+- **AI planning:** draft a cast, threats, places, quests and clues from your brief, get ideas for each step of session prep, and turn your session log into a recap. Use your own OpenAI key, or a Patreon membership.
+- **Two-way sync** ([Patreon](https://www.patreon.com/c/DormanLakely) premium): the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
+- **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
+- **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
 
-## Setup
+The **How it works** window (the **?** button in the Journal sidebar) explains both, step by step. It opens once the first time a GM loads the module.
 
-1. On Dungeon Master Guru, link your Patreon account and create an API token: **Dashboard → Connections → API tokens**.
-2. In Foundry, enable the module, then open **Settings → Module Settings → Dorman Lakely's Campaign Planner → Connect**.
-3. Paste the token, choose a campaign, and click **Link campaign**.
-4. Open the **Campaign Dashboard** from the Journal Notes scene controls.
+## Finding things
 
-No campaign yet? Click **New campaign** in the Connect window or the Campaign Dashboard to start one step by step.
+The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 
-The compendium index is sent when the GM loads the world, and again whenever a book module updates. To send it now, click **Send compendium index** in the Connect window. Each campaign on Dungeon Master Guru can turn compendiums off in its **Compendiums** list.
+| Button | What it does |
+|---|---|
+| **Campaign** | Opens the Campaign Dashboard. Also in the scene controls, under Journal Notes. |
+| **New** | Starts a new campaign, step by step. Your answers are kept as you go. |
+| **Open** | Opens another campaign: one in this world, or one on Dungeon Master Guru when you're connected. |
+| **?** | How it works. |
+
+## Connecting to Dungeon Master Guru
+
+1. Make a free account at [dungeonmaster.guru](https://dungeonmaster.guru), then create an API token: **Dashboard → Connections → API tokens**.
+2. In Foundry, open **Settings → Module Settings → Dorman Lakely's Campaign Planner → Connect**, or the Dashboard's menu.
+3. Paste the token and click **Check connection**. Then link a campaign, or create one with **New** → **Create on Dungeon Master Guru**.
 
 The token is saved in your browser only. It is never stored in the world, so your players never receive it.
+
+The compendium index is sent when the GM loads the world, and again whenever a book module updates. To send it now, click **Send compendium index** in the Connect window. Each campaign on Dungeon Master Guru can turn compendiums off in its **Compendiums** list.
 
 ## Settings
 

@@ -3,6 +3,7 @@ import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
 import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
 import { characterPayload, isPlayerCharacter, partyOption } from "./characters.mjs";
+import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -60,9 +61,11 @@ function pageName(collection, record) {
 }
 
 /**
- * Keeps this world's journals in step with the linked Dungeon Master Guru
- * campaign. Each record is a journal page whose flags hold the record JSON
- * and its sync version; the Campaign Dashboard reads from those flags.
+ * Keeps this world's journals in step with its campaign. Each record is a
+ * journal page whose flags hold the record JSON; the Campaign Dashboard reads
+ * from those flags. A campaign is either linked to Dungeon Master Guru (and
+ * synced both ways) or local: it lives only in this world, and changes are
+ * saved straight to its journals.
  */
 export class CampaignSync {
   #pulling = null;
@@ -81,8 +84,14 @@ export class CampaignSync {
     return game.settings.get(MODULE_ID, SETTINGS.baseUrl) || DEFAULT_BASE_URL;
   }
 
+  /** True for a campaign that lives only in this world */
+  get isLocal() {
+    return Boolean(this.linked?.local);
+  }
+
+  // Ready to sync with Dungeon Master Guru (a local campaign never is)
   get ready() {
-    return Boolean(game.user.isGM && this.token && this.linked);
+    return Boolean(game.user.isGM && this.token && this.linked && !this.isLocal);
   }
 
   api(token = this.token) {
@@ -110,6 +119,7 @@ export class CampaignSync {
 
   /** Pulls changes from Dungeon Master Guru into the journals */
   pull({ full = false } = {}) {
+    if (this.isLocal) return Promise.reject(new Error("This campaign lives in this world; there's nothing to sync."));
     this.#pulling ??= this.#pull(full).finally(() => {
       this.#pulling = null;
     });
@@ -179,6 +189,12 @@ export class CampaignSync {
    * DM when both sides changed the same thing. Returns true when saved.
    */
   async update(collection, record, attributes) {
+    if (this.isLocal) {
+      return this.#saveRecord(
+        collection,
+        applyLocalChange(collection, record, attributes, { now: () => new Date().toISOString() }),
+      );
+    }
     const type = PUSH_TYPES[collection];
     if (!type) throw new Error(`Can't change ${collection} from Foundry.`);
 
@@ -291,6 +307,60 @@ export class CampaignSync {
       .map((actor) => characterPayload(actor, { users, labels, toText: htmlToText }));
   }
 
+  /**
+   * Creates a campaign in this world from the setup guide's answers, with its
+   * template's sessions, quests and threat, and makes it this world's campaign.
+   * Needs no Dungeon Master Guru account.
+   */
+  async createLocal(draft) {
+    const { campaign, records } = buildLocalCampaign(draft, { id: () => foundry.utils.randomID(16) });
+    await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, local: true });
+    const entries = await this.#ensureEntries(campaign.name);
+    const store = this.records();
+    store.campaign.set(campaign.id, campaign);
+    for (const [collection, list] of Object.entries(records)) {
+      for (const record of list) store[collection].set(record.id, record);
+    }
+    const context = this.#renderContext(store);
+    for (const { collection } of SECTIONS) {
+      await this.#writePages(entries[collection], collection, [...store[collection].values()], new Set(), context);
+    }
+    Hooks.callAll(SYNCED_HOOK);
+    return campaign;
+  }
+
+  /**
+   * Adds a record to this world's local campaign from an Add form.
+   * Returns the record, or { error } when the form is missing something.
+   */
+  async addLocal(collection, values) {
+    if (!this.isLocal) return { error: "Add to this campaign on Dungeon Master Guru; it syncs here." };
+    const existing = [...(this.records()[collection]?.values() ?? [])];
+    const record = newRecord(collection, values, { id: () => foundry.utils.randomID(16), existing });
+    if (record.error) return record;
+    await this.#saveRecord(collection, record);
+    return record;
+  }
+
+  /** The campaigns that live in this world: [{ uuid, name }] */
+  localCampaigns() {
+    const campaigns = [];
+    for (const folder of game.folders.filter((f) => f.type === "JournalEntry" && flag(f, "campaignUuid"))) {
+      const overview = game.journal.find(
+        (entry) => entry.folder?.id === folder.id && flag(entry, "collection") === "campaign",
+      );
+      const record = overview?.pages.contents.map((page) => flag(page, "record")).find(Boolean);
+      if (record?.local) campaigns.push({ uuid: record.uuid, name: record.name });
+    }
+    return campaigns.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Makes one of this world's own campaigns the one the Dashboard shows */
+  async useLocal(campaign) {
+    await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, local: true });
+    Hooks.callAll(SYNCED_HOOK);
+  }
+
   /** Links this world to a campaign and pulls it into the journals */
   async link(campaign) {
     await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, cursor: 0 });
@@ -312,6 +382,7 @@ export class CampaignSync {
     return {
       baseUrl: this.baseUrl,
       compendiumUuid: this.#compendiumLookup(store),
+      actorName: (uuid) => fromUuidSync(uuid)?.name ?? null,
       references: [...store.references.values()],
       nameOf: (collection, id) => {
         if (id === null || id === undefined) return null;
@@ -331,7 +402,7 @@ export class CampaignSync {
     let folder = this.folder;
     if (!folder) {
       folder = await Folder.create({
-        name: `${campaignName} (DM Guru)`,
+        name: this.isLocal ? campaignName : `${campaignName} (DM Guru)`,
         type: "JournalEntry",
         flags: { [MODULE_ID]: { campaignUuid: uuid } },
       });
@@ -363,8 +434,9 @@ export class CampaignSync {
         "text.content": content,
         [`flags.${MODULE_ID}`]: { uuid: record.uuid, collection, syncVersion: record.syncVersion, record },
       };
-      // Sessions in play order; other pages keep their creation order
+      // Sessions in play order and main quests by act; other pages keep their creation order
       if (collection === "sessions") data.sort = record.number * 1000;
+      if (collection === "quests") data.sort = (record.kind === "main" ? 0 : 100000) + (record.act ?? 99) * 1000 + (record.position ?? 0);
       const page = pages.get(record.uuid);
       if (!page) {
         creates.push(

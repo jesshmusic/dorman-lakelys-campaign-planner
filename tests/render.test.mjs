@@ -188,6 +188,18 @@ test("makes no compendium link from an unsafe uuid", () => {
   assert.equal(compendiumLink("Compendium.x.Actor.a", "Odd}Name"), "@UUID[Compendium.x.Actor.a]{OddName}");
 });
 
+test("lists a local campaign's party as actor links", () => {
+  const html = renderRecord(
+    "campaign",
+    { name: "Zombie Siege", partyActorUuids: ["Actor.akra000000000000", "Actor.gone"] },
+    { ...context, actorName: (uuid) => (uuid === "Actor.akra000000000000" ? "Akra" : null) },
+  );
+
+  assert.match(html, /<h3>The party<\/h3>/);
+  assert.match(html, /@UUID\[Actor\.akra000000000000\]\{Akra\}/);
+  assert.match(html, /@UUID\[Actor\.gone\]\{Character\}/);
+});
+
 test("renders a revealed secret with its session", () => {
   const html = renderRecord(
     "secrets",

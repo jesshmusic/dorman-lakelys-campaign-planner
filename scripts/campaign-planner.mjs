@@ -3,6 +3,8 @@ import { CampaignSync } from "./sync.mjs";
 import { ConnectApp } from "./apps/connect-app.mjs";
 import { DashboardApp } from "./apps/dashboard-app.mjs";
 import { NewCampaignApp } from "./apps/new-campaign-app.mjs";
+import { HelpApp } from "./apps/help-app.mjs";
+import { openCampaignPicker } from "./apps/campaign-picker.mjs";
 import { DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
@@ -26,6 +28,13 @@ let newCampaign = null;
 function openNewCampaign() {
   newCampaign ??= new NewCampaignApp();
   newCampaign.render({ force: true });
+}
+
+let help = null;
+
+function openHelp() {
+  help ??= new HelpApp();
+  help.render({ force: true });
 }
 
 async function autoSync({ notifyErrors = false } = {}) {
@@ -69,6 +78,14 @@ Hooks.once("init", () => {
     config: false,
     type: Object,
     default: {},
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.welcomed, {
+    name: "Seen the Campaign Planner welcome",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: false,
   });
 
   game.settings.register(MODULE_ID, SETTINGS.campaign, {
@@ -159,8 +176,14 @@ function watchCharacters() {
 }
 
 Hooks.once("ready", () => {
-  game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect, openNewCampaign };
+  game.modules.get(MODULE_ID).api = { sync, openDashboard, openConnect, openNewCampaign, openHelp, openCampaignPicker };
   if (!game.user.isGM) return;
+
+  // The first time a GM loads the module, show how it works
+  if (!game.settings.get(MODULE_ID, SETTINGS.welcomed)) {
+    openHelp();
+    game.settings.set(MODULE_ID, SETTINGS.welcomed, true);
+  }
 
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
   scheduleAutoSync();
@@ -181,4 +204,30 @@ Hooks.on("getSceneControlButtons", (controls) => {
     button: true,
     onChange: () => openDashboard(),
   };
+});
+
+// Campaign Planner buttons at the top of the Journal sidebar, for the GM
+Hooks.on("renderJournalDirectory", (_app, html) => {
+  if (!game.user.isGM) return;
+  const element = html instanceof HTMLElement ? html : html?.[0];
+  const header = element?.querySelector(".directory-header");
+  if (!header || header.querySelector(".dlcp-directory")) return;
+  const row = document.createElement("div");
+  row.className = "dlcp-directory action-buttons flexrow";
+  row.innerHTML = `
+    <button type="button" data-dlcp="dashboard"><i class="fas fa-scroll"></i> Campaign</button>
+    <button type="button" data-dlcp="new"><i class="fas fa-feather-alt"></i> New</button>
+    <button type="button" data-dlcp="open"><i class="fas fa-folder-open"></i> Open</button>
+    <button type="button" data-dlcp="help" class="dlcp-icon-button" aria-label="Campaign Planner help" data-tooltip="Campaign Planner help">
+      <i class="fas fa-circle-question"></i></button>`;
+  row.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-dlcp]")?.dataset.dlcp;
+    if (action === "dashboard") openDashboard();
+    else if (action === "new") openNewCampaign();
+    else if (action === "open") openCampaignPicker();
+    else if (action === "help") openHelp();
+  });
+  const actions = header.querySelector(".header-actions");
+  if (actions) actions.after(row);
+  else header.prepend(row);
 });
