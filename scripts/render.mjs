@@ -52,6 +52,18 @@ export function compendiumLink(uuid, name) {
   return `@UUID[${uuid}]{${escapeHtml(name).replaceAll("}", "")}}`;
 }
 
+const COINS = ["pp", "gp", "ep", "sp", "cp"];
+
+/** Coins as one line, biggest first: { gp: 150, sp: 30 } -> "150 gp, 30 sp" */
+export function currencyText(currency) {
+  return COINS.filter((coin) => Number(currency?.[coin]) > 0)
+    .map((coin) => `${Number(currency[coin])} ${coin}`)
+    .join(", ");
+}
+
+// A line with a label and a link (or other markup that's already safe)
+const linkFact = (label, html) => (html ? `<p><strong>${escapeHtml(label)}:</strong> ${html}</p>` : "");
+
 const MONSTER_CATEGORIES = ["monster"];
 const TREASURE_CATEGORIES = ["magic_item", "equipment", "table"];
 
@@ -87,6 +99,8 @@ const RENDERERS = {
 
   npcs: (npc, { baseUrl, nameOf, compendiumUuid }) => {
     const statBlocks = [];
+    const actorLink = compendiumLink(npc.foundryActorUuid, npc.foundryActorName ?? npc.name);
+    if (actorLink) statBlocks.push(actorLink);
     if (npc.statBlockReference) statBlocks.push(referenceLink(npc.statBlockReference));
     const monsterLink = npc.monster && compendiumLink(compendiumUuid?.("monster", npc.monster.name), npc.monster.name);
     if (monsterLink) {
@@ -115,6 +129,7 @@ const RENDERERS = {
   locations: (location, { nameOf }) =>
     [
       fact("Inside", nameOf("locations", location.parentId)),
+      linkFact("Map", compendiumLink(location.foundrySceneUuid, location.foundrySceneName ?? "Map")),
       para(location.description),
       section("Fantastic features", list(location.features)),
       section("Notes", para(location.notes)),
@@ -149,7 +164,7 @@ const RENDERERS = {
       fact("Act", quest.act),
       fact(
         "Levels",
-        quest.levelMin && quest.levelMax ? `${quest.levelMin}–${quest.levelMax}` : quest.levelMin ?? quest.levelMax,
+        quest.levelMin && quest.levelMax ? `${quest.levelMin}–${quest.levelMax}` : (quest.levelMin ?? quest.levelMax),
       ),
       fact("Quest giver", nameOf("npcs", quest.giverNpcId)),
       fact("Where", nameOf("locations", quest.locationId)),
@@ -166,13 +181,26 @@ const RENDERERS = {
       `<p><em>${secret.revealed ? `Revealed${secret.revealedSessionId ? ` in ${escapeHtml(nameOf("sessions", secret.revealedSessionId) ?? "a session")}` : ""}` : "Not revealed yet"}</em></p>`,
     ].join(""),
 
-  sessions: (session, { references, compendiumUuid }) => {
+  sessions: (session, { references, compendiumUuid, recordOf }) => {
     const withDetail = (html, detail) => (detail ? `${html} (${escapeHtml(detail)})` : html);
     const linkLine = (link) => {
       if (link.linkableType === "CampaignReference") {
         const reference = references.find((r) => r.id === link.linkableId);
         if (!reference) return text(link.name);
-        return withDetail(referenceLink(reference), reference.challengeRating && `CR ${reference.challengeRating}`);
+        const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
+        return withDetail(
+          `${referenceLink(reference)}${quantity}`,
+          reference.challengeRating && `CR ${reference.challengeRating}`,
+        );
+      }
+      // A place's map, or an NPC's actor, next to its name
+      if (link.linkableType === "CampaignLocation" || link.linkableType === "CampaignNpc") {
+        const record = recordOf?.(link.linkableType === "CampaignLocation" ? "locations" : "npcs", link.linkableId);
+        const extra =
+          link.linkableType === "CampaignLocation"
+            ? compendiumLink(record?.foundrySceneUuid, record?.foundrySceneName ?? "Map")
+            : compendiumLink(record?.foundryActorUuid, record?.foundryActorName ?? link.name);
+        return `${withDetail(escapeHtml(link.name), link.detail)}${extra ? ` · ${extra}` : ""}`;
       }
       // Monsters and items from Dungeon Master Guru's SRD link to the compendium entry of the same name
       const kind = { Monster: "monster", Item: "item" }[link.linkableType];
@@ -194,12 +222,24 @@ const RENDERERS = {
       section("2. Strong start", para(session.strongStart)),
       section("3. Potential scenes", list(session.scenes)),
       section("4. Secrets and clues", linkList(linksOf("CampaignSecret"))),
-      section("5. Fantastic locations", linkList(linksOf("CampaignLocation"))),
+      section(
+        "5. Fantastic locations",
+        linkList(linksOf("CampaignLocation")) +
+          linkFact(
+            "Maps",
+            (session.foundryScenes ?? [])
+              .map((scene) => compendiumLink(scene.uuid, scene.name))
+              .filter(Boolean)
+              .join(", "),
+          ),
+      ),
       section("6. Important NPCs", linkList(linksOf("CampaignNpc"))),
       section("7. Relevant monsters", linkList([...linksOf("Monster"), ...bookLinks(MONSTER_CATEGORIES)])),
       section(
         "8. Treasure",
-        para(session.treasure) + linkList([...linksOf("Item"), ...bookLinks(TREASURE_CATEGORIES)]),
+        para(session.treasure) +
+          fact("Coins", currencyText(session.treasureCurrency)) +
+          linkList([...linksOf("Item"), ...bookLinks(TREASURE_CATEGORIES)]),
       ),
       section("Session log", para(session.log)),
       section("Recap", para(session.recap)),

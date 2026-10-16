@@ -44,6 +44,14 @@ export const TYPE_COLLECTIONS = {
 };
 
 // Records Foundry may change, and the push type the server expects
-export const PUSH_TYPES = { fronts: "front", quests: "quest", secrets: "secret", sessions: "session" };
+export const PUSH_TYPES = {
+  fronts: "front",
+  quests: "quest",
+  secrets: "secret",
+  sessions: "session",
+  // Foundry-only fields: a place's map and an NPC's actor
+  locations: "location",
+  npcs: "npc",
+};
 
 export const AUTO_SYNC_MINUTES = 2;

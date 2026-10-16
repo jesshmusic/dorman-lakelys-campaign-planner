@@ -11,6 +11,13 @@ export const QUEST_STATUSES = ["available", "active", "completed", "failed"];
 export const SESSION_STATUSES = ["planned", "prepped", "played"];
 export const THREE_CLUES = 3;
 const MAX_NAME = 120;
+const MAX_SCENES = 20;
+const MAX_COINS = 1000000;
+const MAX_QUANTITY = 9999;
+export const COINS = ["pp", "gp", "ep", "sp", "cp"];
+// Foundry ids, as Dungeon Master Guru checks them
+const SCENE_UUID = /^Scene\.[A-Za-z0-9]{16}$/;
+const ACTOR_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?Actor\.[A-Za-z0-9]{16}$/;
 const LIMITS = { stakes: 10, features: 20, scenes: 20, portents: 10 };
 const ROLE_LABELS = {
   bbeg: "BBEG",
@@ -290,6 +297,63 @@ export function applyBrief(campaign, values) {
   return { record: { ...campaign, ...changes } };
 }
 
+/**
+ * The attributes that set (or clear, with no uuid) a place's map, or { error }.
+ * @param {string|null} uuid a scene, e.g. "Scene.QdI6Ix83ypmPq4lc"
+ */
+export function sceneChange(uuid, name) {
+  if (!uuid) return { foundrySceneUuid: null, foundrySceneName: null };
+  if (!SCENE_UUID.test(uuid)) return { error: "That isn't a scene from this world." };
+  return { foundrySceneUuid: uuid, foundrySceneName: String(name ?? "Map").slice(0, MAX_NAME) };
+}
+
+/**
+ * The attributes that set (or clear) an NPC's actor, or { error }.
+ * @param {string|null} uuid a world or compendium actor
+ */
+export function actorChange(uuid, name) {
+  if (!uuid) return { foundryActorUuid: null, foundryActorName: null };
+  if (!ACTOR_UUID.test(uuid)) return { error: "That isn't an actor." };
+  return { foundryActorUuid: uuid, foundryActorName: String(name ?? "Stat block").slice(0, MAX_NAME) };
+}
+
+/** A session's maps with one added (once), or { error } */
+export function addSessionScene(scenes, uuid, name) {
+  if (!SCENE_UUID.test(uuid ?? "")) return { error: "That isn't a scene from this world." };
+  if ((scenes ?? []).some((scene) => scene.uuid === uuid)) return { scenes: scenes ?? [] };
+  if ((scenes ?? []).length >= MAX_SCENES) return { error: `Up to ${MAX_SCENES} maps a session.` };
+  return { scenes: [...(scenes ?? []), { uuid, name: String(name ?? "Map").slice(0, MAX_NAME) }] };
+}
+
+/** Coins from form values (coin_pp, coin_gp, ...): { gp: 150 }, or { error } */
+export function coinsFrom(values) {
+  const coins = {};
+  for (const coin of COINS) {
+    const amount = whole(values[`coin_${coin}`]);
+    if (Number.isNaN(amount) || (amount !== null && (amount < 0 || amount > MAX_COINS))) {
+      return { error: `Coins must be whole numbers from 0 to ${MAX_COINS.toLocaleString("en")}.` };
+    }
+    if (amount) coins[coin] = amount;
+  }
+  return { coins };
+}
+
+/** A session with one link's quantity set (1 or blank clears it), or { error } */
+export function setLinkQuantity(session, linkId, value) {
+  const quantity = whole(value);
+  if (Number.isNaN(quantity) || (quantity !== null && (quantity < 1 || quantity > MAX_QUANTITY))) {
+    return { error: `Quantity must be a whole number from 1 to ${MAX_QUANTITY}.` };
+  }
+  return {
+    record: {
+      ...session,
+      links: (session.links ?? []).map((link) =>
+        link.id === linkId ? { ...link, quantity: quantity && quantity > 1 ? quantity : null } : link,
+      ),
+    },
+  };
+}
+
 /** A session after its prep is saved, or { error } */
 export function applySessionPrep(session, values) {
   const level = whole(values.level);
@@ -302,6 +366,8 @@ export function applySessionPrep(session, values) {
   if (scenes.length > LIMITS.scenes) return { error: `Up to ${LIMITS.scenes} scenes.` };
   const scheduledOn = text(values.scheduledOn);
   if (scheduledOn && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledOn)) return { error: "Pick a date for the session." };
+  const { coins, error } = coinsFrom(values);
+  if (error) return { error };
   return {
     record: {
       ...session,
@@ -314,6 +380,7 @@ export function applySessionPrep(session, values) {
       strongStart: text(values.strongStart),
       scenes,
       treasure: text(values.treasure),
+      treasureCurrency: coins,
     },
   };
 }
@@ -371,7 +438,8 @@ export function setSessionLinks(session, collection, ids, records, id) {
     .filter((linkableId) => byId.has(linkableId))
     .map((linkableId) => {
       const record = byId.get(linkableId);
-      const key = existing.get(linkableId)?.id ?? id();
+      const before = existing.get(linkableId);
+      const key = before?.id ?? id();
       return {
         id: key,
         uuid: key,
@@ -381,6 +449,7 @@ export function setSessionLinks(session, collection, ids, records, id) {
         slug: null,
         detail: linkDetail(collection, record),
         position: 0,
+        quantity: before?.quantity ?? null,
       };
     });
   return { ...session, links: [...keep, ...wanted].map((link, position) => ({ ...link, position })) };

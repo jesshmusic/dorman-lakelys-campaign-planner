@@ -2,6 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   EDIT_FORMS,
+  actorChange,
+  addSessionScene,
+  coinsFrom,
+  sceneChange,
+  setLinkQuantity,
   applyBrief,
   applyEdit,
   applySessionPrep,
@@ -310,4 +315,72 @@ test("lists what to do next, as the website does", () => {
     ],
   );
   assert.equal(steps[4].sessionId, "a");
+});
+
+test("sets a place's map from a scene in this world", () => {
+  assert.deepEqual(sceneChange("Scene.QdI6Ix83ypmPq4lc", "Mountain Pass"), {
+    foundrySceneUuid: "Scene.QdI6Ix83ypmPq4lc",
+    foundrySceneName: "Mountain Pass",
+  });
+  assert.deepEqual(sceneChange(null), { foundrySceneUuid: null, foundrySceneName: null });
+  assert.deepEqual(sceneChange("Compendium.x.y.Scene.QdI6Ix83ypmPq4lc"), {
+    error: "That isn't a scene from this world.",
+  });
+});
+
+test("sets an NPC's actor from the world or a compendium", () => {
+  assert.equal(actorChange("Actor.akra000000000000", "Akra").foundryActorUuid, "Actor.akra000000000000");
+  assert.equal(
+    actorChange("Compendium.dnd-monster-manual.actors.Actor.mmCultFanatic000", "Cult Fanatic").foundryActorName,
+    "Cult Fanatic",
+  );
+  assert.deepEqual(actorChange("Item.abc"), { error: "That isn't an actor." });
+  assert.deepEqual(actorChange(""), { foundryActorUuid: null, foundryActorName: null });
+});
+
+test("adds a map to a session once", () => {
+  const first = addSessionScene([], "Scene.QdI6Ix83ypmPq4lc", "Mountain Pass").scenes;
+  assert.deepEqual(first, [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Mountain Pass" }]);
+  assert.equal(addSessionScene(first, "Scene.QdI6Ix83ypmPq4lc", "Again").scenes.length, 1);
+  assert.deepEqual(addSessionScene(first, "Actor.x"), { error: "That isn't a scene from this world." });
+});
+
+test("reads coins, leaving out the empty ones", () => {
+  assert.deepEqual(coinsFrom({ coin_gp: "150", coin_sp: " 30 ", coin_cp: "0", coin_pp: "" }), {
+    coins: { gp: 150, sp: 30 },
+  });
+  assert.deepEqual(coinsFrom({ coin_gp: "-5" }), { error: "Coins must be whole numbers from 0 to 1,000,000." });
+  assert.deepEqual(coinsFrom({ coin_gp: "2.5" }), { error: "Coins must be whole numbers from 0 to 1,000,000." });
+});
+
+test("saves a session's coins with its prep", () => {
+  const { record } = applySessionPrep({ id: "s", number: 1, status: "planned" }, { coin_gp: "100", coin_ep: "4" });
+  assert.deepEqual(record.treasureCurrency, { gp: 100, ep: 4 });
+});
+
+test("sets how many of a treasure item there are", () => {
+  const session = { links: [{ id: "k1", linkableType: "CampaignReference", linkableId: "r1", quantity: null }] };
+
+  assert.equal(setLinkQuantity(session, "k1", "3").record.links[0].quantity, 3);
+  assert.equal(setLinkQuantity(session, "k1", "1").record.links[0].quantity, null);
+  assert.deepEqual(setLinkQuantity(session, "k1", "0"), { error: "Quantity must be a whole number from 1 to 9999." });
+});
+
+test("keeps an item's quantity when the session's links change", () => {
+  const session = {
+    links: [{ id: "k1", linkableType: "CampaignReference", linkableId: "r1", name: "Gem", quantity: 4 }],
+  };
+  const references = [
+    { id: "r1", name: "Gem", citation: "SRD 5.2" },
+    { id: "r2", name: "Rope", citation: "SRD 5.2" },
+  ];
+  const updated = setSessionLinks(session, "references", ["r1", "r2"], references, ids());
+
+  assert.deepEqual(
+    updated.links.map((l) => [l.linkableId, l.quantity]),
+    [
+      ["r1", 4],
+      ["r2", null],
+    ],
+  );
 });

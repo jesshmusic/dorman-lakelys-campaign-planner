@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **Maps:** give a place its Foundry scene, and a session its maps, by dragging scenes from the Scenes directory. They're links in the journals, and the Dashboard can show a map to you or activate it for the players.
+- **NPC actors:** drop an actor (from the world or a compendium) on an NPC for their stat block, or drop one on the Cast tab to add them as a new NPC.
+- **Treasure:** coins and item quantities in session prep. The Dashboard lists them, and items can be dragged onto a character's sheet to hand them out.
+- For Dungeon Master Guru campaigns, maps and actors are set here too, and sync.
 - **Campaign Planner:** a full planner in Foundry for campaigns in the world, with the same tabs as Dungeon Master Guru: Overview with Getting started, Party, Story (threats and factions), Quests, Cast, Places, Secrets with the Three Clue Rule check, and Sessions with the eight steps of prep. Add, edit and delete everything; deleting clears anything that pointed to it. Drag monsters, items and roll tables in from your compendiums. Dungeon Master Guru campaigns show read-only.
 - The Journal sidebar's buttons are now Plan, Run, New, Open and help.
 - **Plan in your world, no account needed:** the New campaign guide can create the campaign right in this world, with the same journals and template structure. The Campaign Dashboard works on it, and can add threats, secrets, quests, NPCs, places, factions and sessions.

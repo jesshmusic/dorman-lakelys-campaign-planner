@@ -436,6 +436,7 @@ export class CampaignSync {
       baseUrl: this.baseUrl,
       compendiumUuid: this.#compendiumLookup(store),
       actorName: (uuid) => fromUuidSync(uuid)?.name ?? null,
+      recordOf: (collection, id) => store[collection]?.get(String(id)) ?? null,
       references: [...store.references.values()],
       nameOf: (collection, id) => {
         if (id === null || id === undefined) return null;

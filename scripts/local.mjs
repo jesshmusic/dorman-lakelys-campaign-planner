@@ -55,6 +55,9 @@ const BLANKS = {
     log: null,
     recap: null,
     links: [],
+    // Foundry scenes (maps) for the session, and its coins: { uuid, name }[] and { pp, gp, ep, sp, cp }
+    foundryScenes: [],
+    treasureCurrency: {},
   }),
   fronts: (r) => ({
     name: r.name,
@@ -103,6 +106,9 @@ const BLANKS = {
     factionId: null,
     monster: null,
     statBlockReference: null,
+    // The Foundry actor that is this NPC's stat block, from the world or a compendium
+    foundryActorUuid: r.foundryActorUuid ?? null,
+    foundryActorName: r.foundryActorName ?? null,
   }),
   locations: (r) => ({
     name: r.name,
@@ -111,6 +117,9 @@ const BLANKS = {
     notes: null,
     parentId: null,
     foundryMapId: null,
+    // The Foundry scene that maps this place
+    foundrySceneUuid: null,
+    foundrySceneName: null,
   }),
   factions: (r) => ({ name: r.name, description: r.description ?? null, goal: r.goal ?? null, notes: null }),
 };
@@ -335,6 +344,8 @@ export function newRecord(collection, values, { id, existing = [] }) {
       return record(
         collection,
         {
+          foundryActorUuid: text("foundryActorUuid"),
+          foundryActorName: text("foundryActorName"),
           name: text("name"),
           role: NPC_ROLES.includes(values.role) ? values.role : "neutral",
           description: text("description"),
@@ -382,7 +393,9 @@ export function applyLocalChange(collection, record, attributes, { now }) {
   const allowed = {
     fronts: ["clockFilled", "portents"],
     quests: ["status"],
-    sessions: ["log", "recap", "status"],
+    sessions: ["log", "recap", "status", "foundryScenes", "treasureCurrency"],
+    locations: ["foundrySceneUuid", "foundrySceneName"],
+    npcs: ["foundryActorUuid", "foundryActorName"],
   }[collection];
   if (!allowed) return record;
   const changes = Object.fromEntries(Object.entries(attributes).filter(([key]) => allowed.includes(key)));

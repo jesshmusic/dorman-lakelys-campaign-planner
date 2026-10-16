@@ -1,4 +1,4 @@
-import { clockSvg, escapeHtml } from "../render.mjs";
+import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { ADD_FORMS } from "../local.mjs";
 
@@ -33,6 +33,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       newCampaign: DashboardApp.#onNewCampaign,
       help: DashboardApp.#onHelp,
       plan: DashboardApp.#onPlan,
+      viewScene: DashboardApp.#onViewScene,
+      activateScene: DashboardApp.#onActivateScene,
       openCampaign: DashboardApp.#onOpenCampaign,
       add: DashboardApp.#onAdd,
       openJournals: DashboardApp.#onOpenJournals,
@@ -162,6 +164,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         <h2>${escapeHtml(session.displayTitle)}${session.status === "played" ? " (played)" : ""}</h2>
         ${session.strongStart ? `<p><strong>Strong start:</strong> ${escapeHtml(session.strongStart)}</p>` : ""}
         ${scenes}
+        ${this.#renderMaps(session)}
+        ${this.#renderTreasure(session)}
         <label for="dlcp-log"><strong>Session log</strong></label>
         <textarea id="dlcp-log" rows="5" placeholder="What happened? Names you made up, promises, loose ends…">${escapeHtml(session.log ?? "")}</textarea>
         <div class="dlcp-buttons">
@@ -169,6 +173,40 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
           ${session.status !== "played" ? `<button type="button" data-action="markPlayed"><i class="fas fa-check"></i> Mark played</button>` : ""}
         </div>
       </section>`;
+  }
+
+  // The session's maps: view one yourself, or activate it for the players
+  #renderMaps(session) {
+    const maps = session.foundryScenes ?? [];
+    if (!maps.length) return "";
+    return `<p class="dlcp-maps"><strong>Maps:</strong> ${maps
+      .map(
+        (map) => `<span class="dlcp-map">
+          <button type="button" class="dlcp-link-button" data-action="viewScene" data-scene="${escapeHtml(map.uuid)}">${escapeHtml(map.name)}</button>
+          <button type="button" class="dlcp-icon-button" data-action="activateScene" data-scene="${escapeHtml(map.uuid)}"
+            aria-label="Activate ${escapeHtml(map.name)} for the players" data-tooltip="Activate for the players"><i class="fas fa-bullseye"></i></button>
+        </span>`,
+      )
+      .join("")}</p>`;
+  }
+
+  // Coins and items to hand out; drag an item onto a character sheet to give it
+  #renderTreasure(session) {
+    const references = this.sync.records().references;
+    const items = (session.links ?? [])
+      .filter((link) => link.linkableType === "CampaignReference")
+      .map((link) => ({ link, reference: references.get(String(link.linkableId)) }))
+      .filter(({ reference }) => reference && reference.category !== "monster");
+    const coins = currencyText(session.treasureCurrency);
+    if (!items.length && !coins) return "";
+    const item = ({ link, reference }) =>
+      `${
+        reference.foundryUuid
+          ? `<a class="content-link" draggable="true" data-uuid="${escapeHtml(reference.foundryUuid)}" data-link><i class="fas fa-suitcase"></i>${escapeHtml(reference.name)}</a>`
+          : escapeHtml(reference.name)
+      }${link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : ""}`;
+    return `<p><strong>Treasure:</strong> ${[coins && escapeHtml(coins), ...items.map(item)].filter(Boolean).join(", ")}</p>
+      ${items.length ? `<p class="dlcp-muted">Drag an item onto a character's sheet to give it to them.</p>` : ""}`;
   }
 
   #renderClocks(fronts) {
@@ -290,6 +328,18 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onNewCampaign() {
     game.modules.get(MODULE_ID).api.openNewCampaign();
+  }
+
+  static async #onViewScene(_event, target) {
+    const scene = await fromUuid(target.dataset.scene);
+    if (scene) await scene.view();
+    else ui.notifications.warn("That scene isn't in this world any more.");
+  }
+
+  static async #onActivateScene(_event, target) {
+    const scene = await fromUuid(target.dataset.scene);
+    if (scene) await scene.activate();
+    else ui.notifications.warn("That scene isn't in this world any more.");
   }
 
   static #onPlan() {

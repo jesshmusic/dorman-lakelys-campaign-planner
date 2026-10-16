@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clockSvg, compendiumLink, escapeHtml, referenceLink, renderRecord } from "../scripts/render.mjs";
+import { clockSvg, compendiumLink, currencyText, escapeHtml, referenceLink, renderRecord } from "../scripts/render.mjs";
 
 const names = {
   factions: { 3: "The Cult" },
@@ -24,11 +24,18 @@ const context = {
 };
 
 test("escapes HTML", () => {
-  assert.equal(escapeHtml(`<script>"x" & 'y'</script>`), "&lt;script&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/script&gt;");
+  assert.equal(
+    escapeHtml(`<script>"x" & 'y'</script>`),
+    "&lt;script&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/script&gt;",
+  );
 });
 
 test("never lets record text through as HTML", () => {
-  const html = renderRecord("npcs", { name: "x", role: "villain", description: "<img src=x onerror=alert(1)>" }, context);
+  const html = renderRecord(
+    "npcs",
+    { name: "x", role: "villain", description: "<img src=x onerror=alert(1)>" },
+    context,
+  );
 
   assert.ok(!html.includes("<img"));
   assert.ok(html.includes("&lt;img"));
@@ -117,11 +124,17 @@ test("renders a session's eight prep steps with links grouped by step", () => {
   assert.match(step("7. Relevant monsters"), /Zombie/);
   assert.match(step("7. Relevant monsters"), /Cult Fanatic \(Monster Manual p\. 92\)/);
   assert.doesNotMatch(step("7. Relevant monsters"), /Bag of Holding/);
-  assert.match(step("8. Treasure"), /@UUID\[Compendium\.dnd-dungeon-masters-guide\.equipment\.Item\.abc123\]\{Bag of Holding\}/);
+  assert.match(
+    step("8. Treasure"),
+    /@UUID\[Compendium\.dnd-dungeon-masters-guide\.equipment\.Item\.abc123\]\{Bag of Holding\}/,
+  );
 });
 
 test("links SRD monsters and items to the compendium entry of the same name", () => {
-  const uuids = { "monster:zombie": "Compendium.dnd-monster-manual.actors.Actor.mmZombie00000000", "item:rope": "Compendium.dnd5e.equipment24.Item.rope" };
+  const uuids = {
+    "monster:zombie": "Compendium.dnd-monster-manual.actors.Actor.mmZombie00000000",
+    "item:rope": "Compendium.dnd5e.equipment24.Item.rope",
+  };
   const lookup = { ...context, compendiumUuid: (kind, name) => uuids[`${kind}:${name.toLowerCase()}`] ?? null };
   const html = renderRecord(
     "sessions",
@@ -146,11 +159,18 @@ test("links SRD monsters and items to the compendium entry of the same name", ()
 test("shows a book monster's CR next to its link in session prep", () => {
   const withCr = {
     ...context,
-    references: [{ id: "11", name: "Ghoul", category: "monster", challengeRating: "1", foundryUuid: "Compendium.x.Actor.ghoul" }],
+    references: [
+      { id: "11", name: "Ghoul", category: "monster", challengeRating: "1", foundryUuid: "Compendium.x.Actor.ghoul" },
+    ],
   };
   const html = renderRecord(
     "sessions",
-    { number: 1, status: "planned", scenes: [], links: [{ linkableType: "CampaignReference", linkableId: "11", name: "Ghoul" }] },
+    {
+      number: 1,
+      status: "planned",
+      scenes: [],
+      links: [{ linkableType: "CampaignReference", linkableId: "11", name: "Ghoul" }],
+    },
     withCr,
   );
 
@@ -164,7 +184,12 @@ test("lists book equipment with the treasure", () => {
   };
   const html = renderRecord(
     "sessions",
-    { number: 1, status: "planned", scenes: [], links: [{ linkableType: "CampaignReference", linkableId: "12", name: "Spyglass" }] },
+    {
+      number: 1,
+      status: "planned",
+      scenes: [],
+      links: [{ linkableType: "CampaignReference", linkableId: "12", name: "Spyglass" }],
+    },
     withGear,
   );
 
@@ -216,4 +241,61 @@ test("draws a clock with filled and empty segments", () => {
   assert.equal((svg.match(/dlcp-clock-filled/g) ?? []).length, 1);
   assert.equal((svg.match(/dlcp-clock-empty/g) ?? []).length, 3);
   assert.match(svg, /aria-label="1 of 4 segments filled"/);
+});
+
+test("writes coins biggest first, leaving out the empty ones", () => {
+  assert.equal(currencyText({ sp: 30, gp: 150, cp: 0 }), "150 gp, 30 sp");
+  assert.equal(currencyText({}), "");
+  assert.equal(currencyText(null), "");
+});
+
+test("links a place's map and an NPC's actor", () => {
+  const place = renderRecord(
+    "locations",
+    { name: "Pass", foundrySceneUuid: "Scene.QdI6Ix83ypmPq4lc", foundrySceneName: "Mountain Pass" },
+    context,
+  );
+  assert.match(place, /<strong>Map:<\/strong> @UUID\[Scene\.QdI6Ix83ypmPq4lc\]\{Mountain Pass\}/);
+
+  const npc = renderRecord(
+    "npcs",
+    { name: "Kalvar", role: "bbeg", foundryActorUuid: "Actor.kalvar0000000000", foundryActorName: "Cult Fanatic" },
+    context,
+  );
+  assert.match(npc, /<strong>Stat block:<\/strong> @UUID\[Actor\.kalvar0000000000\]\{Cult Fanatic\}/);
+});
+
+test("shows a session's maps, coins and item quantities", () => {
+  const withGem = {
+    ...context,
+    references: [{ id: "g1", name: "Ruby", category: "magic_item", foundryUuid: "Compendium.x.Item.ruby" }],
+    recordOf: (collection, id) =>
+      collection === "locations" && id === "l1"
+        ? { foundrySceneUuid: "Scene.QdI6Ix83ypmPq4lc", foundrySceneName: "Mountain Pass" }
+        : collection === "npcs" && id === "n1"
+          ? { foundryActorUuid: "Actor.kalvar0000000000", foundryActorName: "Cult Fanatic" }
+          : null,
+  };
+  const html = renderRecord(
+    "sessions",
+    {
+      number: 1,
+      status: "planned",
+      scenes: [],
+      foundryScenes: [{ uuid: "Scene.WVPcqI82sGV2YrXq", name: "Test Map" }],
+      treasureCurrency: { gp: 150 },
+      links: [
+        { linkableType: "CampaignLocation", linkableId: "l1", name: "The Pass" },
+        { linkableType: "CampaignNpc", linkableId: "n1", name: "Kalvar", detail: "BBEG" },
+        { linkableType: "CampaignReference", linkableId: "g1", name: "Ruby", quantity: 3 },
+      ],
+    },
+    withGem,
+  );
+
+  assert.match(html, /The Pass · @UUID\[Scene\.QdI6Ix83ypmPq4lc\]\{Mountain Pass\}/);
+  assert.match(html, /<strong>Maps:<\/strong> @UUID\[Scene\.WVPcqI82sGV2YrXq\]\{Test Map\}/);
+  assert.match(html, /Kalvar \(BBEG\) · @UUID\[Actor\.kalvar0000000000\]\{Cult Fanatic\}/);
+  assert.match(html, /<strong>Coins:<\/strong> 150 gp/);
+  assert.match(html, /\{Ruby\} ×3/);
 });

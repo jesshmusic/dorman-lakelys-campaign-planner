@@ -3,7 +3,12 @@ import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { newRecord } from "../local.mjs";
 import {
   BRIEF_FIELDS,
+  COINS,
   EDIT_FORMS,
+  actorChange,
+  addSessionScene,
+  sceneChange,
+  setLinkQuantity,
   QUEST_STATUSES,
   applyBrief,
   applyEdit,
@@ -44,6 +49,10 @@ const PREP_STEPS = {
   monsters: ["7. Choose relevant monsters", "Monsters that fit the locations and story, ready to drop in anywhere."],
   treasure: ["8. Select treasure and magic items", "Rewards that suit the characters."],
 };
+
+// A Foundry content link: click to open, drag onto a scene or sheet
+const contentLink = (uuid, name, icon) =>
+  `<a class="content-link" draggable="true" data-uuid="${escapeHtml(uuid)}" data-link><i class="fas fa-${icon}"></i>${escapeHtml(name)}</a>`;
 
 const field = (f, value) => {
   const id = `dlcp-planner-${f.name}`;
@@ -97,6 +106,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       saveSession: PlannerApp.#onSaveSession,
       addSession: PlannerApp.#onAddSession,
       removeLink: PlannerApp.#onRemoveLink,
+      clearScene: PlannerApp.#onClearScene,
+      clearActor: PlannerApp.#onClearActor,
+      removeSessionScene: PlannerApp.#onRemoveSessionScene,
       run: PlannerApp.#onRun,
       newCampaign: PlannerApp.#onNewCampaign,
       openCampaign: PlannerApp.#onOpenCampaign,
@@ -144,7 +156,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     await super._onRender?.(context, options);
     for (const zone of this.element.querySelectorAll(".dlcp-drop")) {
       zone.addEventListener("dragover", (event) => event.preventDefault());
-      zone.addEventListener("drop", (event) => this.#onDrop(event, zone.dataset.kind));
+      zone.addEventListener("drop", (event) => this.#onDrop(event, zone.dataset.kind, zone.dataset.uuid));
     }
   }
 
@@ -397,12 +409,22 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           ${npc.motive ? `<p><strong>Wants:</strong> ${escapeHtml(npc.motive)}</p>` : ""}
           ${npc.secret ? `<p><strong>Secret:</strong> ${escapeHtml(npc.secret)}</p>` : ""}
           ${npc.voice ? `<p><strong>Voice:</strong> ${escapeHtml(npc.voice)}</p>` : ""}
+          <p class="dlcp-foundry">
+            ${
+              npc.foundryActorUuid
+                ? `<strong>Actor:</strong> ${contentLink(npc.foundryActorUuid, npc.foundryActorName ?? npc.name, "user")}
+                   <button type="button" class="dlcp-link-button" data-action="clearActor" data-uuid="${escapeHtml(npc.uuid)}">remove</button>`
+                : ""
+            }
+            <span class="dlcp-drop dlcp-drop--small" data-kind="actor" data-uuid="${escapeHtml(npc.uuid)}"><i class="fas fa-user"></i> ${npc.foundryActorUuid ? "Drop another actor to replace it" : "Drop an actor for their stat block"}</span>
+          </p>
         </li>`,
       )
       .join("");
     return `<p class="dlcp-muted">The people who drive the story: villains, allies, patrons, and everyone in between.</p>
       ${cards ? `<ul class="dlcp-cards">${cards}</ul>` : this.#empty("No NPCs yet.")}
-      <div class="dlcp-buttons">${this.#addButton("npcs")}</div>`;
+      <div class="dlcp-buttons">${this.#addButton("npcs")}</div>
+      ${this.#editable ? `<div class="dlcp-drop" data-kind="newNpc"><i class="fas fa-user-plus"></i> Drag an actor here from the Actors directory or a compendium to add them to the cast.</div>` : ""}`;
   }
 
   // Places --------------------------------------------------------------------
@@ -425,6 +447,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
             <header class="dlcp-card-header"><h3>${escapeHtml(location.name)}</h3>${this.#recordButtons("locations", location)}</header>
             ${location.description ? `<p>${escapeHtml(location.description)}</p>` : ""}
             ${(location.features ?? []).length ? `<ul>${location.features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>` : ""}
+            <p class="dlcp-foundry">
+              ${
+                location.foundrySceneUuid
+                  ? `<strong>Map:</strong> ${contentLink(location.foundrySceneUuid, location.foundrySceneName ?? "Map", "map")}
+                     <button type="button" class="dlcp-link-button" data-action="clearScene" data-uuid="${escapeHtml(location.uuid)}">remove</button>`
+                  : ""
+              }
+              <span class="dlcp-drop dlcp-drop--small" data-kind="scene" data-uuid="${escapeHtml(location.uuid)}"><i class="fas fa-map"></i> ${location.foundrySceneUuid ? "Drop another scene to replace it" : "Drop a scene from the Scenes directory"}</span>
+            </p>
           </div>${tree(location.id)}</li>`,
         )
         .join("")}</ul>`;
@@ -493,9 +524,23 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       return this.#renderSessions(store);
     }
     const back = `<button type="button" class="dlcp-link-button" data-action="closeSession"><i class="fas fa-arrow-left"></i> All sessions</button>`;
+    const maps = `<h4>Maps</h4>
+      ${
+        (session.foundryScenes ?? []).length
+          ? `<ul class="dlcp-list">${session.foundryScenes
+              .map(
+                (scene) => `<li><span class="dlcp-grow">${contentLink(scene.uuid, scene.name, "map")}</span>
+                  <button type="button" class="dlcp-link-button" data-action="removeSessionScene" data-scene="${escapeHtml(scene.uuid)}" aria-label="Remove ${escapeHtml(scene.name)}">remove</button></li>`,
+              )
+              .join("")}</ul>`
+          : ""
+      }
+      <div class="dlcp-drop" data-kind="sessionScene"><i class="fas fa-map"></i> Drag scenes here from the Scenes directory.</div>`;
     if (!this.#editable) {
       return `${back}<h2>${escapeHtml(session.displayTitle)}</h2>
-        <p>Prep this session on Dungeon Master Guru. Its plan is on its journal page here.</p>
+        <p>Prep this session on Dungeon Master Guru. Its plan is on its journal page here. Maps come from this world, so
+          add them here.</p>
+        <section class="dlcp-card dlcp-prep-step">${maps}</section>
         <div class="dlcp-buttons"><button type="button" data-action="openPage" data-collection="sessions" data-uuid="${escapeHtml(session.uuid)}"><i class="fas fa-book-open"></i> Open the journal page</button></div>`;
     }
     const step = (key, body) => `<section class="dlcp-card dlcp-prep-step"><h3>${escapeHtml(PREP_STEPS[key][0])}</h3>
@@ -506,18 +551,21 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       return `<div class="dlcp-checks">${records
         .map(
           (record) => `<label class="dlcp-check"><input type="checkbox" data-link-collection="${collection}" value="${escapeHtml(record.id)}" ${linked.has(record.id) ? "checked" : ""}>
-            ${escapeHtml(collection === "secrets" ? record.text : record.name)}${collection === "secrets" && record.revelation ? ` <span class="dlcp-muted">(${escapeHtml(record.revelation)})</span>` : ""}</label>`,
+            ${escapeHtml(collection === "secrets" ? record.text : record.name)}${collection === "secrets" && record.revelation ? ` <span class="dlcp-muted">(${escapeHtml(record.revelation)})</span>` : ""}${record.foundrySceneName ? ` <span class="dlcp-muted"><i class="fas fa-map"></i> ${escapeHtml(record.foundrySceneName)}</span>` : ""}${record.foundryActorName ? ` <span class="dlcp-muted"><i class="fas fa-user"></i> ${escapeHtml(record.foundryActorName)}</span>` : ""}</label>`,
         )
         .join("")}</div>`;
     };
-    const references = (categories) => {
-      const ids = linkedIds(session, "references");
-      const linked = store.references.filter((r) => ids.includes(r.id) && categories.includes(r.category));
-      return linked.length
-        ? `<ul class="dlcp-list">${linked
+    const references = (categories, { quantities = false } = {}) => {
+      const rows = (session.links ?? [])
+        .filter((link) => link.linkableType === "CampaignReference")
+        .map((link) => ({ link, r: store.references.find((ref) => ref.id === link.linkableId) }))
+        .filter(({ r }) => r && categories.includes(r.category));
+      return rows.length
+        ? `<ul class="dlcp-list">${rows
             .map(
-              (r) => `<li><span class="dlcp-grow">${r.foundryUuid ? `<a class="content-link" draggable="true" data-uuid="${escapeHtml(r.foundryUuid)}" data-link><i class="fas fa-${r.category === "monster" ? "user" : "suitcase"}"></i>${escapeHtml(r.name)}</a>` : escapeHtml(r.name)}
+              ({ link, r }) => `<li><span class="dlcp-grow">${r.foundryUuid ? contentLink(r.foundryUuid, r.name, r.category === "monster" ? "user" : "suitcase") : escapeHtml(r.name)}
                 ${r.challengeRating ? ` <span class="dlcp-muted">CR ${escapeHtml(r.challengeRating)}</span>` : ""} <span class="dlcp-muted">${escapeHtml(r.citation ?? "")}</span></span>
+                ${quantities ? `<input class="dlcp-quantity" type="number" min="1" max="9999" name="qty_${escapeHtml(link.id)}" value="${escapeHtml(link.quantity ?? 1)}" aria-label="How many ${escapeHtml(r.name)}">` : ""}
                 <button type="button" class="dlcp-link-button" data-action="removeLink" data-id="${escapeHtml(r.id)}" aria-label="Remove ${escapeHtml(r.name)}">remove</button></li>`,
             )
             .join("")}</ul>`
@@ -544,7 +592,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         ${step("strongStart", `<textarea name="strongStart" rows="3" aria-label="Strong start">${escapeHtml(values.strongStart ?? "")}</textarea>`)}
         ${step("scenes", `<textarea name="scenes" rows="4" aria-label="Potential scenes">${escapeHtml((values.scenes ?? []).join("\n"))}</textarea>`)}
         ${step("secrets", checklist("secrets", unrevealed, "secrets"))}
-        ${step("locations", checklist("locations", store.locations, "places"))}
+        ${step("locations", checklist("locations", store.locations, "places") + maps)}
         ${step("npcs", checklist("npcs", store.npcs, "NPCs"))}
         ${step(
           "monsters",
@@ -553,7 +601,10 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         ${step(
           "treasure",
           `<textarea name="treasure" rows="3" aria-label="Treasure">${escapeHtml(values.treasure ?? "")}</textarea>
-          ${references(["magic_item", "equipment", "table", "spell", "other"])}
+          <div class="dlcp-coins">${COINS.map(
+            (coin) => `<label>${coin}<input type="number" min="0" name="coin_${coin}" value="${escapeHtml(values.treasureCurrency?.[coin] ?? "")}" aria-label="${coin}"></label>`,
+          ).join("")}</div>
+          ${references(["magic_item", "equipment", "table", "spell", "other"], { quantities: true })}
           <div class="dlcp-drop" data-kind="treasure"><i class="fas fa-gem"></i> Drag items or roll tables here from a compendium or the sidebar.</div>`,
         )}
         <div class="dlcp-buttons dlcp-sticky">
@@ -624,10 +675,28 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         }
         return field({ ...f, name: f.name }, values[f.name] ?? "").replaceAll("dlcp-planner-", "dlcp-edit-");
       };
+      // A place's map and an NPC's actor are picked from this world (or kept, if from a compendium)
+      const picker = (name, label, current, currentName, documents, hint) => {
+        const options = [["", "None"], ...documents.map((d) => [d.uuid, d.name])];
+        if (current && !options.some(([uuid]) => uuid === current)) options.push([current, currentName ?? current]);
+        return `<div class="form-group"><label for="dlcp-edit-${name}">${label}</label>
+          <select id="dlcp-edit-${name}" name="${name}">${options
+            .map(([uuid, text]) => `<option value="${escapeHtml(uuid)}" ${(values[name] ?? current ?? "") === uuid ? "selected" : ""}>${escapeHtml(text)}</option>`)
+            .join("")}</select><p class="hint">${hint}</p></div>`;
+      };
+      const extra =
+        collection === "locations"
+          ? picker("foundrySceneUuid", "Map", record?.foundrySceneUuid, record?.foundrySceneName, game.scenes.contents,
+              "A scene from this world. You can also drop one on the place's card.")
+          : collection === "npcs"
+            ? picker("foundryActorUuid", "Actor", record?.foundryActorUuid, record?.foundryActorName,
+                game.actors.filter((a) => ["npc", "character"].includes(a.type)),
+                "Their stat block. To use one from a compendium, drop it on the NPC's card.")
+            : "";
       const submitted = await foundry.applications.api.DialogV2.prompt({
         window: { title: `${record ? "Edit" : "Add"} ${form.title.toLowerCase() === "npc" ? "NPC" : form.title.toLowerCase()}` },
         position: { width: 520 },
-        content: form.fields.map(control).join(""),
+        content: form.fields.map(control).join("") + extra,
         ok: {
           label: record ? "Save" : "Add",
           icon: record ? "fas fa-save" : "fas fa-plus",
@@ -652,8 +721,42 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         ui.notifications.warn(result.error);
         continue;
       }
-      return (await this.#save(collection, result.record)) ? result.record : null;
+      let saved = result.record;
+      const pickedName = (uuid, fallback) => (uuid ? (fromUuidSync(uuid)?.name ?? fallback) : null);
+      if (collection === "locations") {
+        const uuid = values.foundrySceneUuid || null;
+        const change = sceneChange(uuid, pickedName(uuid, record?.foundrySceneName));
+        if (!change.error) saved = { ...saved, ...change };
+      }
+      if (collection === "npcs") {
+        const uuid = values.foundryActorUuid || null;
+        const change = actorChange(uuid, pickedName(uuid, record?.foundryActorName));
+        if (!change.error) saved = { ...saved, ...change };
+      }
+      return (await this.#save(collection, saved)) ? saved : null;
     }
+  }
+
+  // Sets a place's map or an NPC's actor. Works for Dungeon Master Guru campaigns too: these come from Foundry.
+  async #setForeign(collection, uuid, change) {
+    if (change.error) return ui.notifications.warn(change.error);
+    return this.#change(collection, uuid, change);
+  }
+
+  // Adds a map to the open session, keeping anything typed in its prep
+  async #addSessionScene(scene) {
+    const session = this.#record("sessions", this.#sessionId);
+    if (!session) return;
+    const result = addSessionScene(session.foundryScenes, scene.uuid, scene.name);
+    if (result.error) return ui.notifications.warn(result.error);
+    return this.#saveSessionScenes(session, result.scenes);
+  }
+
+  async #saveSessionScenes(session, scenes) {
+    if (!this.#editable) return this.#change("sessions", session.uuid, { foundryScenes: scenes });
+    const current = this.#sessionFromForm(session);
+    if (current.error) return ui.notifications.warn(current.error);
+    return this.#save("sessions", { ...current.record, foundryScenes: scenes });
   }
 
   // Reads the session prep form into the session, with its links
@@ -668,14 +771,37 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       const ids = [...form.querySelectorAll(`[data-link-collection="${collection}"]:checked`)].map((box) => box.value);
       updated = setSessionLinks(updated, collection, ids, store[collection], () => foundry.utils.randomID(16));
     }
+    for (const input of form.querySelectorAll('[name^="qty_"]')) {
+      const result = setLinkQuantity(updated, input.name.slice(4), input.value);
+      if (result.error) return result;
+      updated = result.record;
+    }
     return { record: updated };
   }
 
   // A monster, item or table dropped on session prep becomes a linked book reference
-  async #onDrop(event, kind) {
+  async #onDrop(event, kind, recordUuid) {
     event.preventDefault();
+    event.stopPropagation();
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     const document = data?.uuid ? await fromUuid(data.uuid) : null;
+    if (["scene", "sessionScene"].includes(kind) && document?.documentName !== "Scene") {
+      return ui.notifications.warn("Drop a scene here, from the Scenes directory.");
+    }
+    if (["actor", "newNpc"].includes(kind) && document?.documentName !== "Actor") {
+      return ui.notifications.warn("Drop an actor here, from the Actors directory or a compendium.");
+    }
+    if (kind === "scene") return this.#setForeign("locations", recordUuid, sceneChange(document.uuid, document.name));
+    if (kind === "actor") return this.#setForeign("npcs", recordUuid, actorChange(document.uuid, document.name));
+    if (kind === "newNpc") {
+      const npc = newRecord(
+        "npcs",
+        { name: document.name, foundryActorUuid: document.uuid, foundryActorName: document.name },
+        { id: () => foundry.utils.randomID(16), existing: this.sync.recordLists().npcs },
+      );
+      return this.#save("npcs", npc);
+    }
+    if (kind === "sessionScene") return this.#addSessionScene(document);
     const wanted = kind === "monster" ? ["Actor"] : ["Item", "RollTable"];
     if (!document || !wanted.includes(document.documentName)) {
       ui.notifications.warn(kind === "monster" ? "Drop an actor here." : "Drop an item or a roll table here.");
@@ -825,6 +951,21 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       "sessions",
       setSessionLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)),
     );
+  }
+
+  static #onClearScene(_event, target) {
+    return this.#setForeign("locations", target.dataset.uuid, sceneChange(null));
+  }
+
+  static #onClearActor(_event, target) {
+    return this.#setForeign("npcs", target.dataset.uuid, actorChange(null));
+  }
+
+  static #onRemoveSessionScene(_event, target) {
+    const session = this.#record("sessions", this.#sessionId);
+    if (!session) return;
+    const scenes = (session.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene);
+    return this.#saveSessionScenes(session, scenes);
   }
 
   static #onRun() {

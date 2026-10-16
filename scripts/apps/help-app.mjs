@@ -74,7 +74,10 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Cast</strong> and <strong>Places:</strong> NPCs, and places inside other places.</li>
         <li><strong>Secrets:</strong> clues grouped by what they reveal, with a warning when one has fewer than three.</li>
         <li><strong>Sessions:</strong> prep each session with the Lazy Dungeon Master's eight steps. Drag monsters,
-          items and roll tables straight in from your compendiums; they become links in the session's journal page.</li>
+          items and roll tables straight in from your compendiums; they become links in the session's journal page. Add
+          coins and item quantities to the treasure, and drag in scenes as the session's maps.</li>
+        <li><strong>Maps and actors:</strong> drop a scene on a place for its map, and an actor on an NPC for their stat
+          block. Drop an actor on the Cast tab to add them as a new NPC.</li>
       </ul>
       <p>Everything is saved to the campaign's journal pages, so you can also read and share them as journals.</p>
 
@@ -87,6 +90,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Secrets and clues:</strong> click Reveal when the party learns one.</li>
         <li><strong>Quests:</strong> set each one's status as the party takes it on and finishes it.</li>
         <li><strong>Session log:</strong> jot down what happened, then click Mark played.</li>
+        <li><strong>Maps and treasure:</strong> show the session's maps to yourself, or activate one for the players.
+          Drag treasure items onto a character's sheet to hand them out.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
         <li><strong>On Dungeon Master Guru?</strong> The planner shows the campaign too; plan it on the website, and it

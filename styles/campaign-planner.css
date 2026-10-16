@@ -538,3 +538,57 @@
   padding: 0.4rem 0;
   position: sticky;
 }
+
+/* Maps, actors and treasure */
+
+.dlcp-foundry {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.dlcp-drop--small {
+  border-width: 1px;
+  display: inline-block;
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 0.15rem 0.5rem;
+}
+
+.dlcp-coins {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0.4rem 0;
+}
+
+.dlcp-coins label {
+  display: flex;
+  flex-direction: column;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.dlcp-quantity {
+  flex: 0 0 4rem;
+  width: 4rem;
+}
+
+.dlcp-prep-step h4 {
+  font-size: 0.95rem;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.dlcp-maps {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dlcp-map {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.15rem;
+}

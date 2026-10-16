@@ -222,3 +222,42 @@ test("saves Dashboard changes to local records", () => {
   );
   assert.deepEqual(applyLocalChange("npcs", { name: "Kalvar" }, { name: "Changed" }, { now }), { name: "Kalvar" });
 });
+
+test("lets the Dashboard and planner set Foundry-only fields", () => {
+  const now = () => "x";
+  const place = applyLocalChange(
+    "locations",
+    { name: "Pass" },
+    { foundrySceneUuid: "Scene.a", foundrySceneName: "A", name: "No" },
+    { now },
+  );
+  assert.deepEqual([place.foundrySceneName, place.name], ["A", "Pass"]);
+  assert.equal(
+    applyLocalChange("npcs", { name: "K" }, { foundryActorUuid: "Actor.b" }, { now }).foundryActorUuid,
+    "Actor.b",
+  );
+  assert.deepEqual(
+    applyLocalChange("sessions", { log: null }, { treasureCurrency: { gp: 5 }, foundryScenes: [] }, { now })
+      .treasureCurrency,
+    { gp: 5 },
+  );
+});
+
+test("makes an NPC from an actor", () => {
+  const npc = newRecord(
+    "npcs",
+    { name: "Cult Fanatic", foundryActorUuid: "Compendium.x.y.Actor.abc", foundryActorName: "Cult Fanatic" },
+    { id: ids() },
+  );
+  assert.deepEqual(
+    [npc.name, npc.foundryActorUuid, npc.foundryActorName],
+    ["Cult Fanatic", "Compendium.x.y.Actor.abc", "Cult Fanatic"],
+  );
+  assert.equal(newRecord("npcs", { name: "Plain" }, { id: ids() }).foundryActorUuid, null);
+});
+
+test("starts new records with the Foundry-only fields empty", () => {
+  const { records } = buildLocalCampaign(draft("five_room"), { id: ids() });
+  assert.deepEqual([records.sessions[0].foundryScenes, records.sessions[0].treasureCurrency], [[], {}]);
+  assert.equal(newRecord("locations", { name: "Crypt" }, { id: ids() }).foundrySceneUuid, null);
+});
