@@ -23,8 +23,7 @@ export async function sendCampaign() {
     position: { width: 480 },
     content: `<p>Send <strong>${escapeHtml(name)}</strong> to Dungeon Master Guru, with its party and all
         ${recordCount(store)} of its threats, quests, NPCs, places, secrets, sessions and book references?</p>
-      <p>With premium Patreon, this world then syncs with it: its journals stay where they are, and changes on either side
-        come across. Without premium, Dungeon Master Guru gets a copy to plan on, and this world keeps its own.</p>`,
+      <p>This world then syncs with it: its journals stay where they are, and changes on either side come across.</p>`,
     yes: { label: "Send", icon: "fas fa-cloud-arrow-up" },
     no: { label: "Cancel" },
   });
@@ -42,12 +41,8 @@ export async function sendCampaign() {
   await foundry.applications.api.DialogV2.prompt({
     window: { title: "Sent to Dungeon Master Guru", icon: "fas fa-check" },
     position: { width: 480 },
-    content: result.linked
-      ? `<p><strong>${escapeHtml(name)}</strong> is on Dungeon Master Guru, and this world syncs with it. Plan it on the
-          website or here; the Campaign Dashboard works as before.</p>`
-      : `<p><strong>${escapeHtml(name)}</strong> is on Dungeon Master Guru, ready to plan on the website.</p>
-         <p>This world keeps its own copy: syncing them needs a premium Patreon membership linked to your Dungeon Master
-          Guru account.</p>`,
+    content: `<p><strong>${escapeHtml(name)}</strong> is on Dungeon Master Guru, and this world syncs with it. Plan it on the
+        website or here; the Campaign Dashboard works as before.</p>`,
     ok: {
       label: "Open on Dungeon Master Guru",
       icon: "fas fa-external-link-alt",

@@ -52,7 +52,7 @@ async function autoSync({ notifyErrors = false } = {}) {
     await sync.pull();
   } catch (error) {
     console.warn(`${MODULE_TITLE} | Sync failed`, error);
-    if (notifyErrors || error.unauthorized || error.premiumRequired) {
+    if (notifyErrors || error.unauthorized) {
       ui.notifications.warn(`${MODULE_TITLE}: ${error.message}`);
     }
   }
@@ -147,7 +147,7 @@ Hooks.once("init", () => {
   game.settings.registerMenu(MODULE_ID, "patreonLink", {
     name: "Support on Patreon",
     label: "Visit Patreon",
-    hint: "Campaign sync is a Patreon premium feature. Your support funds new features and updates.",
+    hint: "Your support funds new features and updates.",
     icon: "fab fa-patreon",
     type: PatreonLink,
     restricted: true,

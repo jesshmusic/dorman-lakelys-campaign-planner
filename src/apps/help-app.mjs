@@ -43,7 +43,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <section>
           <h3><i class="fas fa-globe"></i> On Dungeon Master Guru</h3>
           <p>Plan on the website as well as here, with a free account: from any computer or phone, even with Foundry
-            closed. With premium Patreon it syncs with this world.</p>
+            closed. It syncs with this world.</p>
           <button type="button" data-action="connect"><i class="fas fa-link"></i> Connect</button>
         </section>
       </div>
@@ -100,8 +100,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           Drag treasure items onto a character's sheet to hand them out.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
-        <li><strong>On Dungeon Master Guru?</strong> With premium sync, plan it on the website or in the Campaign Planner
-          here: changes on either side come across.</li>
+        <li><strong>On Dungeon Master Guru?</strong> Plan it on the website or in the Campaign Planner here: changes on
+          either side come across.</li>
       </ul>
 
       <h2>Plan on Dungeon Master Guru</h2>
@@ -117,24 +117,20 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <ul>
         <li><strong>Plan from anywhere:</strong> the same planner on the website, from any computer or phone, even with
           Foundry closed.</li>
-        <li><strong>Sync with this world</strong> (premium Patreon): link the campaign and it comes into your journals.
+        <li><strong>Sync with this world:</strong> link the campaign and it comes into your journals.
           Changes you make at the table, like clocks, secrets, quests and the session log, go back to the website.</li>
         <li><strong>Your books and your party:</strong> monsters and treasure you pick from your compendiums become links
           you can drag onto a scene, and your players' character sheets are there while you prep.</li>
-        <li><strong>Your maps</strong> (with sync): a thumbnail of each scene in this world goes to the website, so you
+        <li><strong>Your maps:</strong> a thumbnail of each scene in this world goes to the website, so you
           can pick a place's, session's or quest's maps there, and see them while Foundry is closed.</li>
       </ul>
 
       <h2>Send a campaign to Dungeon Master Guru</h2>
       <p>Started in this world and want to plan on the website too? Connect, then click <strong>Send to Dungeon Master
         Guru</strong>: in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. Everything
-        goes: the brief, the party, threats, quests, NPCs, places, secrets, sessions and book references.</p>
-      <ul>
-        <li><strong>With premium Patreon</strong>, this world then syncs with it. Its journal folder and pages stay
-          where they are, including anything you've shared with players.</li>
-        <li><strong>Without premium</strong>, Dungeon Master Guru gets a copy to plan on, and this world keeps its
-          own.</li>
-      </ul>
+        goes: the brief, the party, threats, quests, NPCs, places, secrets, sessions and book references. This world then
+        syncs with it, and its journal folder and pages stay where they are, including anything you've shared with
+        players.</p>
 
       <h2>Your books</h2>
       <p>Dungeon Master Guru never stores stat blocks or book text. Links to your Player's Handbook, Dungeon Master's
@@ -143,8 +139,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <h2>Help and support</h2>
       <p>Found a bug? <strong>Report a bug</strong> opens a GitHub issue with your Foundry, system and module versions
         filled in; add what happened and how to make it happen again. Your support on
-        <a href="${LINKS.patreon}" target="_blank" rel="noopener">Patreon</a> funds new features, and premium members
-        get campaign sync with Dungeon Master Guru.</p>
+        <a href="${LINKS.patreon}" target="_blank" rel="noopener">Patreon</a> funds new features and updates.</p>
 
       <div class="dlcp-buttons">
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>

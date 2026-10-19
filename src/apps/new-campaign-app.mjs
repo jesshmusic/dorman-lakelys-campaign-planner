@@ -16,12 +16,10 @@ import {
   validateStep,
 } from "../setup.mjs";
 
-const PATREON_URL = "https://www.patreon.com/c/DormanLakely";
-
 /**
  * The guided "New campaign" setup: what kind of game, the pitch, the table,
  * the world and the books, then a review. Creates the campaign on Dungeon
- * Master Guru, and links this world to it when the DM has premium sync.
+ * Master Guru (and links this world to it) or in this world.
  * Answers are kept as the DM goes (per world, in this browser).
  */
 export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
@@ -324,7 +322,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         <p><strong>In this world:</strong> no account needed. Everything stays in Foundry: journals for the plan, and the
           Campaign Dashboard to run it.</p>
         <p><strong>On Dungeon Master Guru:</strong> plan on the website as well as here, with a free account, from any
-          computer or phone. With premium Patreon it syncs into this world.</p>
+          computer or phone. It syncs into this world.</p>
         ${
           this.sync.token
             ? ""
@@ -348,12 +346,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const sync = linked
       ? `<p>This world is linked to it. Its journals are in the "${escapeHtml(campaign.name)} (DM Guru)" folder, and the
           Campaign Dashboard is open.</p>`
-      : linkError
-        ? `<p class="dlcp-notice dlcp-notice--warning">The campaign was made, but linking this world failed: ${escapeHtml(linkError)}
-            Try again from the Connect window.</p>`
-        : `<p>It's on Dungeon Master Guru. Syncing it into this world as journals and a Campaign Dashboard is a premium
-            feature: <a href="${PATREON_URL}" target="_blank" rel="noopener">join on Patreon</a>, link it on your Dungeon Master Guru
-            dashboard, then link the campaign from the Connect window.</p>`;
+      : `<p class="dlcp-notice dlcp-notice--warning">The campaign was made, but linking this world failed: ${escapeHtml(linkError ?? "unknown error")}
+            Try again from the Connect window.</p>`;
     return `
       <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
       ${sync}
@@ -546,20 +540,12 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       await this.#writeDraft(null);
       this.#created = { campaign, linked: false };
 
-      let premium = false;
       try {
-        premium = Boolean((await api.me()).premium);
-      } catch {
-        // Treated as not premium; the campaign is made either way
-      }
-      if (premium) {
-        try {
-          await this.sync.link(campaign);
-          this.#created.linked = true;
-          game.modules.get(MODULE_ID).api.openDashboard();
-        } catch (error) {
-          this.#created.linkError = error.message;
-        }
+        await this.sync.link(campaign);
+        this.#created.linked = true;
+        game.modules.get(MODULE_ID).api.openDashboard();
+      } catch (error) {
+        this.#created.linkError = error.message;
       }
       this.#focusHeading = true;
     } catch (error) {

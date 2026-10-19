@@ -6,7 +6,7 @@ export class DmGuruApiError extends Error {
   /**
    * @param {string} message
    * @param {number} status HTTP status, or 0 when the request never reached the server
-   * @param {string|null} code e.g. "premium_required"
+   * @param {string|null} code e.g. "authorization_pending"
    * @param {string[]} fields the fields a 422 says are wrong, e.g. ["target_level"]
    */
   constructor(message, status, code = null, fields = []) {
@@ -19,10 +19,6 @@ export class DmGuruApiError extends Error {
 
   get unauthorized() {
     return this.status === 401;
-  }
-
-  get premiumRequired() {
-    return this.code === "premium_required";
   }
 }
 
@@ -53,7 +49,7 @@ export class DmGuruApi {
     return this.#request("POST", "/v1/foundry/link/token", { deviceCode });
   }
 
-  /** The account the token belongs to: { user, premium, patreon } */
+  /** The account the token belongs to: { user } */
   me() {
     return this.#request("GET", "/v1/foundry/me");
   }

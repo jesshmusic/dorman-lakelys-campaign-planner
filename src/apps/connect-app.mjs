@@ -165,7 +165,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     try {
       const api = this.sync.api(token);
       this.#account = await api.me();
-      this.#campaigns = this.#account.premium ? await api.campaigns() : null;
+      this.#campaigns = await api.campaigns();
       return true;
     } catch (error) {
       this.#account = null;
@@ -196,8 +196,8 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     if (!this.sync.isLocal) return "";
     return `<section class="dlcp-card">
       <h3><i class="fas fa-cloud-arrow-up"></i> Send ${escapeHtml(this.sync.linked.name)} to Dungeon Master Guru</h3>
-      <p class="hint">Plan it on the website too, from anywhere. With premium Patreon, this world then syncs with it; its
-        journals stay where they are.</p>
+      <p class="hint">Plan it on the website too, from anywhere. This world then syncs with it, and its journals stay
+        where they are.</p>
       <div class="dlcp-buttons">
         <button type="button" data-action="sendCampaign" ${this.#busy ? "disabled" : ""}><i class="fas fa-cloud-arrow-up"></i> Send to Dungeon Master Guru</button>
       </div>
@@ -206,16 +206,9 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
 
   #renderAccount() {
     if (!this.#account) return "";
-    const { user, premium } = this.#account;
+    const { user } = this.#account;
     const header = `<p>Signed in as <strong>${escapeHtml(user.name ?? user.username)}</strong>.</p>${this.#renderSend()}`;
     const newCampaign = `<button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>`;
-    if (!premium) {
-      return `${header}<p class="dlcp-notice dlcp-notice--warning">Campaign sync needs a premium Patreon membership linked to
-        your Dungeon Master Guru account. <a href="https://www.patreon.com/c/DormanLakely" target="_blank" rel="noopener">Join on Patreon</a>,
-        then link it in your Dungeon Master Guru dashboard.</p>
-        <p>You can still plan a campaign: it's free, and it's saved on Dungeon Master Guru.</p>
-        <div class="dlcp-buttons">${newCampaign}</div>`;
-    }
     if (!this.#campaigns?.length) {
       return `${header}${this.#renderIndex()}<p>You don't have any campaigns yet. Start one here, step by step.</p>
         <div class="dlcp-buttons">${newCampaign}</div>`;
@@ -244,7 +237,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     this.#busy = true;
     await this.render();
     try {
-      if (await sendCampaign()) this.#campaigns = this.#account?.premium ? await this.sync.api().campaigns() : null;
+      if (await sendCampaign()) this.#campaigns = await this.sync.api().campaigns();
     } finally {
       this.#busy = false;
       await this.render();

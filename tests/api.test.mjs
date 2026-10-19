@@ -13,10 +13,10 @@ function fakeFetch(responses) {
 }
 
 test("sends the token and reads the account", async () => {
-  const { calls, fetchImpl } = fakeFetch([{ body: { premium: true } }]);
+  const { calls, fetchImpl } = fakeFetch([{ body: { user: { name: "Jess" } } }]);
   const api = new DmGuruApi({ baseUrl: "http://localhost:3000/", token: "dmg_abc", fetchImpl });
 
-  assert.deepEqual(await api.me(), { premium: true });
+  assert.deepEqual(await api.me(), { user: { name: "Jess" } });
   assert.equal(calls[0].url, "http://localhost:3000/v1/foundry/me");
   assert.equal(calls[0].init.method, "GET");
   assert.equal(calls[0].init.headers.Authorization, "Bearer dmg_abc");
@@ -48,15 +48,15 @@ test("pushes changes as JSON", async () => {
 
 test("turns error responses into DmGuruApiError with the server's message and code", async () => {
   const { fetchImpl } = fakeFetch([
-    { status: 403, body: { errors: ["Campaign sync needs a premium Patreon membership."], code: "premium_required" } },
+    { status: 404, body: { errors: ["Campaign not found"], code: "not_found" } },
   ]);
   const api = new DmGuruApi({ token: "t", fetchImpl });
 
   await assert.rejects(api.campaigns(), (error) => {
     assert.ok(error instanceof DmGuruApiError);
-    assert.equal(error.status, 403);
-    assert.equal(error.premiumRequired, true);
-    assert.match(error.message, /premium/);
+    assert.equal(error.status, 404);
+    assert.equal(error.code, "not_found");
+    assert.equal(error.message, "Campaign not found");
     return true;
   });
 });

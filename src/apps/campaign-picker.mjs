@@ -19,9 +19,7 @@ export async function openCampaignPicker() {
     try {
       remote = await sync.api().campaigns();
     } catch (error) {
-      remoteNote = error.premiumRequired
-        ? "Opening Dungeon Master Guru campaigns here needs a premium Patreon membership."
-        : `Couldn't load your Dungeon Master Guru campaigns: ${error.message}`;
+      remoteNote = `Couldn't load your Dungeon Master Guru campaigns: ${error.message}`;
     }
   }
 

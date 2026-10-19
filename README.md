@@ -18,7 +18,7 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 **On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
 
 - **Plan from anywhere:** the same planner on the website, from any computer or phone, even with Foundry closed.
-- **Two-way sync** ([Patreon](https://www.patreon.com/c/DormanLakely) premium): the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
+- **Two-way sync:** the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
 - **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
 - **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
 - **Your maps** (with sync): a thumbnail of each scene in your world, so you can pick maps on the website and see them while Foundry is closed.
@@ -46,7 +46,7 @@ The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 
 The connection is saved in your browser only. It is never stored in the world, so your players never receive it.
 
-With premium sync, a Dungeon Master Guru campaign can be planned in the Campaign Planner here as well as on the website: add, edit and delete anything, and the changes go both ways.
+A Dungeon Master Guru campaign can be planned in the Campaign Planner here as well as on the website: add, edit and delete anything, and the changes go both ways.
 
 The compendium index is sent when the GM loads the world, and again whenever a book module updates. To send it now, click **Send compendium index** in the Connect window. Each campaign on Dungeon Master Guru can turn compendiums off in its **Compendiums** list.
 
@@ -59,12 +59,12 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 
 ## Send a campaign to Dungeon Master Guru
 
-Planned a campaign in this world and want to plan on the website too? Connect, then click **Send to Dungeon Master Guru** in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. The brief, the party and every threat, quest, NPC, place, secret, session and book reference go with it. With premium Patreon the world then syncs with it, keeping the same journal folder and pages; without premium, Dungeon Master Guru gets a copy and the world keeps its own.
+Planned a campaign in this world and want to plan on the website too? Connect, then click **Send to Dungeon Master Guru** in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. The brief, the party and every threat, quest, NPC, place, secret, session and book reference go with it. The world then syncs with it, keeping the same journal folder and pages.
 
 ## Help and support
 
 - **Found a bug?** Click **Report a bug**: in the Campaign Dashboard's footer, the Campaign Planner's or Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
-- **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features. Premium members get campaign sync with Dungeon Master Guru.
+- **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features and updates.
 - After an update that adds features, a message in chat (for the GM) lists what's new.
 
 ## Development

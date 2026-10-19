@@ -578,11 +578,10 @@ export class CampaignSync {
   }
 
   /**
-   * Sends this world's campaign to Dungeon Master Guru. With premium, the
-   * world then syncs with it: the same journal folder and pages carry on,
-   * re-tagged with the new records' ids, so their sharing stays as it was.
-   * Without premium, Dungeon Master Guru gets a copy and this world keeps its own.
-   * @returns {Promise<{ campaign: object, linked: boolean }>}
+   * Sends this world's campaign to Dungeon Master Guru, then syncs the world
+   * with it: the same journal folder and pages carry on, re-tagged with the
+   * new records' ids, so their sharing stays as it was.
+   * @returns {Promise<{ campaign: object }>}
    */
   async sendToDmGuru() {
     if (!this.isLocal) throw new Error("This campaign is already on Dungeon Master Guru.");
@@ -593,14 +592,8 @@ export class CampaignSync {
     const sent = await api.importCampaign(
       importPayload({ campaign, store, world, characters: this.characterPayloads(campaign.partyActorUuids ?? []) }),
     );
-    let premium = false;
-    try {
-      premium = Boolean((await api.me()).premium);
-    } catch {
-      // Treated as not premium: the campaign is on Dungeon Master Guru either way
-    }
-    if (premium) await this.#switchToSynced(sent);
-    return { campaign: sent, linked: premium };
+    await this.#switchToSynced(sent);
+    return { campaign: sent };
   }
 
   // Turns the local campaign's folder into the synced campaign's: each page

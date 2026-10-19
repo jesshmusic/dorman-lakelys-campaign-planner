@@ -144,7 +144,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return this.sync.linked ? `Campaign Planner: ${this.sync.linked.name}` : "Campaign Planner";
   }
 
-  // A campaign in this world, or a synced one (premium): both can be changed here
+  // A campaign in this world, or a synced one: both can be changed here
   get #editable() {
     return this.sync.editable;
   }
@@ -307,8 +307,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const send = this.sync.isLocal
       ? `<section class="dlcp-card dlcp-send">
           <header class="dlcp-card-header"><h3><i class="fas fa-cloud-arrow-up"></i> Plan it on Dungeon Master Guru too</h3></header>
-          <p class="dlcp-muted">Send this campaign to Dungeon Master Guru to plan it from any computer or phone. With premium
-            Patreon, this world then syncs with it, and its journals stay where they are.</p>
+          <p class="dlcp-muted">Send this campaign to Dungeon Master Guru to plan it from any computer or phone. This world
+            then syncs with it, and its journals stay where they are.</p>
           <div class="dlcp-buttons"><button type="button" data-action="sendCampaign"><i class="fas fa-cloud-arrow-up"></i> Send to Dungeon Master Guru</button></div>
         </section>`
       : "";
