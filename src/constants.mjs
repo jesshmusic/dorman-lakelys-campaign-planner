@@ -18,6 +18,13 @@ export const SETTINGS = {
   openDashboard: "openDashboardOnStartup",
   // The New campaign guide's words as last fetched from Dungeon Master Guru. Client scope.
   setupGuide: "setupGuide",
+  // Techniques a DM can switch off for this world (see techniques.mjs). World scope, GM only.
+  useTruths: "useTruths",
+  useClocks: "useClocks",
+  usePortents: "usePortents",
+  useSecrets: "useSecrets",
+  useThreeClueRule: "useThreeClueRule",
+  useGettingStarted: "useGettingStarted",
 };
 
 // Fired after every pull or push so open windows can re-render

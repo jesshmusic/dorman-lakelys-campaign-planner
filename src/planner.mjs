@@ -7,6 +7,7 @@ import { formatCr, PACK_NAMES } from "./compendium.mjs";
 import { NPC_ROLES } from "./local.mjs";
 import { NPC_ROLES as ROLE_LABELS } from "./render.mjs";
 import { MAX_TRUTHS, truthsOf } from "./setup.mjs";
+import { ALL_ON, visibleFields } from "./techniques.mjs";
 
 export const QUEST_STATUSES = ["available", "active", "completed", "failed"];
 export const SESSION_STATUSES = ["planned", "prepped", "played"];
@@ -195,6 +196,18 @@ export const BRIEF_FIELDS = [
   { name: "settingNotes", label: "Setting notes", type: "textarea" },
 ];
 
+/**
+ * A record's edit form with only the fields for the techniques this world
+ * uses: a threat's form leaves out its clock or portents when they're off.
+ */
+export function editForm(collection, techniques = ALL_ON) {
+  const form = EDIT_FORMS[collection];
+  return form && { ...form, fields: visibleFields(form.fields, techniques) };
+}
+
+/** The brief's fields, without the truths when they're switched off */
+export const briefFields = (techniques = ALL_ON) => visibleFields(BRIEF_FIELDS, techniques);
+
 /** A record's values as form strings. A new record gets each field's default. */
 export function formValues(fields, record) {
   return Object.fromEntries(
@@ -245,14 +258,16 @@ function readFields(fields, values, store, current = {}) {
 }
 
 /**
- * A record after its edit form is saved, or { error }.
+ * A record after its edit form is saved, or { error }. Fields for techniques
+ * that are switched off aren't in the form, so the record keeps their values.
  * @param {string} collection
  * @param {object} record
  * @param {Record<string, string>} values
  * @param {Record<string, object[]>} store every record in the campaign, by collection
+ * @param {object} techniques the ones this world uses (see techniques.mjs)
  */
-export function applyEdit(collection, record, values, store = {}) {
-  const form = EDIT_FORMS[collection];
+export function applyEdit(collection, record, values, store = {}, techniques = ALL_ON) {
+  const form = editForm(collection, techniques);
   if (!form) return { error: `Can't edit ${collection}.` };
   const read = readFields(form.fields, values, store, record);
   if (read.error) return read;
@@ -260,16 +275,18 @@ export function applyEdit(collection, record, values, store = {}) {
 
   if (collection === "fronts") {
     const segments = changes.clockSegments ?? record.clockSegments ?? 6;
-    const filled = changes.clockFilled ?? 0;
+    const filled = "clockFilled" in changes ? (changes.clockFilled ?? 0) : (record.clockFilled ?? 0);
     if (filled > segments) return { error: "The clock can't have more segments filled than it has." };
     if (changes.stakes.length > LIMITS.stakes) return { error: `Up to ${LIMITS.stakes} stakes.` };
-    if (changes.portents.length > LIMITS.portents) return { error: `Up to ${LIMITS.portents} portents.` };
-    // A portent keeps its tick when its words don't change
-    const triggered = new Map((record.portents ?? []).map((p) => [p.text, p.triggered]));
-    changes.portents = changes.portents.map((portent) => ({
-      text: portent,
-      triggered: Boolean(triggered.get(portent)),
-    }));
+    if ("portents" in changes) {
+      if (changes.portents.length > LIMITS.portents) return { error: `Up to ${LIMITS.portents} portents.` };
+      // A portent keeps its tick when its words don't change
+      const triggered = new Map((record.portents ?? []).map((p) => [p.text, p.triggered]));
+      changes.portents = changes.portents.map((portent) => ({
+        text: portent,
+        triggered: Boolean(triggered.get(portent)),
+      }));
+    }
     changes.clockSegments = segments;
     changes.clockFilled = filled;
   }
@@ -298,12 +315,12 @@ function isWithin(records, id, ancestorId) {
   return false;
 }
 
-/** The campaign after its brief is saved, or { error } */
-export function applyBrief(campaign, values) {
-  const read = readFields(BRIEF_FIELDS, values);
+/** The campaign after its brief is saved, or { error }. With truths switched off, it keeps the ones it has. */
+export function applyBrief(campaign, values, techniques = ALL_ON) {
+  const read = readFields(briefFields(techniques), values);
   if (read.error) return read;
   const changes = read.values;
-  if (changes.truths.length > MAX_TRUTHS) {
+  if (changes.truths && changes.truths.length > MAX_TRUTHS) {
     return { error: `Keep it to ${MAX_TRUTHS} truths. You have ${changes.truths.length}.` };
   }
   if (changes.startLevel && changes.targetLevel && changes.targetLevel < changes.startLevel) {
@@ -582,8 +599,31 @@ export function planDelete(store, collection, id) {
   return { remove: [{ collection, id }], updates };
 }
 
-/** The Getting started list for a campaign, as the website shows it */
-export function gettingStarted(campaign, store) {
+/** The Story tab's line about threats, for the techniques this world uses */
+export function threatsIntro({ portents, clocks } = ALL_ON) {
+  if (portents && clocks) {
+    return "Each threat has a goal, grim portents that show it getting closer, and a clock that fills if no one stops it.";
+  }
+  if (portents) return "Each threat has a goal, and grim portents that show it getting closer.";
+  if (clocks) return "Each threat has a goal, and a clock that fills if no one stops it.";
+  return "Each threat has a goal, and what happens if no one stops it.";
+}
+
+// The Getting started line about threats, for the techniques this world uses
+function threatDetail({ portents, clocks }) {
+  if (portents && clocks) return "A threat with grim portents, and a clock that fills if the heroes do nothing.";
+  if (portents) return "A threat with grim portents that show it getting closer.";
+  if (clocks) return "A threat with a clock that fills if the heroes do nothing.";
+  return "A villain or danger with a plan, and what happens if the heroes do nothing.";
+}
+
+/**
+ * The Getting started list for a campaign, as the website shows it, for the
+ * techniques this world uses: nothing when the checklist is switched off,
+ * and no secrets when they are.
+ */
+export function gettingStarted(campaign, store, techniques = ALL_ON) {
+  if (!techniques.checklist) return [];
   const secrets = store.secrets ?? [];
   const { groups } = revelationGroups(secrets);
   const firstSession = [...(store.sessions ?? [])].sort((a, b) => a.number - b.number)[0];
@@ -596,7 +636,7 @@ export function gettingStarted(campaign, store) {
     },
     {
       label: "Give your villain a threat",
-      detail: "A threat with grim portents, and a clock that fills if the heroes do nothing.",
+      detail: threatDetail(techniques),
       done: (store.fronts ?? []).length > 0,
       tab: "story",
     },
@@ -606,12 +646,20 @@ export function gettingStarted(campaign, store) {
       done: (store.npcs ?? []).length >= 3,
       tab: "cast",
     },
-    {
-      label: "Hide some secrets",
-      detail: "Give each revelation three clues, so the players have more than one way to find it.",
-      done: groups.length > 0 && groups.every((group) => !group.short),
-      tab: "secrets",
-    },
+    techniques.secrets &&
+      (techniques.threeClues
+        ? {
+            label: "Hide some secrets",
+            detail: "Give each revelation three clues, so the players have more than one way to find it.",
+            done: groups.length > 0 && groups.every((group) => !group.short),
+            tab: "secrets",
+          }
+        : {
+            label: "Hide some secrets",
+            detail: "Write down a few things the party could discover. Don't decide how they'll find them.",
+            done: secrets.length > 0,
+            tab: "secrets",
+          }),
     {
       label: "Prep the first session",
       detail: "Write a strong start: something already happening when play begins.",
@@ -619,5 +667,5 @@ export function gettingStarted(campaign, store) {
       tab: "sessions",
       sessionId: firstSession?.id ?? null,
     },
-  ];
+  ].filter(Boolean);
 }

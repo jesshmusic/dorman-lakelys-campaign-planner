@@ -6,6 +6,8 @@
 // admin edits them for the website and this module alike. STEPS and TEMPLATES
 // hold the words the module ships with, for worlds that have never reached it.
 
+import { ALL_ON, visibleFields } from "./techniques.mjs";
+
 export const MAX_TRUTHS = 6;
 
 export const TEMPLATES = [
@@ -117,6 +119,24 @@ export const STEPS = [
 
 export const LAST_STEP = STEPS.length - 1;
 
+// The ideas behind some templates, to credit where they come from (see techniques.mjs)
+export const TEMPLATE_IDEAS = { sandbox: "sandbox", five_room: "oneShot" };
+
+/**
+ * The guide's steps for the techniques this world uses. With the six truths
+ * switched off, the World step doesn't ask for them, and leaves out its "why"
+ * and example, which are about them.
+ * @param {object[]} steps the guide's steps (see guideSteps)
+ */
+export function stepsFor(steps, techniques = ALL_ON) {
+  if (techniques.truths) return steps;
+  return steps.map((step) => {
+    if (step.id !== "world") return step;
+    const { why: _why, example: _example, ...rest } = step;
+    return { ...rest, fields: visibleFields(step.fields, techniques) };
+  });
+}
+
 // The words an admin can change on Dungeon Master Guru; the rest (ids, fields) is the module's
 const STEP_WORDS = ["label", "title", "intro", "why", "example"];
 const TEMPLATE_WORDS = ["title", "description", "example"];
@@ -195,8 +215,10 @@ const text = (values, name) => String(values?.[name] ?? "").trim();
  * Why the DM can't leave a step yet, or null when they can.
  * @param {string} stepId
  * @param {Record<string, string>} values
+ * @param {object} techniques the ones this world uses. Truths typed before
+ *   they were switched off still go with the campaign, so they're still checked.
  */
-export function validateStep(stepId, values) {
+export function validateStep(stepId, values, techniques = ALL_ON) {
   if (stepId === "pitch" && !text(values, "name")) return "Give your campaign a name to go on.";
   if (stepId === "table") {
     for (const name of STEPS.find((step) => step.id === "table").fields) {
@@ -216,15 +238,18 @@ export function validateStep(stepId, values) {
   }
   if (stepId === "world") {
     const count = truthsOf(values?.truths).length;
-    if (count > MAX_TRUTHS) return `Keep it to ${MAX_TRUTHS} truths. You have ${count}.`;
+    if (count > MAX_TRUTHS) {
+      const hidden = techniques.truths ? "" : " Turn the six truths back on in Module Settings to change them.";
+      return `Keep it to ${MAX_TRUTHS} truths. You have ${count}.${hidden}`;
+    }
   }
   return null;
 }
 
 /** The first check that fails across every step, as { step, error } */
-export function validateAll(values) {
+export function validateAll(values, techniques = ALL_ON) {
   for (const [index, step] of STEPS.entries()) {
-    const error = validateStep(step.id, values);
+    const error = validateStep(step.id, values, techniques);
     if (error) return { step: index, error };
   }
   return null;

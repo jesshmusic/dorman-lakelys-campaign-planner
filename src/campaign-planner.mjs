@@ -8,6 +8,7 @@ import { PlannerApp } from "./apps/planner-app.mjs";
 import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
 import { useRememberedGuideWords } from "./guide-words.mjs";
+import { registerTechniqueSettings } from "./technique-settings.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
 const sync = new CampaignSync();
@@ -57,6 +58,23 @@ async function autoSync({ notifyErrors = false } = {}) {
       ui.notifications.warn(`${MODULE_TITLE}: ${error.message}`);
     }
   }
+}
+
+// Rewrites the campaign's journal pages a moment after a technique is
+// switched on or off, so changing several settings at once rewrites them once
+const rewritePagesSoon = foundry.utils.debounce(async () => {
+  try {
+    await sync.rewritePages();
+  } catch (error) {
+    console.warn(`${MODULE_TITLE} | Could not update the journal pages`, error);
+  }
+}, 500);
+
+// A technique was switched on or off: open windows and the journal pages show
+// it or hide it. Only one GM rewrites the pages.
+function techniquesChanged() {
+  for (const app of [dashboard, planner, newCampaign]) if (app?.rendered) app.render();
+  if (game.user.isActiveGM) rewritePagesSoon();
 }
 
 function scheduleAutoSync() {
@@ -144,6 +162,9 @@ Hooks.once("init", () => {
     default: true,
     onChange: () => scheduleAutoSync(),
   });
+
+  // Use the six truths, threat clocks, grim portents, ...: each on unless a GM switches it off
+  registerTechniqueSettings(() => techniquesChanged());
 
   game.settings.registerMenu(MODULE_ID, "connect", {
     name: "Dungeon Master Guru campaign",

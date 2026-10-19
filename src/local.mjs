@@ -5,6 +5,7 @@
 // globals, so it can be tested in Node.
 
 import { truthsOf } from "./setup.mjs";
+import { ALL_ON, visibleFields } from "./techniques.mjs";
 
 // The starting structures, as Dungeon Master Guru's CampaignTemplate builds them
 export const DEFAULT_ARC_SESSIONS = 6;
@@ -303,6 +304,15 @@ export const ADD_FORMS = {
     ],
   },
 };
+
+/**
+ * An Add form with only the fields for the techniques this world uses: a
+ * threat's leaves out its clock or portents when they're off.
+ */
+export function addForm(collection, techniques = ALL_ON) {
+  const form = ADD_FORMS[collection];
+  return form && { ...form, fields: visibleFields(form.fields, techniques) };
+}
 
 /**
  * A new record from an Add form, or { error } when something required is missing.

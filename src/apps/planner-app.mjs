@@ -1,12 +1,12 @@
-import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
+import { clockSvg, creditHtml, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { NPC_ROLES, newRecord } from "../local.mjs";
+import { prepSteps } from "../techniques.mjs";
+import { currentTechniques } from "../technique-settings.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import { exportAdventure } from "./export-adventure.mjs";
 import {
-  BRIEF_FIELDS,
   COINS,
-  EDIT_FORMS,
   actorChange,
   addScene,
   sceneChange,
@@ -16,6 +16,8 @@ import {
   applyEdit,
   applyQuestReward,
   applySessionPrep,
+  briefFields,
+  editForm,
   formValues,
   gettingStarted,
   ROLE_LABELS,
@@ -23,6 +25,7 @@ import {
   linkedIds,
   revelationGroups,
   setLinks,
+  threatsIntro,
 } from "../planner.mjs";
 
 const TABS = [
@@ -43,26 +46,31 @@ const NOUNS = { fronts: "threat", quests: "quest", npcs: "NPC", locations: "plac
 // Book references that are treasure: anything but a monster
 const TREASURE = ["magic_item", "equipment", "table", "spell", "other"];
 
-// The Lazy DM's eight steps, as the website words them
+// The Lazy DM's eight steps, as the website words them. Numbered as they're
+// shown: without secrets and clues, there are seven.
 const PREP_STEPS = {
-  characters: ["1. Review the characters", "What does each character want? What hooks might pull them in this session?"],
-  strongStart: ["2. Create a strong start", "Open with something happening that pulls the players straight into the game."],
-  scenes: ["3. Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away. One per line."],
-  secrets: ["4. Define secrets and clues", "Pick around ten unrevealed secrets the party could discover. Don't decide how."],
-  locations: ["5. Develop fantastic locations", "Places that might come up, each with a few evocative features."],
-  npcs: ["6. Outline important NPCs", "Who is likely to show up?"],
-  monsters: ["7. Choose relevant monsters", "Monsters that fit the locations and story, ready to drop in anywhere."],
-  treasure: ["8. Select treasure and magic items", "Rewards that suit the characters."],
+  characters: ["Review the characters", "What does each character want? What hooks might pull them in this session?"],
+  strongStart: ["Create a strong start", "Open with something happening that pulls the players straight into the game."],
+  scenes: ["Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away. One per line."],
+  secrets: ["Define secrets and clues", "Pick around ten unrevealed secrets the party could discover. Don't decide how."],
+  locations: ["Develop fantastic locations", "Places that might come up, each with a few evocative features."],
+  npcs: ["Outline important NPCs", "Who is likely to show up?"],
+  monsters: ["Choose relevant monsters", "Monsters that fit the locations and story, ready to drop in anywhere."],
+  treasure: ["Select treasure and magic items", "Rewards that suit the characters."],
 };
+
+// Where the brief's fields come from, credited under them
+const BRIEF_CREDITS = { pitch: ["pitch"], truths: ["truths"] };
 
 // A Foundry content link: click to open, drag onto a scene or sheet
 const contentLink = (uuid, name, icon) =>
   `<a class="content-link" draggable="true" data-uuid="${escapeHtml(uuid)}" data-link><i class="fas fa-${icon}"></i>${escapeHtml(name)}</a>`;
 
-const field = (f, value) => {
+// A form field; `extra` is markup that's already safe, shown under its hint
+const field = (f, value, extra = "") => {
   const id = `dlcp-planner-${f.name}`;
   const label = `<label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>`;
-  const hint = f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : "";
+  const hint = `${f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : ""}${extra}`;
   if (f.type === "textarea" || f.type === "lines") {
     return `<div class="form-group stacked">${label}<textarea id="${id}" name="${f.name}" rows="${f.type === "lines" ? 4 : 3}">${escapeHtml(value)}</textarea>${hint}</div>`;
   }
@@ -152,6 +160,11 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return this.sync.editable;
   }
 
+  // The techniques this world uses; the ones switched off are hidden
+  get #techniques() {
+    return currentTechniques();
+  }
+
   /** Opens on a tab, a session's prep, or a quest's plan */
   show({ tab, sessionId, questId } = {}) {
     if (tab) this.#tab = tab;
@@ -206,10 +219,12 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const store = this.sync.recordLists();
     const campaign = store.campaign[0] ?? { name: this.sync.linked.name };
     const site = campaign.slug ? `${this.sync.baseUrl}/app/campaigns/${encodeURIComponent(campaign.slug)}` : this.sync.baseUrl;
+    const techniques = this.#techniques;
+    if (this.#tab === "secrets" && !techniques.secrets) this.#tab = "overview";
     const where = this.sync.isLocal
       ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
       : `<span class="dlcp-muted"><i class="fas fa-globe"></i> On Dungeon Master Guru${this.#editable ? ", synced" : ""}</span>`;
-    const nav = TABS.map(
+    const nav = TABS.filter((tab) => tab.id !== "secrets" || techniques.secrets).map(
       (tab) => `<button type="button" data-action="showTab" data-tab="${tab.id}" ${tab.id === this.#tab ? 'aria-current="page"' : ""}>
         <i class="fas ${tab.icon}"></i> ${tab.label}</button>`,
     ).join("");
@@ -277,7 +292,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   // Overview ------------------------------------------------------------------
 
   #renderOverview(store, campaign) {
-    const steps = gettingStarted(campaign, store);
+    const techniques = this.#techniques;
+    const steps = gettingStarted(campaign, store, techniques);
     const done = steps.filter((step) => step.done).length;
     const checklist =
       done === steps.length
@@ -292,20 +308,23 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
             )
             .join("")}</ol></section>`;
 
+    const fields = briefFields(techniques);
+    const values = formValues(fields, campaign);
+    const credit = (f) => (BRIEF_CREDITS[f.name] ? creditHtml(BRIEF_CREDITS[f.name], techniques) : "");
     const brief = this.#editable
       ? `<form class="dlcp-brief" data-form="brief">
-          <div class="dlcp-grid">${BRIEF_FIELDS.filter((f) => f.type === "text" || f.type === "number")
-            .map((f) => field(f, formValues(BRIEF_FIELDS, campaign)[f.name]))
+          <div class="dlcp-grid">${fields.filter((f) => f.type === "text" || f.type === "number")
+            .map((f) => field(f, values[f.name]))
             .join("")}</div>
-          ${BRIEF_FIELDS.filter((f) => f.type === "textarea" || f.type === "lines")
-            .map((f) => field(f, formValues(BRIEF_FIELDS, campaign)[f.name]))
+          ${fields.filter((f) => f.type === "textarea" || f.type === "lines")
+            .map((f) => field(f, values[f.name], credit(f)))
             .join("")}
           <div class="dlcp-buttons"><button type="button" data-action="saveBrief"><i class="fas fa-save"></i> Save the brief</button></div>
         </form>`
       : `<section class="dlcp-card">
           ${campaign.premise ? `<h3>Premise</h3><p>${escapeHtml(campaign.premise)}</p>` : ""}
-          ${campaign.pitch ? `<h3>Pitch for your players</h3><p>${escapeHtml(campaign.pitch)}</p>` : ""}
-          ${(campaign.truths ?? []).length ? `<h3>Truths of the setting</h3><ul>${campaign.truths.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : ""}
+          ${campaign.pitch ? `<h3>Pitch for your players</h3><p>${escapeHtml(campaign.pitch)}</p>${creditHtml(["pitch"], techniques)}` : ""}
+          ${techniques.truths && (campaign.truths ?? []).length ? `<h3>Truths of the setting</h3><ul>${campaign.truths.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>${creditHtml(["truths"], techniques)}` : ""}
         </section>`;
     const send = this.sync.isLocal
       ? `<section class="dlcp-card dlcp-send">
@@ -357,20 +376,26 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   // Story ---------------------------------------------------------------------
 
   #renderStory(store) {
+    const techniques = this.#techniques;
     const nameOf = (collection, id) => store[collection]?.find((r) => r.id === id)?.name;
     const threats = store.fronts
       .map((front) => {
-        const portents = (front.portents ?? [])
-          .map(
-            (portent, index) => `<label class="dlcp-portent"><input type="checkbox" data-action="togglePortent" data-uuid="${escapeHtml(front.uuid)}" data-index="${index}" ${portent.triggered ? "checked" : ""}> ${escapeHtml(portent.text)}</label>`,
-          )
-          .join("");
-        return `<li class="dlcp-card dlcp-front">
-          <div class="dlcp-front-clock">
+        const portents = techniques.portents
+          ? (front.portents ?? [])
+              .map(
+                (portent, index) => `<label class="dlcp-portent"><input type="checkbox" data-action="togglePortent" data-uuid="${escapeHtml(front.uuid)}" data-index="${index}" ${portent.triggered ? "checked" : ""}> ${escapeHtml(portent.text)}</label>`,
+              )
+              .join("")
+          : "";
+        const clock = techniques.clocks
+          ? `<div class="dlcp-front-clock">
             <button type="button" data-action="windBackClock" data-uuid="${escapeHtml(front.uuid)}" aria-label="Wind back ${escapeHtml(front.name)}" ${front.clockFilled <= 0 ? "disabled" : ""}>−</button>
             ${clockSvg(front.clockSegments, front.clockFilled, 64)}
             <button type="button" data-action="advanceClock" data-uuid="${escapeHtml(front.uuid)}" aria-label="Advance ${escapeHtml(front.name)}" ${front.clockFilled >= front.clockSegments ? "disabled" : ""}>+</button>
-          </div>
+          </div>`
+          : "";
+        return `<li class="dlcp-card dlcp-front">
+          ${clock}
           <div class="dlcp-grow">
             <header class="dlcp-card-header"><h3>${escapeHtml(front.name)}</h3>${this.#recordButtons("fronts", front)}</header>
             ${front.goal ? `<p><strong>Wants:</strong> ${escapeHtml(front.goal)}</p>` : ""}
@@ -390,7 +415,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       )
       .join("");
     return `<h2>Threats</h2>
-      <p class="dlcp-muted">Each threat has a goal, grim portents that show it getting closer, and a clock that fills if no one stops it.</p>
+      <p class="dlcp-muted">${escapeHtml(threatsIntro(techniques))}</p>
+      ${creditHtml(["threats", "clocks"], techniques)}
       ${threats ? `<ul class="dlcp-cards">${threats}</ul>` : this.#empty("No threats yet.")}
       <div class="dlcp-buttons">${this.#addButton("fronts")}</div>
       <h2>Factions</h2>
@@ -670,6 +696,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   // Secrets -------------------------------------------------------------------
 
   #renderSecrets(store) {
+    const techniques = this.#techniques;
     const { groups, loose } = revelationGroups(store.secrets);
     const clue = (secret) => `<li>
       <span class="dlcp-grow">${escapeHtml(secret.text)}</span>
@@ -683,10 +710,11 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const group = (g) => `<section class="dlcp-card">
       <header class="dlcp-card-header"><h3>${escapeHtml(g.revelation)}</h3>
         <span class="dlcp-muted">${g.clues.length} ${g.clues.length === 1 ? "clue" : "clues"}${g.revealed ? `, ${g.revealed} revealed` : ""}</span></header>
-      ${g.short ? `<p class="dlcp-notice dlcp-notice--warning">Needs ${3 - g.clues.length} more ${3 - g.clues.length === 1 ? "clue" : "clues"}. The Three Clue Rule: give the party three ways to find anything they must learn.</p>` : ""}
+      ${techniques.threeClues && g.short ? `<p class="dlcp-notice dlcp-notice--warning">Needs ${3 - g.clues.length} more ${3 - g.clues.length === 1 ? "clue" : "clues"}. The Three Clue Rule: give the party three ways to find anything they must learn.</p>` : ""}
       <ul class="dlcp-list">${g.clues.map(clue).join("")}</ul>
     </section>`;
     return `<p class="dlcp-muted">Secrets the party could discover, grouped by what they reveal. Don't decide how they'll find them.</p>
+      ${creditHtml(["secrets", "threeClues"], techniques)}
       ${groups.length ? groups.map(group).join("") : ""}
       ${loose.length ? `<section class="dlcp-card"><h3>Not tied to a revelation</h3><ul class="dlcp-list">${loose.map(clue).join("")}</ul></section>` : ""}
       ${groups.length || loose.length ? "" : this.#empty("No secrets yet.")}
@@ -709,7 +737,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         </tr>`,
       )
       .join("");
-    return `<p class="dlcp-muted">Prep each session with the Lazy Dungeon Master's eight steps, then run it from the Campaign Dashboard.</p>
+    const steps = this.#techniques.secrets ? "with the Lazy Dungeon Master's eight steps" : "the Lazy Dungeon Master way";
+    return `<p class="dlcp-muted">Prep each session ${steps}, then run it from the Campaign Dashboard.</p>
       ${
         rows
           ? `<table class="dlcp-sessions"><thead><tr><th>#</th><th>Session</th><th>Date</th><th>Level</th><th>Status</th><th aria-label="Actions"></th></tr></thead><tbody>${rows}</tbody></table>`
@@ -744,8 +773,13 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         <section class="dlcp-card dlcp-prep-step">${maps}</section>
         <div class="dlcp-buttons"><button type="button" data-action="openPage" data-collection="sessions" data-uuid="${escapeHtml(session.uuid)}"><i class="fas fa-book-open"></i> Open the journal page</button></div>`;
     }
-    const step = (key, body) => `<section class="dlcp-card dlcp-prep-step"><h3>${escapeHtml(PREP_STEPS[key][0])}</h3>
-      <p class="dlcp-muted">${escapeHtml(PREP_STEPS[key][1])}</p>${body}</section>`;
+    const techniques = this.#techniques;
+    const shown = prepSteps(techniques);
+    const step = (key, body, credit = "") =>
+      shown.includes(key)
+        ? `<section class="dlcp-card dlcp-prep-step"><h3>${shown.indexOf(key) + 1}. ${escapeHtml(PREP_STEPS[key][0])}</h3>
+      <p class="dlcp-muted">${escapeHtml(PREP_STEPS[key][1])}</p>${credit}${body}</section>`
+        : "";
     const checklist = (collection, records, label) => this.#checklist(session, collection, records, label);
     const references = (categories, { quantities = false } = {}) =>
       this.#referenceRows(session, store, categories, { quantities, remove: "removeLink" });
@@ -756,6 +790,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return `${back}
       <form data-form="session">
         <h2>${escapeHtml(session.displayTitle)}</h2>
+        ${creditHtml(["sessionPrep"], techniques)}
         <div class="dlcp-grid">
           <div class="form-group"><label for="dlcp-session-title">Title</label><input id="dlcp-session-title" name="title" type="text" value="${escapeHtml(values.title ?? "")}" placeholder="Session ${escapeHtml(session.number)}"></div>
           <div class="form-group"><label for="dlcp-session-date">Date</label><input id="dlcp-session-date" name="scheduledOn" type="date" value="${escapeHtml(values.scheduledOn ?? "")}"></div>
@@ -767,7 +802,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           `${party.length ? `<ul>${party.map((p) => `<li><button type="button" class="dlcp-link-button" data-action="openSheet" data-uuid="${escapeHtml(p.uuid)}">${escapeHtml(p.name)}</button> <span class="dlcp-muted">${escapeHtml([p.classes, p.level && `level ${p.level}`].filter(Boolean).join(", "))}</span></li>`).join("")}</ul>` : `<p class="dlcp-muted">Choose the party on the Party tab to see them here.</p>`}
           <textarea name="characterNotes" rows="3" aria-label="Character notes">${escapeHtml(values.characterNotes ?? "")}</textarea>`,
         )}
-        ${step("strongStart", `<textarea name="strongStart" rows="3" aria-label="Strong start">${escapeHtml(values.strongStart ?? "")}</textarea>`)}
+        ${step("strongStart", `<textarea name="strongStart" rows="3" aria-label="Strong start">${escapeHtml(values.strongStart ?? "")}</textarea>`, creditHtml(["strongStart"], techniques))}
         ${step("scenes", `<textarea name="scenes" rows="4" aria-label="Potential scenes">${escapeHtml((values.scenes ?? []).join("\n"))}</textarea>`)}
         ${step("secrets", checklist("secrets", unrevealed, "secrets"))}
         ${step("locations", checklist("locations", store.locations, "places") + maps)}
@@ -837,7 +872,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   // Asks for a record's details. Keeps asking while something's wrong, so
   // nothing typed is lost. Returns the saved record, or null if cancelled.
   async #editDialog(collection, record) {
-    const form = EDIT_FORMS[collection];
+    const techniques = this.#techniques;
+    const form = editForm(collection, techniques);
     const store = this.sync.recordLists();
     let values = formValues(form.fields, record ?? {});
     for (;;) {
@@ -895,7 +931,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           continue;
         }
       }
-      const result = applyEdit(collection, base, values, store);
+      const result = applyEdit(collection, base, values, store, techniques);
       if (result.error) {
         ui.notifications.warn(result.error);
         continue;
@@ -946,7 +982,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (result.error) return result;
     const store = this.sync.recordLists();
     let updated = result.record;
-    for (const collection of ["secrets", "locations", "npcs"]) {
+    // With secrets and clues switched off, the session keeps the secrets it links to
+    const collections = this.#techniques.secrets ? ["secrets", "locations", "npcs"] : ["locations", "npcs"];
+    for (const collection of collections) {
       const ids = [...form.querySelectorAll(`[data-link-collection="${collection}"]:checked`)].map((box) => box.value);
       updated = setLinks(updated, collection, ids, store[collection], () => foundry.utils.randomID(16));
     }
@@ -1126,7 +1164,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   static async #onSaveBrief() {
     const form = this.element.querySelector('[data-form="brief"]');
     const campaign = this.sync.recordLists().campaign[0];
-    const result = applyBrief(campaign, Object.fromEntries(new FormData(form).entries()));
+    const result = applyBrief(campaign, Object.fromEntries(new FormData(form).entries()), this.#techniques);
     if (result.error) return ui.notifications.warn(result.error);
     if (await this.#save("campaign", result.record)) ui.notifications.info("Saved the brief.");
   }

@@ -48,6 +48,27 @@
   margin: 0;
 }
 
+/* "Learn more" links to where a technique comes from: small and quiet */
+.dlcp-credit {
+  color: var(--color-text-subtle, #7a7971);
+  font-size: 0.75rem;
+  margin: 0.125rem 0 0.25rem;
+}
+
+.dlcp-credit a {
+  color: inherit;
+  text-decoration: underline dotted;
+}
+
+.dlcp-credit a:hover,
+.dlcp-credit a:focus-visible {
+  color: var(--color-text-hyperlink, #972c1d);
+}
+
+.dlcp-sources ul {
+  margin: 0.125rem 0 0.25rem;
+}
+
 .dlcp-notice {
   border-left: 4px solid #c9ad6a;
   margin: 0;

@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clockSvg, compendiumLink, currencyText, escapeHtml, referenceLink, renderRecord } from "../src/render.mjs";
+import {
+  clockSvg,
+  compendiumLink,
+  creditHtml,
+  currencyText,
+  escapeHtml,
+  referenceLink,
+  renderRecord,
+} from "../src/render.mjs";
+import { ALL_ON } from "../src/techniques.mjs";
 
 const names = {
   factions: { 3: "The Cult" },
@@ -343,4 +352,72 @@ test("leaves out a quest's empty sections", () => {
   const html = renderRecord("quests", { name: "Find the crypt", kind: "main", status: "available" }, context);
 
   for (const heading of ["Maps", "NPCs", "Monsters", "Reward"]) assert.ok(!html.includes(`<h3>${heading}</h3>`), heading);
+});
+
+const without = (...keys) => ({ ...ALL_ON, ...Object.fromEntries(keys.map((key) => [key, false])) });
+
+test("shows the truths on the Overview page unless they're switched off", () => {
+  const campaign = { name: "Zombie Siege", pitch: "Survive", truths: ["The dead walk"] };
+
+  assert.match(renderRecord("campaign", campaign, context), /Truths of the setting.*The dead walk/);
+  const html = renderRecord("campaign", campaign, { ...context, techniques: without("truths") });
+  assert.doesNotMatch(html, /Truths of the setting|The dead walk/);
+  assert.match(html, /Survive/);
+});
+
+test("leaves a threat's clock or portents off its page when they're switched off", () => {
+  const front = {
+    name: "The Plague",
+    goal: "Spread",
+    clockFilled: 2,
+    clockSegments: 6,
+    portents: [{ text: "Villages fall", triggered: true }],
+    stakes: [],
+  };
+
+  const noClock = renderRecord("fronts", front, { ...context, techniques: without("clocks") });
+  assert.doesNotMatch(noClock, /Clock:|2 of 6/);
+  assert.match(noClock, /Villages fall/);
+  const noPortents = renderRecord("fronts", front, { ...context, techniques: without("portents") });
+  assert.doesNotMatch(noPortents, /Grim portents|Villages fall/);
+  assert.match(noPortents, /2 of 6/);
+  assert.match(noPortents, /Spread/);
+});
+
+test("numbers a session's prep in seven steps without secrets and clues", () => {
+  const session = {
+    number: 1,
+    status: "planned",
+    strongStart: "The bells toll",
+    links: [
+      { linkableType: "CampaignSecret", linkableId: "1", name: "Gravediggers fell first" },
+      { linkableType: "Monster", linkableId: "4", name: "Zombie" },
+    ],
+  };
+
+  const html = renderRecord("sessions", session, { ...context, techniques: without("secrets") });
+  assert.doesNotMatch(html, /Secrets and clues|Gravediggers/);
+  assert.match(html, /<h3>6\. Relevant monsters<\/h3><ul><li>Zombie/);
+  assert.doesNotMatch(html, /<h3>[78]\. /);
+  assert.match(html, /<h3>2\. Strong start<\/h3>/);
+  assert.match(renderRecord("sessions", session, context), /<h3>4\. Secrets and clues<\/h3>/);
+});
+
+test("credits a technique's sources with links that open in a new tab", () => {
+  const html = creditHtml(["threats", "clocks"]);
+
+  assert.match(html, /^<p class="dlcp-credit">Learn more: /);
+  assert.match(
+    html,
+    /<a href="https:\/\/roll20\.net\/compendium\/BITD\/Progress%20clocks" target="_blank" rel="noopener">Progress clocks<\/a> \(Blades in the Dark\)/,
+  );
+  assert.equal((html.match(/target="_blank" rel="noopener"/g) ?? []).length, 3);
+  assert.match(creditHtml(["dontPrepPlots", "sandbox"]), /Don&#39;t Prep Plots/);
+  assert.match(creditHtml(["oneShot"], ALL_ON, { inline: true }), /^<span class="dlcp-credit">.*<\/span>$/);
+});
+
+test("credits nothing for a technique that's switched off", () => {
+  assert.equal(creditHtml(["truths"], without("truths")), "");
+  assert.doesNotMatch(creditHtml(["threats", "clocks"], without("clocks")), /Progress clocks/);
+  assert.equal(creditHtml([]), "");
 });

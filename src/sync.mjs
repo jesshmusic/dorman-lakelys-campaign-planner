@@ -22,6 +22,7 @@ import {
   worldDocument,
 } from "./adventure.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
+import { currentTechniques } from "./technique-settings.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
 
@@ -586,6 +587,8 @@ export class CampaignSync {
   /** Makes one of this world's own campaigns the one the Dashboard shows */
   async useLocal(campaign) {
     await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, local: true });
+    // Its pages may have been written (or imported) with other techniques switched on
+    await this.rewritePages();
     Hooks.callAll(SYNCED_HOOK);
   }
 
@@ -791,6 +794,7 @@ export class CampaignSync {
 
   #renderContext(store) {
     return {
+      techniques: currentTechniques(),
       baseUrl: this.baseUrl,
       compendiumUuid: this.#compendiumLookup(store),
       actorName: (uuid) => fromUuidSync(uuid)?.name ?? null,
@@ -876,6 +880,21 @@ export class CampaignSync {
     if (creates.length) await entry.createEmbeddedDocuments("JournalEntryPage", creates);
     if (updates.length) await entry.updateEmbeddedDocuments("JournalEntryPage", updates);
     if (removals.length) await entry.deleteEmbeddedDocuments("JournalEntryPage", removals);
+  }
+
+  /**
+   * Writes the linked campaign's journal pages again from their records, as
+   * after a technique is switched on or off. Only pages that change are saved.
+   */
+  async rewritePages() {
+    if (!game.user.isGM || !this.linked) return;
+    const store = this.records();
+    const context = this.#renderContext(store);
+    for (const entry of this.#entriesInFolder()) {
+      const collection = flag(entry, "collection");
+      if (!store[collection]) continue;
+      await this.#writePages(entry, collection, [...store[collection].values()], new Set(), context);
+    }
   }
 
   /** Forgets the link (the journals stay) */

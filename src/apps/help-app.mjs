@@ -1,7 +1,23 @@
 import { MODULE_ID } from "../constants.mjs";
+import { escapeHtml } from "../render.mjs";
+import { sourcesByAuthor } from "../techniques.mjs";
 import { LINKS } from "../welcome.mjs";
 
 const SITE = LINKS.site;
+
+// Every source of the planner's ideas, by author
+const sources = () =>
+  sourcesByAuthor()
+    .map(
+      ({ author, sources: list }) => `<li><strong>${escapeHtml(author)}:</strong>
+        <ul>${list
+          .map(
+            (source) =>
+              `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener">${escapeHtml(source.title)}</a>: ${escapeHtml(source.about)}</li>`,
+          )
+          .join("")}</ul></li>`,
+    )
+    .join("");
 
 /**
  * How to use the Campaign Planner: planning in this world, or on Dungeon
@@ -84,6 +100,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           block. Drop an actor on the Cast tab to add them as a new NPC.</li>
       </ul>
       <p>Everything is saved to the campaign's journal pages, so you can also read and share them as journals.</p>
+      <p>Don't use some of these? In <strong>Module Settings</strong>, switch off the six truths, threat clocks, grim
+        portents, secrets and clues, the Three Clue Rule check or the Getting started checklist. The planner, the
+        Dashboard and the journal pages stop showing it. Nothing is deleted: switch it back on and it all comes back.</p>
 
       <h2>Run it with the Campaign Dashboard</h2>
       <p>It opens when the world loads (untick <strong>Open at startup</strong> in its footer to stop that). Otherwise
@@ -137,6 +156,10 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <h2>Your books</h2>
       <p>Dungeon Master Guru never stores stat blocks or book text. Links to your Player's Handbook, Dungeon Master's
         Guide and Monster Manual open your own licensed copies in Foundry.</p>
+
+      <h2>Where these ideas come from</h2>
+      <p>The planner builds on techniques other game masters and designers came up with. Read more about them here:</p>
+      <ul class="dlcp-sources">${sources()}</ul>
 
       <h2>Help and support</h2>
       <p>Found a bug? <strong>Report a bug</strong> opens a GitHub issue with your Foundry, system and module versions

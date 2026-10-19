@@ -5,12 +5,14 @@ import {
   ADD_FORMS,
   FIVE_ROOMS,
   PORTENTS,
+  addForm,
   applyLocalChange,
   buildLocalCampaign,
   levelFor,
   newRecord,
 } from "../src/local.mjs";
 import { defaultDraft } from "../src/setup.mjs";
+import { ALL_ON } from "../src/techniques.mjs";
 
 // Predictable ids: id1, id2, ...
 const ids = () => {
@@ -287,4 +289,18 @@ test("starts new records with the Foundry-only fields empty", () => {
   const { records } = buildLocalCampaign(draft("five_room"), { id: ids() });
   assert.deepEqual([records.sessions[0].foundryScenes, records.sessions[0].treasureCurrency], [[], {}]);
   assert.equal(newRecord("locations", { name: "Crypt" }, { id: ids() }).foundrySceneUuid, null);
+});
+
+test("the Dashboard's threat form leaves out the clock or portents when they're switched off", () => {
+  const names = (techniques) => addForm("fronts", techniques).fields.map((f) => f.name);
+
+  assert.deepEqual(names(ALL_ON), ADD_FORMS.fronts.fields.map((f) => f.name));
+  assert.deepEqual(names({ ...ALL_ON, clocks: false, portents: false }), ["name", "goal", "doom"]);
+  assert.ok(names({ ...ALL_ON, clocks: false }).includes("portents"));
+  assert.equal(addForm("secrets", ALL_ON).title, "Add a secret");
+  assert.equal(addForm("nothing"), undefined);
+
+  // A threat added without them still gets a clock, ready if it's switched back on
+  const front = newRecord("fronts", { name: "Cult" }, { id: ids() });
+  assert.deepEqual([front.clockSegments, front.clockFilled, front.portents], [6, 0, []]);
 });

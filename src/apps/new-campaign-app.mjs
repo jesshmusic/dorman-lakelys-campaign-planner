@@ -1,21 +1,25 @@
-import { escapeHtml } from "../render.mjs";
+import { creditHtml, escapeHtml } from "../render.mjs";
 import { PACK_NAMES } from "../compendium.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
 import {
   FIELDS,
   LAST_STEP,
+  TEMPLATE_IDEAS,
   defaultDraft,
   guideSteps,
   guideTemplates,
   hasProgress,
   normalizeDraft,
   stepForField,
+  stepsFor,
   toPayload,
   truthsOf,
   validateAll,
   validateStep,
 } from "../setup.mjs";
+import { gettingStarted } from "../planner.mjs";
 import { loadGuideWords } from "../guide-words.mjs";
+import { currentTechniques } from "../technique-settings.mjs";
 
 /**
  * The guided "New campaign" setup: what kind of game, the pitch, the table,
@@ -57,6 +61,16 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
 
   get sync() {
     return game.modules.get(MODULE_ID).api.sync;
+  }
+
+  // The techniques this world uses; the ones switched off are hidden
+  get #techniques() {
+    return currentTechniques();
+  }
+
+  // The guide's steps, without what's switched off
+  #steps() {
+    return stepsFor(guideSteps(), this.#techniques);
   }
 
   // Drafts --------------------------------------------------------------------
@@ -119,8 +133,9 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
 
   #renderStep() {
     const draft = this.#draft;
-    const step = guideSteps()[draft.step];
-    const progress = guideSteps().map(
+    const steps = this.#steps();
+    const step = steps[draft.step];
+    const progress = steps.map(
       (s, index) => `<li><button type="button" data-action="goTo" data-step="${index}"
         ${index === draft.step ? 'aria-current="step"' : ""} ${index > draft.furthest ? "disabled" : ""}>${index + 1}. ${escapeHtml(s.label)}</button></li>`,
     ).join("");
@@ -134,7 +149,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         : "";
     const forward =
       draft.step < LAST_STEP
-        ? `<button type="button" data-action="next">Next: ${escapeHtml(guideSteps()[draft.step + 1].title)} <i class="fas fa-arrow-right"></i></button>`
+        ? `<button type="button" data-action="next">Next: ${escapeHtml(steps[draft.step + 1].title)} <i class="fas fa-arrow-right"></i></button>`
         : `${
             this.sync.token
               ? `<button type="button" data-action="create" ${this.#busy ? "disabled" : ""}>
@@ -174,6 +189,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderKinds() {
+    const techniques = this.#techniques;
     return `<div class="dlcp-kinds" role="radiogroup" aria-label="Campaign template">${guideTemplates().map(
       (option) => `
       <label class="dlcp-kind ${this.#draft.template === option.value ? "dlcp-kind--selected" : ""}">
@@ -181,11 +197,13 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
           <strong>${escapeHtml(option.title)}</strong></span>
         <span class="dlcp-muted">${escapeHtml(option.description)}</span>
         <em class="dlcp-muted">${escapeHtml(option.example)}</em>
+        ${TEMPLATE_IDEAS[option.value] ? creditHtml([TEMPLATE_IDEAS[option.value]], techniques, { inline: true }) : ""}
       </label>`,
     ).join("")}</div>`;
   }
 
   #renderFields(names = []) {
+    const techniques = this.#techniques;
     return names
       .map((name) => {
         const field = FIELDS[name];
@@ -202,6 +220,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
           <label for="${id}">${escapeHtml(field.label)}${field.required ? " (required)" : ""}</label>
           ${control}
           ${field.hint ? `<p class="hint">${escapeHtml(field.hint)}</p>` : ""}
+          ${name === "truths" ? creditHtml(["truths"], techniques) : ""}
         </div>`;
       })
       .join("");
@@ -273,10 +292,11 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const text = (name) => String(values[name] ?? "").trim();
     const fact = (label, value) =>
       value ? `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>` : "";
+    const steps = this.#steps();
     const block = (id, body) => {
-      const index = guideSteps().findIndex((step) => step.id === id);
+      const index = steps.findIndex((step) => step.id === id);
       return `<section class="dlcp-summary">
-        <header><h3>${escapeHtml(guideSteps()[index].title)}</h3>
+        <header><h3>${escapeHtml(steps[index].title)}</h3>
           <button type="button" class="dlcp-link-button" data-action="goTo" data-step="${index}">Edit</button></header>
         ${body}
       </section>`;
@@ -287,7 +307,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       .map((option) => option.name);
     const start = text("start_level");
     const target = text("target_level");
-    const truths = truthsOf(values.truths);
+    // Truths typed before they were switched off still go with the campaign, but aren't shown
+    const truths = this.#techniques.truths ? truthsOf(values.truths) : [];
     const packs = this.#packChoices();
     const on = packs.filter((pack) => !this.#draft.excludedPacks.includes(pack.id)).length;
     const linked = this.sync.linked;
@@ -354,7 +375,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     return `
       <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
       ${sync}
-      <p>Next, plan the rest on Dungeon Master Guru: the villain's threat, the cast, secrets and clues, and the first
+      <p>Next, plan the rest on Dungeon Master Guru: the villain's threat, the cast, ${this.#techniques.secrets ? "secrets and clues, " : ""}and the first
         session. The campaign's Overview has a Getting started list to work through.</p>
       <div class="dlcp-buttons">
         <a class="button" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open on Dungeon Master Guru</a>
@@ -364,14 +385,18 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
 
   #renderCreatedLocal() {
     const { campaign } = this.#created;
+    // The Getting started list's steps, as a sentence: "choose the party, ..., and prep the first session"
+    const todo = gettingStarted({}, {}, this.#techniques).map((step) => step.label.toLowerCase());
+    const list = todo.length > 1 ? `${todo.slice(0, -1).join(", ")}, and ${todo.at(-1)}` : (todo[0] ?? "");
+    const next = list
+      ? `Open the <strong>Campaign Planner</strong> to fill it in. Its Overview tab has a Getting started list: ${escapeHtml(list)}.`
+      : `Open the <strong>Campaign Planner</strong> to fill it in.`;
     return `
       <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
       <p>It lives in this world. Its journals are in the "${escapeHtml(campaign.name)}" folder, and the Campaign Planner
         is open.</p>
       <h3>What to do next</h3>
-      <p>Open the <strong>Campaign Planner</strong> to fill it in. Its Overview tab has a Getting started list: choose
-        the party, give your villain a threat, add the cast, hide some secrets, and prep the first session. Run it at
-        the table from the <strong>Campaign Dashboard</strong>.</p>
+      <p>${next} Run it at the table from the <strong>Campaign Dashboard</strong>.</p>
       <p class="dlcp-muted">Want to plan from anywhere? You can move this campaign to Dungeon Master Guru later.
         <button type="button" class="dlcp-link-button" data-action="help">How it works</button></p>
       <div class="dlcp-buttons">
@@ -454,7 +479,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   static #onNext() {
-    const error = validateStep(guideSteps()[this.#draft.step].id, this.#draft.values);
+    const error = validateStep(this.#steps()[this.#draft.step].id, this.#draft.values, this.#techniques);
     if (error) return this.#goTo(this.#draft.step, error);
     return this.#goTo(Math.min(this.#draft.step + 1, LAST_STEP));
   }
@@ -496,7 +521,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   static async #onCreateLocal() {
-    const invalid = validateAll(this.#draft.values);
+    const invalid = validateAll(this.#draft.values, this.#techniques);
     if (invalid) return this.#goTo(invalid.step, invalid.error);
     if (!(await this.#confirmReplace())) return;
 
@@ -522,7 +547,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   static async #onCreate() {
-    const invalid = validateAll(this.#draft.values);
+    const invalid = validateAll(this.#draft.values, this.#techniques);
     if (invalid) return this.#goTo(invalid.step, invalid.error);
     if (!(await this.#confirmReplace())) return;
 

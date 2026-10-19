@@ -1,6 +1,8 @@
 // Journal page HTML for each kind of Dungeon Master Guru record. No Foundry
 // globals, so it can be tested in Node. Every value from the server is escaped.
 
+import { ALL_ON, creditsFor, prepSteps } from "./techniques.mjs";
+
 export function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -119,15 +121,37 @@ const mapLinks = (scenes) =>
  * Renders a record as journal page HTML.
  * @param {string} collection e.g. "npcs"
  * @param {object} record the record JSON from the API
- * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[], compendiumUuid?: (kind: "monster"|"item", name: string) => string|null }} context
+ * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[], compendiumUuid?: (kind: "monster"|"item", name: string) => string|null, techniques?: object }} context
+ *   techniques: the ones this world uses (see techniques.mjs); a page leaves out the ones switched off. All, if not given.
  */
 export function renderRecord(collection, record, context) {
   const renderer = RENDERERS[collection];
-  return renderer ? renderer(record, context) : para(JSON.stringify(record));
+  return renderer ? renderer(record, { ...context, techniques: context?.techniques ?? ALL_ON }) : para(JSON.stringify(record));
+}
+
+/**
+ * Small "Learn more" links to where some techniques and ideas come from, each
+ * opening in a new tab. Empty when there's nothing to credit, e.g. because
+ * the technique is switched off.
+ * @param {string[]} keys technique and idea keys (see techniques.mjs)
+ * @param {object} techniques the ones this world uses
+ * @param {{ inline?: boolean }} options inline: a span, for inside a line of text
+ */
+export function creditHtml(keys, techniques = ALL_ON, { inline = false } = {}) {
+  const sources = creditsFor(keys, techniques);
+  if (!sources.length) return "";
+  const links = sources
+    .map(
+      (source) =>
+        `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener">${escapeHtml(source.title)}</a> (${escapeHtml(source.by)})`,
+    )
+    .join(" · ");
+  const tag = inline ? "span" : "p";
+  return `<${tag} class="dlcp-credit">Learn more: ${links}</${tag}>`;
 }
 
 const RENDERERS = {
-  campaign: (c, { actorName } = {}) =>
+  campaign: (c, { actorName, techniques }) =>
     [
       fact("Setting", c.settingName),
       fact("Tone", c.tone),
@@ -141,7 +165,7 @@ const RENDERERS = {
       ),
       section("Premise", para(c.premise)),
       section("Pitch for the players", para(c.pitch)),
-      section("Truths of the setting", list(c.truths)),
+      techniques.truths ? section("Truths of the setting", list(c.truths)) : "",
       section("Setting notes", para(c.settingNotes)),
     ].join(""),
 
@@ -186,15 +210,17 @@ const RENDERERS = {
   factions: (faction) =>
     [fact("Goal", faction.goal), para(faction.description), section("Notes", para(faction.notes))].join(""),
 
-  fronts: (front, { nameOf }) =>
+  fronts: (front, { nameOf, techniques }) =>
     [
       fact("Led by", nameOf("npcs", front.npcId)),
       fact("Faction", nameOf("factions", front.factionId)),
       fact("Goal", front.goal),
-      `<p><strong>Clock:</strong> ${front.clockFilled} of ${front.clockSegments}</p>`,
+      techniques.clocks
+        ? `<p><strong>Clock:</strong> ${front.clockFilled} of ${front.clockSegments}</p>`
+        : "",
       section(
         "Grim portents",
-        front.portents?.length
+        techniques.portents && front.portents?.length
           ? `<ul>${front.portents
               .map((p) => `<li>${p.triggered ? "&#9745;" : "&#9744;"} ${text(p.text)}</li>`)
               .join("")}</ul>`
@@ -245,21 +271,25 @@ const RENDERERS = {
 
   sessions: (session, context) => {
     const links = linkLists(session, context);
+    // The eight steps of prep, numbered in order (seven without secrets and clues)
+    const steps = {
+      characters: ["Review the characters", () => para(session.characterNotes)],
+      strongStart: ["Strong start", () => para(session.strongStart)],
+      scenes: ["Potential scenes", () => list(session.scenes)],
+      secrets: ["Secrets and clues", () => links.of("CampaignSecret")],
+      locations: ["Fantastic locations", () => links.of("CampaignLocation") + linkFact("Maps", mapLinks(session.foundryScenes))],
+      npcs: ["Important NPCs", () => links.of("CampaignNpc")],
+      monsters: ["Relevant monsters", () => links.monsters()],
+      treasure: [
+        "Treasure",
+        () => para(session.treasure) + fact("Coins", currencyText(session.treasureCurrency)) + links.treasure(),
+      ],
+    };
     return [
       fact("Status", SESSION_STATUSES[session.status] ?? session.status),
       fact("Date", session.scheduledOn),
       fact("Party level", session.level),
-      section("1. Review the characters", para(session.characterNotes)),
-      section("2. Strong start", para(session.strongStart)),
-      section("3. Potential scenes", list(session.scenes)),
-      section("4. Secrets and clues", links.of("CampaignSecret")),
-      section("5. Fantastic locations", links.of("CampaignLocation") + linkFact("Maps", mapLinks(session.foundryScenes))),
-      section("6. Important NPCs", links.of("CampaignNpc")),
-      section("7. Relevant monsters", links.monsters()),
-      section(
-        "8. Treasure",
-        para(session.treasure) + fact("Coins", currencyText(session.treasureCurrency)) + links.treasure(),
-      ),
+      ...prepSteps(context.techniques).map((key, index) => section(`${index + 1}. ${steps[key][0]}`, steps[key][1]())),
       section("Session log", para(session.log)),
       section("Recap", para(session.recap)),
     ].join("");

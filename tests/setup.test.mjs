@@ -19,7 +19,12 @@ import {
   setGuideWords,
   guideSteps,
   guideTemplates,
+  stepsFor,
+  TEMPLATE_IDEAS,
 } from "../src/setup.mjs";
+import { ALL_ON, creditsFor } from "../src/techniques.mjs";
+
+const withoutTruths = { ...ALL_ON, truths: false };
 
 test("walks through the same steps as the website", () => {
   assert.deepEqual(
@@ -195,4 +200,39 @@ test("the guide shows the words it was last given", () => {
   assert.deepEqual(guideTemplates(), TEMPLATES);
   setGuideWords(null);
   assert.equal(guideSteps()[0].title, STEPS[0].title);
+});
+
+test("the World step doesn't ask for truths when they're switched off", () => {
+  assert.equal(stepsFor(STEPS), STEPS);
+  const steps = stepsFor(STEPS, withoutTruths);
+  const world = steps.find((step) => step.id === "world");
+
+  assert.deepEqual(world.fields, ["setting_name", "setting_notes"]);
+  // Its "why" and example are about the truths
+  assert.equal(world.why, undefined);
+  assert.equal(world.example, undefined);
+  assert.equal(world.title, "The world");
+  assert.deepEqual(
+    steps.filter((step) => step.id !== "world"),
+    STEPS.filter((step) => step.id !== "world"),
+  );
+  assert.ok(STEPS.find((step) => step.id === "world").why, "the guide's own steps are unchanged");
+});
+
+test("truths typed before they were switched off are still checked, with a way to change them", () => {
+  const seven = ["1", "2", "3", "4", "5", "6", "7"].join("\n");
+
+  assert.match(validateStep("world", { truths: seven }, withoutTruths), /You have 7\. Turn the six truths back on/);
+  assert.equal(validateAll({ name: "Zombie Siege", truths: seven }, withoutTruths).step, stepForField("truths"));
+  assert.equal(validateStep("world", { truths: "One" }, withoutTruths), null);
+});
+
+test("credits the ideas behind the sandbox and one-shot templates", () => {
+  assert.deepEqual(Object.keys(TEMPLATE_IDEAS).sort(), ["five_room", "sandbox"]);
+  for (const [template, idea] of Object.entries(TEMPLATE_IDEAS)) {
+    assert.ok(TEMPLATES.some((option) => option.value === template));
+    assert.ok(creditsFor([idea]).length > 0, `${template} has a source`);
+  }
+  assert.deepEqual(creditsFor([TEMPLATE_IDEAS.five_room]).map((s) => s.title), ["5 Room Dungeons"]);
+  assert.deepEqual(creditsFor([TEMPLATE_IDEAS.sandbox]).map((s) => s.title), ["Don't Prep Plots"]);
 });

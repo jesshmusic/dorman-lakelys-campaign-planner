@@ -59,6 +59,14 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 |---|---|
 | Connect | Link this world to one of your campaigns, or disconnect. |
 | Sync automatically | Pull changes when the world loads and every 2 minutes while the GM is connected. |
+| Use the six truths | The truths of the setting: in the New campaign guide, the brief and the Overview journal page. |
+| Use threat clocks | A clock on each threat: on the Story tab, the Dashboard and threat journal pages. |
+| Use grim portents | Signs a threat is getting closer: on the Story tab, the Dashboard and threat journal pages. |
+| Use secrets and clues | The Secrets tab, session prep's secrets step, and the Dashboard's Secrets and clues. |
+| Use the Three Clue Rule check | The Secrets tab's warning when something has fewer than three clues. |
+| Use the Getting started checklist | The list of what to plan first, on the Campaign Planner's Overview tab. |
+
+The six **Use …** settings are for the whole world, set by a GM, and on to begin with. Switch off a technique you don't use and the planner, the Dashboard, the New campaign guide and the journal pages stop showing it (the Secrets and Clues journal keeps its pages). Nothing is deleted: switch it back on and it all comes back, and a Dungeon Master Guru campaign keeps syncing it.
 
 ## Send a campaign to Dungeon Master Guru
 
@@ -69,6 +77,28 @@ Planned a campaign in this world and want to plan on the website too? Connect, t
 - **Found a bug?** Click **Report a bug**: in the Campaign Dashboard's footer, the Campaign Planner's or Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
 - **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features and updates.
 - After an update that adds features, a message in chat (for the GM) lists what's new.
+
+## Credits
+
+The planner builds on techniques other game masters and designers came up with. The windows link to them where each one appears, and the How it works window lists them all.
+
+- **Sly Flourish (Mike Shea)**
+  - [The Eight Steps of the Lazy DM](https://slyflourish.com/eight_steps_2023.html): session prep in eight steps
+  - [Return of the Lazy Dungeon Master](https://slyflourish.com/returnofthelazydm/): the book the eight steps come from
+  - [Understanding the Six Truths](https://slyflourish.com/understanding_the_six_truths.html): the truths of the setting
+  - [Secrets and Clues, the Secret Weapon of the Lazy Dungeon Master](https://slyflourish.com/sharing_secrets.html): secrets and clues
+  - [Starting Strong](https://slyflourish.com/starting_strong.html): a session's strong start
+  - [Prepping and Running Lazy Campaigns](https://slyflourish.com/prepping_and_running_lazy_campaigns.html): threats in a Lazy DM campaign
+  - [Writing a One-Page Campaign Guide](https://slyflourish.com/one_page_campaign_guide.html): the pitch for your players
+- **The Alexandrian (Justin Alexander)**
+  - [Three Clue Rule](https://thealexandrian.net/wordpress/1118/roleplaying-games/three-clue-rule): three clues for anything the party must learn
+  - [Don't Prep Plots](https://thealexandrian.net/wordpress/4147/roleplaying-games/dont-prep-plots): prepping situations, not plots, as a sandbox does
+- **Dungeon World (Sage LaTorra and Adam Koebel)**
+  - [Fronts](https://roll20.net/compendium/dw/Fronts): threats, grim portents and impending doom
+- **Blades in the Dark (John Harper)**
+  - [Progress clocks](https://roll20.net/compendium/BITD/Progress%20clocks): threat clocks
+- **Johnn Four**
+  - [5 Room Dungeons](https://www.roleplayingtips.com/5-room-dungeons/): the one-shot template
 
 ## Development
 

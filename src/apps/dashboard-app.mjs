@@ -1,6 +1,7 @@
 import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
-import { ADD_FORMS } from "../local.mjs";
+import { addForm } from "../local.mjs";
+import { currentTechniques } from "../technique-settings.mjs";
 import { LINKS } from "../welcome.mjs";
 import { giveReward } from "./give-reward.mjs";
 
@@ -140,6 +141,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       );
     const secrets = [...store.secrets.values()].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     const local = this.sync.isLocal;
+    // The techniques this world uses; the ones switched off are hidden
+    const techniques = currentTechniques();
     const synced = this.sync.linked.lastSynced ? new Date(this.sync.linked.lastSynced).toLocaleTimeString() : "never";
     const status = local
       ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
@@ -155,8 +158,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         </span>
       </header>
       ${this.#renderSession(next)}
-      ${this.#renderClocks(fronts)}
-      ${this.#renderSecrets(secrets, next)}
+      ${this.#renderClocks(fronts, techniques)}
+      ${techniques.secrets ? this.#renderSecrets(secrets, next) : ""}
       ${this.#renderQuests(quests)}
       ${this.sync.editable ? this.#renderAddMore() : ""}`;
   }
@@ -250,26 +253,31 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       ${items.length ? `<p class="dlcp-muted">Or drag an item onto a character's sheet to give it to them.</p>` : ""}`;
   }
 
-  #renderClocks(fronts) {
+  #renderClocks(fronts, techniques) {
     if (!fronts.length && !this.sync.editable) return "";
     const items = fronts
       .map((front) => {
-        const portents = (front.portents ?? [])
-          .map(
-            (portent, index) => `
+        const portents = techniques.portents
+          ? (front.portents ?? [])
+              .map(
+                (portent, index) => `
             <label class="dlcp-portent">
               <input type="checkbox" data-action="togglePortent" data-uuid="${escapeHtml(front.uuid)}" data-index="${index}" ${portent.triggered ? "checked" : ""} />
               ${escapeHtml(portent.text)}
             </label>`,
-          )
-          .join("");
-        return `
-          <li class="dlcp-front">
-            <div class="dlcp-front-clock">
+              )
+              .join("")
+          : "";
+        const clock = techniques.clocks
+          ? `<div class="dlcp-front-clock">
               <button type="button" data-action="windBackClock" data-uuid="${escapeHtml(front.uuid)}" aria-label="Wind back ${escapeHtml(front.name)}" ${front.clockFilled <= 0 ? "disabled" : ""}>−</button>
               ${clockSvg(front.clockSegments, front.clockFilled, 56)}
               <button type="button" data-action="advanceClock" data-uuid="${escapeHtml(front.uuid)}" aria-label="Advance ${escapeHtml(front.name)}" ${front.clockFilled >= front.clockSegments ? "disabled" : ""}>+</button>
-            </div>
+            </div>`
+          : "";
+        return `
+          <li class="dlcp-front">
+            ${clock}
             <div>
               <strong>${escapeHtml(front.name)}</strong>
               ${front.goal ? `<p class="dlcp-muted">${escapeHtml(front.goal)}</p>` : ""}
@@ -279,7 +287,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       })
       .join("");
     return `<section><h2>Threats</h2>
-      ${items ? `<ul class="dlcp-list">${items}</ul>` : `<p class="dlcp-muted">No threats yet. A threat is a villain or danger with a plan, and a clock that fills if no one stops it.</p>`}
+      ${items ? `<ul class="dlcp-list">${items}</ul>` : `<p class="dlcp-muted">No threats yet. A threat is a villain or danger with a plan${techniques.clocks ? ", and a clock that fills if no one stops it" : ""}.</p>`}
       <div class="dlcp-buttons">${this.#addButton("fronts", "Add a threat")}</div></section>`;
   }
 
@@ -439,7 +447,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   // Asks for a new record's details, then adds it to the local campaign
   static async #onAdd(_event, target) {
     const collection = target.dataset.collection;
-    const form = ADD_FORMS[collection];
+    const form = addForm(collection, currentTechniques());
     if (!form) return;
     const field = (f) => {
       const id = `dlcp-add-${f.name}`;

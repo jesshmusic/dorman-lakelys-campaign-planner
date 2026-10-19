@@ -20,7 +20,13 @@ import {
   setLinks,
   ROLE_LABELS,
   roleFromDisposition,
+  briefFields,
+  editForm,
+  threatsIntro,
 } from "../src/planner.mjs";
+import { ALL_ON } from "../src/techniques.mjs";
+
+const without = (...keys) => ({ ...ALL_ON, ...Object.fromEntries(keys.map((key) => [key, false])) });
 
 const ids = () => {
   let n = 0;
@@ -489,4 +495,86 @@ test("a new NPC's form starts as Neutral, and an existing one keeps its role", (
   assert.equal(formValues(EDIT_FORMS.npcs.fields, {}).role, "neutral");
   assert.equal(formValues(EDIT_FORMS.npcs.fields, { name: "Kalvar", role: "bbeg" }).role, "bbeg");
   assert.equal(formValues(EDIT_FORMS.npcs.fields, {}).name, "");
+});
+
+test("a threat's form leaves out its clock or portents when they're switched off", () => {
+  const names = (techniques) => editForm("fronts", techniques).fields.map((f) => f.name);
+
+  assert.deepEqual(names(ALL_ON), EDIT_FORMS.fronts.fields.map((f) => f.name));
+  assert.ok(!names(without("clocks")).some((name) => name.startsWith("clock")));
+  assert.ok(names(without("clocks")).includes("portents"));
+  assert.ok(!names(without("portents")).includes("portents"));
+  assert.ok(names(without("portents")).includes("clockSegments"));
+  assert.equal(editForm("nothing"), undefined);
+});
+
+test("saving a threat keeps its hidden clock and portents", () => {
+  const front = store.fronts[0];
+  const { record } = applyEdit(
+    "fronts",
+    front,
+    { name: "The Plague", goal: "Spread", stakes: "" },
+    store,
+    without("clocks", "portents"),
+  );
+
+  assert.equal(record.name, "The Plague");
+  assert.deepEqual(
+    [record.clockSegments, record.clockFilled, record.portents],
+    [6, 2, [{ text: "Graves open", triggered: true }]],
+  );
+  // Only the clock hidden: the portents are saved from the form
+  const portents = applyEdit("fronts", front, { name: "P", portents: "Bells toll", stakes: "" }, store, without("clocks"));
+  assert.deepEqual(portents.record.portents, [{ text: "Bells toll", triggered: false }]);
+  assert.deepEqual([portents.record.clockSegments, portents.record.clockFilled], [6, 2]);
+  // With everything on, an empty filled count still means none filled
+  assert.equal(applyEdit("fronts", front, { name: "P", clockSegments: "6", stakes: "" }, store).record.clockFilled, 0);
+});
+
+test("the brief leaves out the truths when they're switched off, and keeps them", () => {
+  assert.ok(briefFields().some((f) => f.name === "truths"));
+  assert.ok(!briefFields(without("truths")).some((f) => f.name === "truths"));
+
+  const campaign = { name: "Old", truths: ["The dead walk"] };
+  const { record } = applyBrief(campaign, { name: "Zombie Siege" }, without("truths"));
+  assert.deepEqual([record.name, record.truths], ["Zombie Siege", ["The dead walk"]]);
+  assert.deepEqual(applyBrief(campaign, { name: "Zombie Siege" }).record.truths, []);
+});
+
+test("Getting started is empty when the checklist is switched off", () => {
+  assert.deepEqual(gettingStarted({ partyActorUuids: [] }, store, without("checklist")), []);
+});
+
+test("Getting started leaves out secrets, or the Three Clue Rule, when they're switched off", () => {
+  const labels = (techniques) => gettingStarted({ partyActorUuids: [] }, store, techniques).map((s) => s.label);
+  assert.deepEqual(labels(without("secrets", "threeClues")), [
+    "Choose the party",
+    "Give your villain a threat",
+    "Add the cast",
+    "Prep the first session",
+  ]);
+
+  // Without the check, any secret will do
+  const secrets = gettingStarted({}, store, without("threeClues")).find((s) => s.tab === "secrets");
+  assert.equal(secrets.done, true);
+  assert.doesNotMatch(secrets.detail, /three/);
+  assert.equal(gettingStarted({}, store).find((s) => s.tab === "secrets").done, false);
+  assert.equal(gettingStarted({}, { secrets: [] }, without("threeClues")).find((s) => s.tab === "secrets").done, false);
+});
+
+test("describes threats with the techniques that are on", () => {
+  const threat = (techniques) => gettingStarted({}, {}, techniques).find((s) => s.tab === "story").detail;
+
+  assert.equal(threat(ALL_ON), "A threat with grim portents, and a clock that fills if the heroes do nothing.");
+  assert.equal(threat(without("clocks")), "A threat with grim portents that show it getting closer.");
+  assert.equal(threat(without("portents")), "A threat with a clock that fills if the heroes do nothing.");
+  assert.doesNotMatch(threat(without("clocks", "portents")), /portents|clock/);
+
+  assert.equal(
+    threatsIntro(),
+    "Each threat has a goal, grim portents that show it getting closer, and a clock that fills if no one stops it.",
+  );
+  assert.equal(threatsIntro(without("clocks")), "Each threat has a goal, and grim portents that show it getting closer.");
+  assert.equal(threatsIntro(without("portents")), "Each threat has a goal, and a clock that fills if no one stops it.");
+  assert.doesNotMatch(threatsIntro(without("clocks", "portents")), /portents|clock/);
 });
