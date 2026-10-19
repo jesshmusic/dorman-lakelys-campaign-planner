@@ -679,3 +679,22 @@
 .dlcp-send {
   margin-top: 0.75rem;
 }
+
+/* Connecting with a code */
+
+.dlcp-user-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  margin: 0.4rem 0;
+  text-align: center;
+}
+
+.dlcp-paste-token {
+  margin-top: 0.75rem;
+}
+
+.dlcp-paste-token summary {
+  cursor: pointer;
+}

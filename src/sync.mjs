@@ -8,6 +8,7 @@ import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
+import { changedAttributes, createAttributes, uuidV4 } from "./editing.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -447,12 +448,61 @@ export class CampaignSync {
    * Returns the record, or { error } when the form is missing something.
    */
   async addLocal(collection, values) {
-    if (!this.isLocal) return { error: "Add to this campaign on Dungeon Master Guru; it syncs here." };
     const existing = [...(this.records()[collection]?.values() ?? [])];
     const record = newRecord(collection, values, { id: () => foundry.utils.randomID(16), existing });
     if (record.error) return record;
+    if (!this.isLocal) return (await this.#createRemote(collection, record)) || { error: "Couldn't add it on Dungeon Master Guru." };
     await this.#saveRecord(collection, record);
     return record;
+  }
+
+  /** True when the planner can change this campaign: one in this world, or a synced one */
+  get editable() {
+    return this.isLocal || this.ready;
+  }
+
+  /**
+   * Saves a record from the planner: in this world, or on Dungeon Master Guru
+   * for a synced campaign (only the fields that changed; a new record is
+   * created there). Returns the saved record, or false.
+   */
+  async saveRecord(collection, record) {
+    if (this.isLocal) return (await this.saveLocal(collection, record)) && record;
+    const store = this.records();
+    const current =
+      collection === "campaign" ? [...store.campaign.values()][0] : store[collection]?.get(String(record.id));
+    if (!current) return this.#createRemote(collection, record);
+    const attributes = changedAttributes(collection, current, record);
+    if (!Object.keys(attributes).length) return current;
+    return (await this.update(collection, current, attributes)) && this.records()[collection]?.get(String(current.id));
+  }
+
+  /** Deletes a record from the planner: in this world, or on Dungeon Master Guru */
+  async deleteRecord(collection, id) {
+    if (this.isLocal) return this.deleteLocal(collection, id);
+    const record = this.records()[collection]?.get(String(id));
+    if (!record) return;
+    const result = await this.api().push(this.linked.uuid, [
+      { op: "delete", type: PUSH_TYPES[collection], uuid: record.uuid },
+    ]);
+    if (result.errors?.length) throw new Error(result.errors[0].errors.join(", "));
+    // Brings the deletion, and the records that pointed at it with the pointer cleared
+    await this.pull();
+  }
+
+  // Creates a record of a synced campaign on Dungeon Master Guru, which gives
+  // it its id; then saves what came back to the journals
+  async #createRemote(collection, record) {
+    const result = await this.api().push(this.linked.uuid, [
+      { op: "create", type: PUSH_TYPES[collection], uuid: uuidV4(), attributes: createAttributes(collection, record) },
+    ]);
+    const created = result.applied?.[0]?.current;
+    if (!created) {
+      ui.notifications.error(result.errors?.[0]?.errors?.join(", ") ?? "Couldn't add it on Dungeon Master Guru.");
+      return false;
+    }
+    await this.#saveRecord(collection, created);
+    return created;
   }
 
   /** Every record as { collection: record[] }, for the planner */
@@ -503,6 +553,7 @@ export class CampaignSync {
       },
       () => foundry.utils.randomID(16),
     );
+    if (!this.isLocal) return this.#createRemote("references", reference);
     await this.#saveRecord("references", reference);
     return reference;
   }

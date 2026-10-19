@@ -135,12 +135,12 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       ${this.#renderClocks(fronts)}
       ${this.#renderSecrets(secrets, next)}
       ${this.#renderQuests(quests)}
-      ${local ? this.#renderAddMore() : ""}`;
+      ${this.sync.editable ? this.#renderAddMore() : ""}`;
   }
 
-  // An "Add" button for a local campaign's section
+  // An "Add" button for a section of a campaign that can be changed here
   #addButton(collection, label) {
-    return this.sync.isLocal
+    return this.sync.editable
       ? `<button type="button" class="dlcp-add" data-action="add" data-collection="${collection}"><i class="fas fa-plus"></i> ${label}</button>`
       : "";
   }
@@ -225,7 +225,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderClocks(fronts) {
-    if (!fronts.length && !this.sync.isLocal) return "";
+    if (!fronts.length && !this.sync.editable) return "";
     const items = fronts
       .map((front) => {
         const portents = (front.portents ?? [])
@@ -258,7 +258,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderSecrets(secrets, session) {
-    if (!secrets.length && !this.sync.isLocal) return "";
+    if (!secrets.length && !this.sync.editable) return "";
     const picked = new Set(
       (session?.links ?? []).filter((l) => l.linkableType === "CampaignSecret").map((l) => l.linkableId),
     );
@@ -286,7 +286,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderQuests(quests) {
-    if (!quests.length && !this.sync.isLocal) return "";
+    if (!quests.length && !this.sync.editable) return "";
     // An active quest shows what it needs at the table: its maps, monsters to drag onto them, and its reward
     const details = (quest) => {
       if (quest.status !== "active") return "";

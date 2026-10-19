@@ -99,16 +99,16 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           Drag treasure items onto a character's sheet to hand them out.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
-        <li><strong>On Dungeon Master Guru?</strong> The planner shows the campaign too; plan it on the website, and it
-          syncs here.</li>
+        <li><strong>On Dungeon Master Guru?</strong> With premium sync, plan it on the website or in the Campaign Planner
+          here: changes on either side come across.</li>
       </ul>
 
       <h2>Plan on Dungeon Master Guru</h2>
       <ol>
         <li>Make a free account at <a href="${SITE}" target="_blank" rel="noopener">dungeonmaster.guru</a>.</li>
-        <li>On your Dungeon Master Guru dashboard, open <strong>Connections</strong> and create an <strong>API token</strong>.</li>
-        <li>Back here, click <strong>Connect</strong>, paste the token and click <strong>Check connection</strong>. The
-          token is saved in this browser only, so your players never see it.</li>
+        <li>Back here, click <strong>Connect</strong>, then <strong>Get a code</strong>. Enter the code on Dungeon
+          Master Guru, and this world connects by itself. (Or paste an API token from your dashboard's
+          <strong>Connections</strong>.) The connection is saved in this browser only, so your players never see it.</li>
         <li>Create a campaign: on the website, or here with <strong>New</strong> and then <strong>Create on
           Dungeon Master Guru</strong>.</li>
       </ol>

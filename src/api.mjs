@@ -36,6 +36,23 @@ export class DmGuruApi {
     this.fetchImpl = fetchImpl;
   }
 
+  /**
+   * Starts linking with a code, no token needed:
+   * { deviceCode, userCode, verificationUrl, verificationUrlComplete, expiresIn, interval }
+   */
+  startLink(world) {
+    return this.#request("POST", "/v1/foundry/link", { world });
+  }
+
+  /**
+   * Asks whether the DM has entered the code on the website yet: { token, user }
+   * once they have. Until then it throws, with the reason as the error's code:
+   * authorization_pending, slow_down, expired_token or access_denied.
+   */
+  pollLink(deviceCode) {
+    return this.#request("POST", "/v1/foundry/link/token", { deviceCode });
+  }
+
   /** The account the token belongs to: { user, premium, patreon } */
   me() {
     return this.#request("GET", "/v1/foundry/me");
@@ -116,7 +133,7 @@ export class DmGuruApi {
         method,
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${this.token}`,
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
           ...(body ? { "Content-Type": "application/json" } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
@@ -129,7 +146,8 @@ export class DmGuruApi {
     if (!response.ok) {
       const message = Array.isArray(data?.errors) ? data.errors.join(", ") : `Request failed (${response.status})`;
       const fields = Array.isArray(data?.fields) ? data.fields : [];
-      throw new DmGuruApiError(message, response.status, data?.code ?? null, fields);
+      // Most errors carry a code; linking's OAuth-style replies name it `error`
+      throw new DmGuruApiError(message, response.status, data?.code ?? data?.error ?? null, fields);
     }
     return data;
   }

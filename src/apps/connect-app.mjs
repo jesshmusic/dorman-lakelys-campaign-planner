@@ -1,11 +1,13 @@
 import { USING_DEV_SERVER } from "../env.mjs";
+import { nextPoll, timeLeft } from "../link.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import { escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
 
 /**
- * Links this world to a Dungeon Master Guru campaign: paste a personal API
- * token (from the Dungeon Master Guru dashboard), check it, pick a campaign.
+ * Connects to Dungeon Master Guru and links this world to a campaign. To
+ * connect, the DM enters a short code on the website (or pastes an API token
+ * from their dashboard); then they pick a campaign, or send this world's.
  */
 export class ConnectApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -16,6 +18,8 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     position: { width: 480, height: "auto" },
     actions: {
       checkToken: ConnectApp.#onCheckToken,
+      startLink: ConnectApp.#onStartLink,
+      cancelLink: ConnectApp.#onCancelLink,
       linkCampaign: ConnectApp.#onLinkCampaign,
       newCampaign: ConnectApp.#onNewCampaign,
       sendIndex: ConnectApp.#onSendIndex,
@@ -29,6 +33,9 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
   #error = null;
   #busy = false;
   #indexResult = null;
+  // Linking with a code: { deviceCode, userCode, verificationUrlComplete, interval, expiresAt, status }
+  #link = null;
+  #pollTimer = null;
 
   get sync() {
     return game.modules.get(MODULE_ID).api.sync;
@@ -45,18 +52,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       ${this.#error ? `<p class="dlcp-notice dlcp-notice--error">${escapeHtml(this.#error)}</p>` : ""}
       ${linked ? `<p class="dlcp-notice">This world is linked to <strong>${escapeHtml(linked.name)}</strong>.</p>` : ""}
       ${USING_DEV_SERVER ? `<p class="dlcp-notice dlcp-notice--warning">Development build: using the Dungeon Master Guru at ${baseUrl}.</p>` : ""}
-      <p>Create an API token on your <a href="${baseUrl}/app/user-dashboard" target="_blank" rel="noopener">Dungeon Master Guru dashboard</a>
-         (Connections → API tokens) and paste it here. It is saved in this browser only.</p>
-      <div class="form-group">
-        <label for="dlcp-token">API token</label>
-        <input id="dlcp-token" type="password" autocomplete="off" placeholder="${hasToken ? "Saved. Paste a new one to replace it" : "dmg_…"}" />
-      </div>
-      <div class="dlcp-buttons">
-        <button type="button" data-action="checkToken" ${this.#busy ? "disabled" : ""}>
-          <i class="fas fa-plug"></i> ${hasToken ? "Check connection" : "Connect"}
-        </button>
-        ${linked || hasToken ? `<button type="button" data-action="disconnect"><i class="fas fa-unlink"></i> Disconnect</button>` : ""}
-      </div>
+      ${hasToken ? this.#renderConnected() : this.#renderConnect(baseUrl)}
       ${this.#renderAccount()}
     `;
     return container;
@@ -64,6 +60,121 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
 
   _replaceHTML(result, content) {
     content.replaceChildren(result);
+  }
+
+  async _onClose(options) {
+    clearTimeout(this.#pollTimer);
+    this.#link = null;
+    await super._onClose?.(options);
+  }
+
+  // Not connected yet: get a code to enter on the website, or paste a token
+  #renderConnect(baseUrl) {
+    return `${this.#link ? this.#renderLink() : `
+      <p>Connect to your free Dungeon Master Guru account to plan on the website too, and sync your campaigns with
+        this world.</p>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="startLink" ${this.#busy ? "disabled" : ""}><i class="fas fa-key"></i> Get a code</button>
+      </div>`}
+      <details class="dlcp-paste-token">
+        <summary>Or paste an API token</summary>
+        <p class="hint">Create one on your <a href="${baseUrl}/app/user-dashboard" target="_blank" rel="noopener">Dungeon Master
+          Guru dashboard</a> (Connections → API tokens). It's saved in this browser only.</p>
+        ${this.#tokenField(false)}
+      </details>`;
+  }
+
+  #renderConnected() {
+    return `<div class="dlcp-buttons">
+        <button type="button" data-action="checkToken" ${this.#busy ? "disabled" : ""}><i class="fas fa-plug"></i> Check connection</button>
+        <button type="button" data-action="disconnect"><i class="fas fa-unlink"></i> Disconnect</button>
+      </div>
+      <details class="dlcp-paste-token">
+        <summary>Use a different API token</summary>
+        ${this.#tokenField(true)}
+      </details>`;
+  }
+
+  #tokenField(hasToken) {
+    return `<div class="form-group">
+        <label for="dlcp-token">API token</label>
+        <input id="dlcp-token" type="password" autocomplete="off" placeholder="${hasToken ? "Saved. Paste a new one to replace it" : "dmg_…"}" />
+      </div>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="checkToken" ${this.#busy ? "disabled" : ""}><i class="fas fa-plug"></i> Connect</button>
+      </div>`;
+  }
+
+  // The code to enter on the website, while waiting for it
+  #renderLink() {
+    const link = this.#link;
+    const url = escapeHtml(link.verificationUrlComplete ?? link.verificationUrl);
+    if (link.status !== "waiting") {
+      const why = {
+        expired: "That code expired before it was entered.",
+        denied: "The code was cancelled on Dungeon Master Guru.",
+        error: "Something went wrong while waiting for the code.",
+      }[link.status];
+      return `<p class="dlcp-notice dlcp-notice--warning">${why}</p>
+        <div class="dlcp-buttons"><button type="button" data-action="startLink"><i class="fas fa-key"></i> Get a new code</button></div>`;
+    }
+    return `<section class="dlcp-card dlcp-link-code">
+        <p>On Dungeon Master Guru, sign in and enter this code:</p>
+        <p class="dlcp-user-code" aria-label="Your code">${escapeHtml(link.userCode)}</p>
+        <div class="dlcp-buttons">
+          <a class="dlcp-button-link" href="${url}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open Dungeon Master Guru</a>
+          <button type="button" data-action="cancelLink">Cancel</button>
+        </div>
+        <p class="dlcp-muted"><i class="fas fa-spinner fa-spin"></i> Waiting for the code… It expires in ${timeLeft(link.expiresAt)}.</p>
+      </section>`;
+  }
+
+  #schedulePoll(seconds) {
+    clearTimeout(this.#pollTimer);
+    this.#pollTimer = setTimeout(() => this.#poll(), seconds * 1000);
+  }
+
+  // Asks whether the code was entered; connects when it was
+  async #poll() {
+    const link = this.#link;
+    if (!link || link.status !== "waiting") return;
+    try {
+      const { token } = await this.sync.api(null).pollLink(link.deviceCode);
+      await game.settings.set(MODULE_ID, SETTINGS.apiToken, token);
+      this.#link = null;
+      ui.notifications.info("Connected to Dungeon Master Guru.");
+      await this.#loadAccount(token);
+    } catch (error) {
+      // Can't reach the server for a moment: keep waiting
+      const step = error.status === 0 ? { wait: link.interval } : nextPoll(error.code, link.interval);
+      if ("wait" in step) {
+        link.interval = Math.max(link.interval, step.wait);
+        this.#schedulePoll(step.wait);
+      } else {
+        link.status = step.stop;
+      }
+      this.render();
+    }
+  }
+
+  // The account and its campaigns, for the parts below the connection
+  async #loadAccount(token) {
+    this.#busy = true;
+    this.#error = null;
+    await this.render();
+    try {
+      const api = this.sync.api(token);
+      this.#account = await api.me();
+      this.#campaigns = this.#account.premium ? await api.campaigns() : null;
+      return true;
+    } catch (error) {
+      this.#account = null;
+      this.#error = error.unauthorized ? "That token didn't work. Check it, or connect again." : error.message;
+      return false;
+    } finally {
+      this.#busy = false;
+      this.render();
+    }
   }
 
   // Compendium index: lets planner searches on Dungeon Master Guru link to these compendiums
@@ -141,27 +252,39 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
   }
 
   static async #onCheckToken() {
-    const pasted = this.element.querySelector("#dlcp-token").value.trim();
+    const pasted = this.element.querySelector("#dlcp-token")?.value.trim();
     const token = pasted || this.sync.token;
     if (!token) {
       this.#error = "Paste your API token first.";
       return this.render();
     }
+    if ((await this.#loadAccount(token)) && pasted) {
+      await game.settings.set(MODULE_ID, SETTINGS.apiToken, pasted);
+      this.render();
+    }
+  }
+
+  static async #onStartLink() {
+    clearTimeout(this.#pollTimer);
     this.#busy = true;
     this.#error = null;
     await this.render();
     try {
-      const api = this.sync.api(token);
-      this.#account = await api.me();
-      this.#campaigns = this.#account.premium ? await api.campaigns() : null;
-      if (pasted) await game.settings.set(MODULE_ID, SETTINGS.apiToken, pasted);
+      const link = await this.sync.api(null).startLink({ id: game.world.id, title: game.world.title });
+      this.#link = { ...link, expiresAt: Date.now() + link.expiresIn * 1000, status: "waiting" };
+      this.#schedulePoll(link.interval);
     } catch (error) {
-      this.#account = null;
-      this.#error = error.unauthorized ? "That token didn't work. Check it, or create a new one." : error.message;
+      this.#error = `Couldn't get a code: ${error.message}`;
     } finally {
       this.#busy = false;
       this.render();
     }
+  }
+
+  static #onCancelLink() {
+    clearTimeout(this.#pollTimer);
+    this.#link = null;
+    this.render();
   }
 
   static async #onLinkCampaign() {

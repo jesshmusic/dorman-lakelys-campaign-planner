@@ -178,3 +178,28 @@ test("sends a campaign planned in Foundry", async () => {
   assert.equal(calls[0].init.method, "POST");
   assert.deepEqual(JSON.parse(calls[0].init.body), body);
 });
+
+test("starts linking with a code without a token", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ status: 201, body: { userCode: "WXYZ-2345", deviceCode: "d" } }]);
+  const api = new DmGuruApi({ token: null, fetchImpl });
+  const world = { id: "dev", title: "Dev" };
+
+  assert.equal((await api.startLink(world)).userCode, "WXYZ-2345");
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/link");
+  assert.equal(calls[0].init.method, "POST");
+  assert.ok(!("Authorization" in calls[0].init.headers));
+  assert.deepEqual(JSON.parse(calls[0].init.body), { world });
+});
+
+test("polls for the token, with the reason it isn't ready as the error code", async () => {
+  const { calls, fetchImpl } = fakeFetch([
+    { status: 400, body: { error: "authorization_pending" } },
+    { body: { token: "dmg_new", user: { name: "Jess" } } },
+  ]);
+  const api = new DmGuruApi({ token: null, fetchImpl });
+
+  await assert.rejects(api.pollLink("d"), (error) => error.code === "authorization_pending" && error.status === 400);
+  assert.equal((await api.pollLink("d")).token, "dmg_new");
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/link/token");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { deviceCode: "d" });
+});

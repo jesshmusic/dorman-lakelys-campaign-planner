@@ -144,8 +144,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return this.sync.linked ? `Campaign Planner: ${this.sync.linked.name}` : "Campaign Planner";
   }
 
+  // A campaign in this world, or a synced one (premium): both can be changed here
   get #editable() {
-    return this.sync.isLocal;
+    return this.sync.editable;
   }
 
   /** Opens on a tab, a session's prep, or a quest's plan */
@@ -202,9 +203,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const store = this.sync.recordLists();
     const campaign = store.campaign[0] ?? { name: this.sync.linked.name };
     const site = campaign.slug ? `${this.sync.baseUrl}/app/campaigns/${encodeURIComponent(campaign.slug)}` : this.sync.baseUrl;
-    const where = this.#editable
+    const where = this.sync.isLocal
       ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
-      : `<span class="dlcp-muted"><i class="fas fa-globe"></i> On Dungeon Master Guru</span>`;
+      : `<span class="dlcp-muted"><i class="fas fa-globe"></i> On Dungeon Master Guru${this.#editable ? ", synced" : ""}</span>`;
     const nav = TABS.map(
       (tab) => `<button type="button" data-action="showTab" data-tab="${tab.id}" ${tab.id === this.#tab ? 'aria-current="page"' : ""}>
         <i class="fas ${tab.icon}"></i> ${tab.label}</button>`,
@@ -215,11 +216,14 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         <span class="dlcp-buttons"><button type="button" data-action="run"><i class="fas fa-scroll"></i> Run it</button></span>
       </header>
       ${
-        this.#editable
+        this.sync.isLocal
           ? ""
-          : `<p class="dlcp-notice">This campaign is planned on Dungeon Master Guru, and changes there sync here. You can
-              advance clocks, reveal secrets and set quest status here, and add maps, actors, coins and XP.
-              <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Plan it on Dungeon Master Guru</a></p>`
+          : this.#editable
+            ? `<p class="dlcp-notice">This campaign is on Dungeon Master Guru. Changes you make here go there too, and changes
+                there come here. <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Open it on Dungeon Master Guru</a></p>`
+            : `<p class="dlcp-notice">This campaign is planned on Dungeon Master Guru. To change it here, connect this browser
+                to Dungeon Master Guru (<strong>Connect</strong> in the Dashboard's menu).
+                <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Plan it on Dungeon Master Guru</a></p>`
       }
       <nav class="dlcp-tabs" aria-label="Campaign sections">${nav}</nav>
       <div class="dlcp-tab">${this.#renderTab(store, campaign)}</div>`;
@@ -300,7 +304,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           ${campaign.pitch ? `<h3>Pitch for your players</h3><p>${escapeHtml(campaign.pitch)}</p>` : ""}
           ${(campaign.truths ?? []).length ? `<h3>Truths of the setting</h3><ul>${campaign.truths.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : ""}
         </section>`;
-    const send = this.#editable
+    const send = this.sync.isLocal
       ? `<section class="dlcp-card dlcp-send">
           <header class="dlcp-card-header"><h3><i class="fas fa-cloud-arrow-up"></i> Plan it on Dungeon Master Guru too</h3></header>
           <p class="dlcp-muted">Send this campaign to Dungeon Master Guru to plan it from any computer or phone. With premium
@@ -314,7 +318,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   // Party ---------------------------------------------------------------------
 
   #renderParty(campaign) {
-    if (!this.#editable) {
+    if (!this.sync.isLocal) {
       return `<p>The party for this campaign is chosen on Dungeon Master Guru, from your world's player characters.</p>`;
     }
     const options = this.sync.partyOptions();
@@ -793,10 +797,11 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     }
   }
 
+  // Saves to this world, or to Dungeon Master Guru for a synced campaign.
+  // Returns the saved record (a new one has its Dungeon Master Guru id), or false.
   async #save(collection, record) {
     try {
-      await this.sync.saveLocal(collection, record);
-      return true;
+      return await this.sync.saveRecord(collection, record);
     } catch (error) {
       ui.notifications.error(`Couldn't save: ${error.message}`);
       return false;
@@ -808,7 +813,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (target.dataset.questStatus) {
       return this.#change("quests", target.dataset.questStatus, { status: target.value });
     }
-    if (target.dataset.party !== undefined && this.#editable) {
+    if (target.dataset.party !== undefined && this.sync.isLocal) {
       const campaign = this.sync.recordLists().campaign[0];
       const uuid = target.dataset.party;
       const party = new Set(campaign.partyActorUuids ?? []);
@@ -896,7 +901,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         const change = actorChange(uuid, pickedName(uuid, record?.foundryActorName));
         if (!change.error) saved = { ...saved, ...change };
       }
-      return (await this.#save(collection, saved)) ? saved : null;
+      return (await this.#save(collection, saved)) || null;
     }
   }
 
@@ -1082,7 +1087,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     });
     if (!confirmed) return;
     try {
-      await this.sync.deleteLocal(collection, id);
+      await this.sync.deleteRecord(collection, id);
       if (collection === "sessions" && this.#sessionId === id) this.#sessionId = null;
     } catch (error) {
       ui.notifications.error(`Couldn't delete: ${error.message}`);
@@ -1160,8 +1165,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   static async #onAddSession() {
     const store = this.sync.recordLists();
     const session = newRecord("sessions", {}, { id: () => foundry.utils.randomID(16), existing: store.sessions });
-    if (await this.#save("sessions", session)) {
-      this.#sessionId = session.id;
+    const saved = await this.#save("sessions", session);
+    if (saved) {
+      this.#sessionId = saved.id;
       this.render();
     }
   }

@@ -39,11 +39,14 @@ The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 
 ## Connecting to Dungeon Master Guru
 
-1. Make a free account at [dungeonmaster.guru](https://dungeonmaster.guru), then create an API token: **Dashboard → Connections → API tokens**.
-2. In Foundry, open **Settings → Module Settings → Dorman Lakely's Campaign Planner → Connect**, or the Dashboard's menu.
-3. Paste the token and click **Check connection**. Then link a campaign, or create one with **New** → **Create on Dungeon Master Guru**.
+1. Make a free account at [dungeonmaster.guru](https://dungeonmaster.guru).
+2. In Foundry, open **Settings → Module Settings → Dorman Lakely's Campaign Planner → Connect**, or the Dashboard's menu, and click **Get a code**.
+3. Enter the code on Dungeon Master Guru (the window links to the page); Foundry connects by itself. You can also paste an API token from **Dashboard → Connections → API tokens** instead.
+4. Link a campaign, create one with **New** → **Create on Dungeon Master Guru**, or send this world's campaign with **Send to Dungeon Master Guru**.
 
-The token is saved in your browser only. It is never stored in the world, so your players never receive it.
+The connection is saved in your browser only. It is never stored in the world, so your players never receive it.
+
+With premium sync, a Dungeon Master Guru campaign can be planned in the Campaign Planner here as well as on the website: add, edit and delete anything, and the changes go both ways.
 
 The compendium index is sent when the GM loads the world, and again whenever a book module updates. To send it now, click **Send compendium index** in the Connect window. Each campaign on Dungeon Master Guru can turn compendiums off in its **Compendiums** list.
 

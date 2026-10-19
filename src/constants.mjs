@@ -45,14 +45,17 @@ export const TYPE_COLLECTIONS = {
 };
 
 // Records Foundry may change, and the push type the server expects
+// The sync's name for each kind of record Foundry can change on Dungeon Master Guru
 export const PUSH_TYPES = {
+  campaign: "campaign",
+  factions: "faction",
   fronts: "front",
   quests: "quest",
   secrets: "secret",
   sessions: "session",
-  // Foundry-only fields: a place's map and an NPC's actor
   locations: "location",
   npcs: "npc",
+  references: "reference",
 };
 
 export const AUTO_SYNC_MINUTES = 2;
