@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EDITABLE, changedAttributes, createAttributes, linksForSync, uuidV4 } from "../src/editing.mjs";
+import { EDITABLE, changedAttributes, createAttributes, describeFields, linksForSync, uuidV4 } from "../src/editing.mjs";
 
 const quest = {
   id: "12",
@@ -92,4 +92,9 @@ test("sends a secret being revealed, and when", () => {
     revealed: true,
     revealedSessionUuid: "s2",
   });
+});
+
+test("fields are named in words when the GM is asked about a clash", () => {
+  assert.equal(describeFields(["motive", "clockFilled"]), "what they want, the clock");
+  assert.equal(describeFields(["settingNotes", "giverNpcId"]), "the setting notes, who gives it");
 });

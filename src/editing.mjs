@@ -117,3 +117,43 @@ export function uuidV4(random = (bytes) => globalThis.crypto.getRandomValues(byt
   const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+// How each field Foundry can change is named when asking the DM about a clash
+export const FIELD_LABELS = {
+  clockFilled: "the clock",
+  portents: "the grim portents",
+  status: "the status",
+  log: "the session log",
+  recap: "the recap",
+  revealed: "whether it's revealed",
+  rewardCurrency: "the reward's coins",
+  rewardXp: "the reward's XP",
+  milestone: "the milestone",
+  treasureCurrency: "the treasure's coins",
+  foundryScenes: "the maps",
+  links: "what's linked",
+  motive: "what they want",
+  secret: "their secret",
+  voice: "their voice",
+  premise: "the premise",
+  pitch: "the pitch",
+  truths: "the truths",
+  strongStart: "the strong start",
+  revealedSessionUuid: "when it was revealed",
+  giverNpcId: "who gives it",
+  factionId: "the faction",
+  locationId: "the place",
+  parentId: "what it's part of",
+  npcId: "who's behind it",
+  statBlockReferenceId: "the stat block",
+};
+
+// Other fields by their name: "settingNotes" is "the setting notes"
+const fieldLabel = (key) =>
+  FIELD_LABELS[key] ??
+  `the ${key
+    .replace(/Id$/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()}`;
+
+export const describeFields = (keys) => keys.map(fieldLabel).join(", ");

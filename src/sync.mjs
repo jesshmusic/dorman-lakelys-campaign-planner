@@ -8,7 +8,7 @@ import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
-import { changedAttributes, createAttributes, syncValue, uuidV4 } from "./editing.mjs";
+import { changedAttributes, createAttributes, describeFields, syncValue, uuidV4 } from "./editing.mjs";
 import { pendingCount, pendingUuids, pushPayload, queueCreate, queueDelete, queueUpdate, withRealIds } from "./outbox.mjs";
 import {
   ADVENTURE_PACK,
@@ -1081,23 +1081,7 @@ function whyNot(error) {
   return "couldn't be reached";
 }
 
-// How each field Foundry can change is named when asking the DM about a clash
-export const FIELD_LABELS = {
-  clockFilled: "the clock",
-  portents: "the grim portents",
-  status: "the status",
-  log: "the session log",
-  recap: "the recap",
-  revealed: "whether it's revealed",
-  rewardCurrency: "the reward's coins",
-  rewardXp: "the reward's XP",
-  milestone: "the milestone",
-  treasureCurrency: "the treasure's coins",
-  foundryScenes: "the maps",
-  links: "what's linked",
-};
 
-export const describeFields = (keys) => keys.map((key) => FIELD_LABELS[key] ?? key).join(", ");
 
 function withExtras(toSend, attributes) {
   return "revealed" in toSend && "revealedSessionUuid" in attributes
