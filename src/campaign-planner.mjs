@@ -9,12 +9,11 @@ import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
 import { useRememberedGuideWords } from "./guide-words.mjs";
 import { registerTechniqueSettings } from "./technique-settings.mjs";
-import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
+import { MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
 const sync = new CampaignSync();
 let dashboard = null;
 let connect = null;
-let autoSyncTimer = null;
 
 function openDashboard() {
   dashboard ??= new DashboardApp();
@@ -48,18 +47,6 @@ function openHelp() {
   help.render({ force: true });
 }
 
-async function autoSync({ notifyErrors = false } = {}) {
-  if (!sync.ready) return;
-  try {
-    await sync.pull();
-  } catch (error) {
-    console.warn(`${MODULE_TITLE} | Sync failed`, error);
-    if (notifyErrors || error.unauthorized) {
-      ui.notifications.warn(`${MODULE_TITLE}: ${error.message}`);
-    }
-  }
-}
-
 // Rewrites the campaign's journal pages a moment after a technique is
 // switched on or off, so changing several settings at once rewrites them once
 const rewritePagesSoon = foundry.utils.debounce(async () => {
@@ -75,14 +62,6 @@ const rewritePagesSoon = foundry.utils.debounce(async () => {
 function techniquesChanged() {
   for (const app of [dashboard, planner, newCampaign]) if (app?.rendered) app.render();
   if (game.user.isActiveGM) rewritePagesSoon();
-}
-
-function scheduleAutoSync() {
-  clearInterval(autoSyncTimer);
-  autoSyncTimer = null;
-  if (game.user.isGM && game.settings.get(MODULE_ID, SETTINGS.autoSync)) {
-    autoSyncTimer = setInterval(() => autoSync(), AUTO_SYNC_MINUTES * 60 * 1000);
-  }
 }
 
 Hooks.once("init", () => {
@@ -150,17 +129,6 @@ Hooks.once("init", () => {
     default: true,
     // Keeps the Dashboard's checkbox in step when this is changed in the settings
     onChange: () => dashboard?.rendered && dashboard.render(),
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.autoSync, {
-    name: "Sync automatically",
-    hint: `Pull changes from Dungeon Master Guru when the world loads and every ${AUTO_SYNC_MINUTES} minutes while the GM is connected.`,
-    scope: "world",
-    config: true,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: () => scheduleAutoSync(),
   });
 
   // Use the six truths, threat clocks, grim portents, ...: each on unless a GM switches it off
@@ -281,8 +249,7 @@ Hooks.once("ready", () => {
   // The welcome message on first install, and what's new after an update
   announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));
 
-  if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
-  scheduleAutoSync();
+  // Campaigns sync only when the GM clicks Sync: nothing pulls or pushes on a timer
   sendCompendiumIndex();
   sendCharactersSoon();
   watchCharacters();

@@ -7,7 +7,6 @@ export const SETTINGS = {
   apiToken: "apiToken",
   // { uuid, name, cursor, lastSynced } for the campaign linked to this world
   campaign: "campaign",
-  autoSync: "autoSync",
   // { [worldId]: draft } for the New campaign guide. Client scope, like the token.
   setupDraft: "setupDraft",
   // Whether this GM has seen the "how it works" window (before the chat welcome)
@@ -69,4 +68,3 @@ export const PUSH_TYPES = {
   references: "reference",
 };
 
-export const AUTO_SYNC_MINUTES = 2;

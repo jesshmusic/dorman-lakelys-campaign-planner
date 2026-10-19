@@ -58,7 +58,6 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 | Setting | What it does |
 |---|---|
 | Connect | Link this world to one of your campaigns, or disconnect. |
-| Sync automatically | Pull changes when the world loads and every 2 minutes while the GM is connected. |
 | Use the six truths | The truths of the setting: in the New campaign guide, the brief and the Overview journal page. |
 | Use threat clocks | A clock on each threat: on the Story tab, the Dashboard and threat journal pages. |
 | Use grim portents | Signs a threat is getting closer: on the Story tab, the Dashboard and threat journal pages. |
