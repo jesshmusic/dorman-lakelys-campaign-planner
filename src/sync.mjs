@@ -8,7 +8,8 @@ import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
-import { changedAttributes, createAttributes, uuidV4 } from "./editing.mjs";
+import { changedAttributes, createAttributes, syncValue, uuidV4 } from "./editing.mjs";
+import { pendingCount, pendingUuids, pushPayload, queueCreate, queueDelete, queueUpdate, withRealIds } from "./outbox.mjs";
 import {
   ADVENTURE_PACK,
   CAMPAIGN_FLAG,
@@ -114,6 +115,9 @@ function pageName(collection, record) {
  */
 export class CampaignSync {
   #pulling = null;
+  #syncing = null;
+  // The last time Sync couldn't reach Dungeon Master Guru: { at, message }, or null
+  lastSyncProblem = null;
   #sentCharacters = null;
   // { uuid -> version } of the scene thumbnails Dungeon Master Guru has
   #sentScenes = null;
@@ -185,24 +189,34 @@ export class CampaignSync {
     const name = changes.campaign?.name ?? linked.name;
     const entries = await this.#ensureEntries(name);
 
-    // Current records, updated with what came in
+    // Current records, updated with what came in. Records changed here and
+    // not synced yet keep the changes made here until Sync sends them.
     const store = this.records();
+    const pending = pendingUuids(this.outbox);
+    const waiting = (uuid) => pending.updated.has(uuid) || pending.deleted.has(uuid) || pending.created.has(uuid);
     const incomingUuids = new Set();
-    if (changes.campaign) store.campaign.set(String(changes.campaign.id), changes.campaign);
+    if (changes.campaign && !waiting(changes.campaign.uuid)) store.campaign.set(String(changes.campaign.id), changes.campaign);
     for (const [collection, records] of Object.entries(changes.records)) {
       for (const record of records) {
-        store[collection]?.set(String(record.id), record);
         incomingUuids.add(record.uuid);
+        if (waiting(record.uuid)) continue;
+        // A record made here gets its real id when Sync sends it; drop the copy under its stand-in id
+        for (const [id, existing] of store[collection] ?? []) if (existing.uuid === record.uuid && id !== String(record.id)) store[collection].delete(id);
+        store[collection]?.set(String(record.id), record);
       }
     }
     const deleted = new Set(changes.tombstones.map((tombstone) => tombstone.uuid));
+    // Deleted on Dungeon Master Guru: edits waiting for it have nowhere to go
+    if (changes.tombstones.some((tombstone) => pending.updated.has(tombstone.uuid))) {
+      await this.#setOutbox(this.outbox.filter((change) => !(change.op === "update" && deleted.has(change.uuid))));
+    }
 
     // On a full pull, anything not sent back no longer exists
     if (changes.full) {
       for (const [collection, records] of Object.entries(store)) {
         if (collection === "campaign") continue;
         for (const [id, record] of records) {
-          if (!incomingUuids.has(record.uuid)) {
+          if (!incomingUuids.has(record.uuid) && !pending.created.has(record.uuid)) {
             deleted.add(record.uuid);
             records.delete(id);
           }
@@ -247,38 +261,172 @@ export class CampaignSync {
     }
     const type = PUSH_TYPES[collection];
     if (!type) throw new Error(`Can't change ${collection} from Foundry.`);
+    // Saved here now; Sync sends it
+    const before = Object.fromEntries(Object.keys(attributes).map((key) => [key, this.#syncedValue(key, record)]));
+    await this.#saveRecord(collection, this.#withChange(collection, record, attributes));
+    await this.#queue(queueUpdate(this.outbox, { collection, type, uuid: record.uuid, baseVersion: record.syncVersion, before, attributes }));
+    return true;
+  }
 
-    const result = await this.api().push(this.linked.uuid, [
-      { type, uuid: record.uuid, baseVersion: record.syncVersion, attributes },
-    ]);
-    if (result.applied.length) return this.#saveRecord(collection, result.applied[0].current);
-    if (result.errors.length) {
-      ui.notifications.error(`${result.errors[0].errors.join(", ")}`);
-      return false;
+  // A field as the sync sends it; a secret's revealing session goes by its uuid
+  #syncedValue(key, record, store = this.records()) {
+    if (key === "revealedSessionUuid") {
+      const session = record.revealedSessionId == null ? null : store.sessions.get(String(record.revealedSessionId));
+      return session?.uuid ?? null;
+    }
+    return syncValue(key, record);
+  }
+
+  // A synced record with a change made here applied, for the journals
+  #withChange(collection, record, attributes) {
+    const { revealedSessionUuid, links, ...rest } = attributes;
+    const updated = { ...record, ...rest };
+    if (collection === "secrets" && "revealed" in attributes) {
+      const session = revealedSessionUuid ? [...this.records().sessions.values()].find((s) => s.uuid === revealedSessionUuid) : null;
+      updated.revealedAt = attributes.revealed ? new Date().toISOString() : null;
+      updated.revealedSessionId = attributes.revealed ? (session?.id ?? null) : null;
+    }
+    if (links) {
+      // Keep what's known about links that were already there (their names), in the new order
+      const known = new Map((record.links ?? []).map((link) => [`${link.linkableType}:${link.linkableId}`, link]));
+      updated.links = links.map((link) => ({ ...known.get(`${link.linkableType}:${link.linkableId}`), ...link }));
+    }
+    return updated;
+  }
+
+  /** The changes made here to this synced campaign, waiting for Sync (kept on its journal folder) */
+  get outbox() {
+    return this.folder?.getFlag(MODULE_ID, "outbox") ?? [];
+  }
+
+  /** How many records have changes waiting for Sync */
+  get pendingCount() {
+    return this.isLocal ? 0 : pendingCount(this.outbox);
+  }
+
+  async #setOutbox(outbox) {
+    if (this.folder) await this.folder.setFlag(MODULE_ID, "outbox", outbox);
+  }
+
+  async #queue(outbox) {
+    await this.#setOutbox(outbox);
+    Hooks.callAll(SYNCED_HOOK);
+  }
+
+  /**
+   * Sends the changes made here to Dungeon Master Guru, in order, then pulls
+   * what changed there. When Dungeon Master Guru can't be reached, stops and
+   * keeps what wasn't sent for next time. A change Dungeon Master Guru turns
+   * down stays waiting, with the reason; the rest still go.
+   * @returns {Promise<{ sent: number, failed: { name: string, reason: string }[], unreachable: string|null }>}
+   */
+  syncNow() {
+    if (this.isLocal) return Promise.resolve({ sent: 0, failed: [], unreachable: null });
+    this.#syncing ??= this.#syncNow().finally(() => {
+      this.#syncing = null;
+    });
+    return this.#syncing;
+  }
+
+  async #syncNow() {
+    const queued = this.outbox;
+    const ids = {};
+    const kept = [];
+    const failed = [];
+    let sent = 0;
+    let unreachable = null;
+    for (const [index, original] of queued.entries()) {
+      const change = withRealIds(original, ids);
+      try {
+        const outcome = await this.#send(change);
+        if (outcome.ok) {
+          sent += 1;
+          if (outcome.id !== undefined) ids[change.uuid] = String(outcome.id);
+        } else {
+          failed.push({ name: outcome.name ?? change.uuid, reason: outcome.reason });
+          kept.push(change);
+        }
+      } catch (error) {
+        if (cantReach(error)) {
+          unreachable = whyNot(error);
+          kept.push(change, ...queued.slice(index + 1).map((rest) => withRealIds(rest, ids)));
+          break;
+        }
+        failed.push({ name: change.uuid, reason: error.message });
+        kept.push(change);
+      }
+      // Save progress as it goes, so nothing is sent twice if this stops partway
+      await this.#setOutbox([...kept, ...queued.slice(index + 1).map((rest) => withRealIds(rest, ids))]);
+    }
+    if (!unreachable) {
+      try {
+        await this.pull();
+      } catch (error) {
+        if (!cantReach(error)) throw error;
+        unreachable = whyNot(error);
+      }
+    }
+    this.lastSyncProblem = unreachable ? { at: Date.now(), message: unreachable } : null;
+    Hooks.callAll(SYNCED_HOOK);
+    return { sent, failed, unreachable };
+  }
+
+  // Sends one queued change. Returns { ok, id? } or { ok: false, reason, name }; throws when it can't reach the server.
+  async #send(change) {
+    const collection = change.collection;
+    const record = [...(this.records()[collection]?.values() ?? [])].find((r) => r.uuid === change.uuid);
+    const name = record ? pageName(collection, record) : undefined;
+    const result = await this.api().push(this.linked.uuid, [pushPayload(change)]);
+    const reason = result.errors?.[0]?.errors?.join(", ");
+
+    if (change.op === "delete") return reason ? { ok: false, reason, name } : { ok: true };
+    if (change.op === "create") {
+      const created = result.applied?.[0]?.current;
+      if (created) {
+        await this.#replaceRecord(collection, change.uuid, created);
+        return { ok: true, id: created.id };
+      }
+      return { ok: false, reason: reason ?? "Dungeon Master Guru didn't accept it.", name };
     }
 
+    if (result.applied?.length) {
+      await this.#saveRecord(collection, result.applied[0].current);
+      return { ok: true };
+    }
+    // Gone from Dungeon Master Guru: the edit has nowhere to go
+    if (reason === "Record not found") return { ok: true };
+    if (reason) return { ok: false, reason, name };
+
+    // Changed on Dungeon Master Guru too: merge field by field, and ask about fields both sides changed
     const theirs = result.conflicts[0].current;
-    const { retry, clashes } = mergeChange(record, comparable(attributes), theirs);
+    const theirsNow = Object.fromEntries(Object.keys(change.attributes).map((key) => [key, this.#syncedValue(key, theirs)]));
+    const { retry, clashes } = mergeChange(change.base ?? {}, change.attributes, theirsNow);
     let toSend = retry;
     if (clashes.length) {
       const keepMine = await foundry.applications.api.DialogV2.confirm({
         window: { title: "Changed on Dungeon Master Guru too" },
-        content: `<p>${escapeHtml(pageName(collection, record))}: ${describeFields(clashes)} also changed on Dungeon Master Guru.</p>
-                  <p>Keep the change you just made in Foundry?</p>`,
+        content: `<p>${escapeHtml(name ?? "A record")}: ${describeFields(clashes)} also changed on Dungeon Master Guru.</p>
+                  <p>Keep the change made in Foundry?</p>`,
       });
-      toSend = keepMine ? comparable(attributes) : retry;
+      toSend = keepMine ? change.attributes : retry;
     }
     if (!Object.keys(toSend).length) {
       await this.#saveRecord(collection, theirs);
-      return false;
+      return { ok: true };
     }
     const retried = await this.api().push(this.linked.uuid, [
-      { type, uuid: record.uuid, baseVersion: theirs.syncVersion, attributes: withExtras(toSend, attributes) },
+      pushPayload({ ...change, baseVersion: theirs.syncVersion, attributes: withExtras(toSend, change.attributes) }),
     ]);
-    if (retried.applied.length) return this.#saveRecord(collection, retried.applied[0].current);
-    ui.notifications.warn("That record keeps changing on Dungeon Master Guru. Sync and try again.");
-    await this.pull();
-    return false;
+    if (retried.applied?.length) {
+      await this.#saveRecord(collection, retried.applied[0].current);
+      return { ok: true };
+    }
+    return { ok: false, reason: "It keeps changing on Dungeon Master Guru. Try Sync again.", name };
+  }
+
+  // Swaps a record made here (under its stand-in id) for Dungeon Master Guru's copy
+  async #replaceRecord(collection, uuid, record) {
+    await this.#saveRecord(collection, record);
   }
 
   async #saveRecord(collection, record) {
@@ -464,57 +612,74 @@ export class CampaignSync {
     const existing = [...(this.records()[collection]?.values() ?? [])];
     const record = newRecord(collection, values, { id: () => foundry.utils.randomID(16), existing });
     if (record.error) return record;
-    if (!this.isLocal) return (await this.#createRemote(collection, record)) || { error: "Couldn't add it on Dungeon Master Guru." };
+    if (!this.isLocal) return this.#createForSync(collection, record);
     await this.#saveRecord(collection, record);
     return record;
   }
 
-  /** True when the planner can change this campaign: one in this world, or a synced one */
+  /**
+   * True when the planner can change this campaign: one in this world, or a
+   * synced one (changes are saved here and wait for Sync, so this browser
+   * needn't be connected to make them)
+   */
   get editable() {
-    return this.isLocal || this.ready;
+    return this.isLocal || Boolean(game.user.isGM && this.linked);
   }
 
   /**
-   * Saves a record from the planner: in this world, or on Dungeon Master Guru
-   * for a synced campaign (only the fields that changed; a new record is
-   * created there). Returns the saved record, or false.
+   * Saves a record from the planner. A synced campaign's changes are saved
+   * here and wait for Sync (only the fields that changed are sent; a new
+   * record is made there). Returns the saved record, or false.
    */
   async saveRecord(collection, record) {
     if (this.isLocal) return (await this.saveLocal(collection, record)) && record;
     const store = this.records();
     const current =
       collection === "campaign" ? [...store.campaign.values()][0] : store[collection]?.get(String(record.id));
-    if (!current) return this.#createRemote(collection, record);
+    if (!current) return this.#createForSync(collection, record);
     const attributes = changedAttributes(collection, current, record);
     if (!Object.keys(attributes).length) return current;
-    return (await this.update(collection, current, attributes)) && this.records()[collection]?.get(String(current.id));
+    const type = PUSH_TYPES[collection];
+    if (!type) throw new Error(`Can't change ${collection} from Foundry.`);
+    const before = Object.fromEntries(Object.keys(attributes).map((key) => [key, this.#syncedValue(key, current, store)]));
+    const saved = { ...record, id: current.id, uuid: current.uuid, syncVersion: current.syncVersion };
+    await this.#saveRecord(collection, saved);
+    await this.#queue(queueUpdate(this.outbox, { collection, type, uuid: current.uuid, baseVersion: current.syncVersion, before, attributes }));
+    return saved;
   }
 
-  /** Deletes a record from the planner: in this world, or on Dungeon Master Guru */
+  /**
+   * Deletes a record from the planner, with what pointed at it cleared. For a
+   * synced campaign it's gone here now, and Sync deletes it there.
+   */
   async deleteRecord(collection, id) {
     if (this.isLocal) return this.deleteLocal(collection, id);
-    const record = this.records()[collection]?.get(String(id));
-    if (!record) return;
-    const result = await this.api().push(this.linked.uuid, [
-      { op: "delete", type: PUSH_TYPES[collection], uuid: record.uuid },
-    ]);
-    if (result.errors?.length) throw new Error(result.errors[0].errors.join(", "));
-    // Brings the deletion, and the records that pointed at it with the pointer cleared
-    await this.pull();
+    const store = this.records();
+    if (!store[collection]?.get(String(id))) return;
+    const { remove, updates } = planDelete(this.recordLists(), collection, id);
+    let outbox = this.outbox;
+    for (const { collection: target, id: targetId } of remove) {
+      const record = store[target]?.get(String(targetId));
+      if (!record) continue;
+      const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === target);
+      const page = entry?.pages.find((p) => flag(p, "uuid") === record.uuid);
+      if (page) await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
+      outbox = queueDelete(outbox, { collection: target, type: PUSH_TYPES[target], uuid: record.uuid });
+    }
+    // Dungeon Master Guru clears these pointers itself when the delete arrives
+    for (const update of updates) await this.#saveRecord(update.collection, update.record);
+    await this.#queue(outbox);
   }
 
-  // Creates a record of a synced campaign on Dungeon Master Guru, which gives
-  // it its id; then saves what came back to the journals
-  async #createRemote(collection, record) {
-    const result = await this.api().push(this.linked.uuid, [
-      { op: "create", type: PUSH_TYPES[collection], uuid: uuidV4(), attributes: createAttributes(collection, record) },
-    ]);
-    const created = result.applied?.[0]?.current;
-    if (!created) {
-      ui.notifications.error(result.errors?.[0]?.errors?.join(", ") ?? "Couldn't add it on Dungeon Master Guru.");
-      return false;
-    }
+  // A new record of a synced campaign: saved here under a new uuid (its id
+  // until Dungeon Master Guru gives it one), and made there on Sync
+  async #createForSync(collection, record) {
+    const type = PUSH_TYPES[collection];
+    if (!type) throw new Error(`Can't add ${collection} from Foundry.`);
+    const uuid = uuidV4();
+    const created = { ...record, id: uuid, uuid, syncVersion: 0 };
     await this.#saveRecord(collection, created);
+    await this.#queue(queueCreate(this.outbox, { collection, type, uuid, attributes: createAttributes(collection, created) }));
     return created;
   }
 
@@ -566,7 +731,7 @@ export class CampaignSync {
       },
       () => foundry.utils.randomID(16),
     );
-    if (!this.isLocal) return this.#createRemote("references", reference);
+    if (!this.isLocal) return this.#createForSync("references", reference);
     await this.#saveRecord("references", reference);
     return reference;
   }
@@ -904,6 +1069,18 @@ export class CampaignSync {
   }
 }
 
+// Dungeon Master Guru can't be reached, or won't take this browser's token:
+// stop syncing and keep the changes for next time
+const cantReach = (error) => error?.status === 0 || error?.status === 401 || error?.status === 429 || error?.status >= 500;
+
+// Why a sync stopped, to finish "Couldn't sync: Dungeon Master Guru …"
+function whyNot(error) {
+  if (error.status === 401) return "didn't accept this browser's connection. Connect again";
+  if (error.status === 429) return "is busy. Try again in a minute";
+  if (error.status >= 500) return `had a problem (error ${error.status})`;
+  return "couldn't be reached";
+}
+
 // How each field Foundry can change is named when asking the DM about a clash
 export const FIELD_LABELS = {
   clockFilled: "the clock",
@@ -921,13 +1098,6 @@ export const FIELD_LABELS = {
 };
 
 export const describeFields = (keys) => keys.map((key) => FIELD_LABELS[key] ?? key).join(", ");
-
-// The push payload names a revealed secret's session by uuid; the record has
-// its id. Compare only the fields both share.
-function comparable(attributes) {
-  const { revealedSessionUuid: _ignored, ...rest } = attributes;
-  return rest;
-}
 
 function withExtras(toSend, attributes) {
   return "revealed" in toSend && "revealedSessionUuid" in attributes

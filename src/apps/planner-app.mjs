@@ -5,6 +5,7 @@ import { prepSteps } from "../techniques.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import { exportAdventure } from "./export-adventure.mjs";
+import { syncButton, syncStatus, syncWithFeedback } from "./sync-button.mjs";
 import {
   COINS,
   actorChange,
@@ -106,6 +107,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     },
     position: { width: 880, height: 760 },
     actions: {
+      syncNow: PlannerApp.#onSyncNow,
       showTab: PlannerApp.#onShowTab,
       add: PlannerApp.#onAdd,
       edit: PlannerApp.#onEdit,
@@ -143,6 +145,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   };
 
   #tab = "overview";
+  #syncing = false;
   #sessionId = null;
   #questId = null;
   #hookId = null;
@@ -223,7 +226,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (this.#tab === "secrets" && !techniques.secrets) this.#tab = "overview";
     const where = this.sync.isLocal
       ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
-      : `<span class="dlcp-muted"><i class="fas fa-globe"></i> On Dungeon Master Guru${this.#editable ? ", synced" : ""}</span>`;
+      : `<span class="dlcp-muted"><i class="fas fa-globe"></i> On Dungeon Master Guru</span> ${syncStatus(this.sync)}`;
     const nav = TABS.filter((tab) => tab.id !== "secrets" || techniques.secrets).map(
       (tab) => `<button type="button" data-action="showTab" data-tab="${tab.id}" ${tab.id === this.#tab ? 'aria-current="page"' : ""}>
         <i class="fas ${tab.icon}"></i> ${tab.label}</button>`,
@@ -231,14 +234,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return `
       <header class="dlcp-toolbar">
         <span>${where} ${campaign.mode ? `<span class="dlcp-badge">${escapeHtml(MODE_LABELS[campaign.mode] ?? campaign.mode)}</span>` : ""}</span>
-        <span class="dlcp-buttons"><button type="button" data-action="run"><i class="fas fa-scroll"></i> Campaign Dashboard</button></span>
+        <span class="dlcp-buttons">${syncButton(this.sync, { busy: this.#syncing })}<button type="button" data-action="run"><i class="fas fa-scroll"></i> Campaign Dashboard</button></span>
       </header>
       ${
         this.sync.isLocal
           ? ""
           : this.#editable
-            ? `<p class="dlcp-notice">This campaign is on Dungeon Master Guru. Changes you make here go there too, and changes
-                there come here. <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Open it on Dungeon Master Guru</a></p>`
+            ? `<p class="dlcp-notice">This campaign is on Dungeon Master Guru. Changes you make here are saved in this world;
+                <strong>Sync</strong> sends them there and brings back what changed there.
+                <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Open it on Dungeon Master Guru</a></p>`
             : `<p class="dlcp-notice">This campaign is planned on Dungeon Master Guru. To change it here, connect this browser
                 to Dungeon Master Guru (<strong>Connect</strong> in the Dashboard's menu).
                 <a href="${escapeHtml(site)}" target="_blank" rel="noopener">Plan it on Dungeon Master Guru</a></p>`
@@ -1282,6 +1286,18 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (!session) return;
     const scenes = (session.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene);
     return this.#saveSessionScenes(session, scenes);
+  }
+
+  // Sends the changes made here to Dungeon Master Guru and brings back its changes
+  static async #onSyncNow() {
+    this.#syncing = true;
+    this.render();
+    try {
+      await syncWithFeedback(this.sync);
+    } finally {
+      this.#syncing = false;
+      this.render();
+    }
   }
 
   static #onRun() {

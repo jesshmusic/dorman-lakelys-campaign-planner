@@ -121,8 +121,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           character's sheet.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
-        <li><strong>On Dungeon Master Guru?</strong> Plan it on the website or in the Campaign Planner here: changes on
-          either side come across.</li>
+        <li><strong>On Dungeon Master Guru?</strong> Plan it on the website or in the Campaign Planner here. Changes made
+          here are saved in this world straight away; <strong>Sync</strong> sends them to the website and brings back
+          its changes.</li>
       </ul>
 
       <h2>Plan on Dungeon Master Guru</h2>
@@ -138,8 +139,10 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <ul>
         <li><strong>Plan from anywhere:</strong> the same planner on the website, from any computer or phone, even with
           Foundry closed.</li>
-        <li><strong>Sync with this world:</strong> link the campaign and it comes into your journals.
-          Changes you make at the table, like clocks, secrets, quests and the session log, go back to the website.</li>
+        <li><strong>Sync with this world:</strong> link the campaign and it comes into your journals. What you change
+          here is saved in this world first, even with no connection, and goes to the website when you click
+          <strong>Sync</strong> at the top of the Campaign Planner or Dashboard. If the website can't be reached, nothing
+          is lost: your changes wait for the next Sync.</li>
         <li><strong>Your books and your party:</strong> monsters and treasure you pick from your compendiums become links
           you can drag onto a scene, and your players' character sheets are there while you prep.</li>
         <li><strong>Your maps:</strong> a thumbnail of each scene in this world goes to the website, so you

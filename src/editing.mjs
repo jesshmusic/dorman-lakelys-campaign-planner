@@ -82,7 +82,9 @@ export const linksForSync = (links) =>
     quantity: link.quantity ?? null,
   }));
 
-const value = (field, record) => (field === "links" ? linksForSync(record[field]) : (record[field] ?? null));
+/** A field's value as the sync sends it (links in their short form) */
+export const syncValue = (field, record) => (field === "links" ? linksForSync(record[field]) : (record[field] ?? null));
+const value = syncValue;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The editable fields an edit changed, ready to send: { field: new value } */

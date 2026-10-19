@@ -4,6 +4,7 @@ import { addForm } from "../local.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { LINKS } from "../welcome.mjs";
 import { giveReward } from "./give-reward.mjs";
+import { syncButton, syncStatus, syncWithFeedback } from "./sync-button.mjs";
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 
@@ -33,6 +34,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     position: { width: 760, height: 840 },
     actions: {
       sync: DashboardApp.#onSync,
+      syncNow: DashboardApp.#onSync,
       connect: DashboardApp.#onConnect,
       newCampaign: DashboardApp.#onNewCampaign,
       help: DashboardApp.#onHelp,
@@ -143,10 +145,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     const local = this.sync.isLocal;
     // The techniques this world uses; the ones switched off are hidden
     const techniques = currentTechniques();
-    const synced = this.sync.linked.lastSynced ? new Date(this.sync.linked.lastSynced).toLocaleTimeString() : "never";
     const status = local
       ? `<span class="dlcp-muted"><i class="fas fa-house"></i> In this world</span>`
-      : `<span class="dlcp-muted">Last synced ${escapeHtml(synced)}</span>`;
+      : syncStatus(this.sync) || `<span class="dlcp-muted">Not synced yet</span>`;
 
     return `
       <header class="dlcp-toolbar">
@@ -154,7 +155,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         <span class="dlcp-buttons">
           <button type="button" data-action="plan"><i class="fas fa-feather-alt"></i> Plan</button>
           <button type="button" data-action="openJournals"><i class="fas fa-book-open"></i> Journals</button>
-          ${local ? "" : `<button type="button" data-action="sync" ${this.#busy ? "disabled" : ""}><i class="fas fa-sync"></i> Sync now</button>`}
+          ${syncButton(this.sync, { busy: this.#busy })}
         </span>
       </header>
       ${this.#renderSession(next)}
@@ -385,9 +386,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     this.#busy = true;
     this.render();
     try {
-      await this.sync.pull();
-    } catch (error) {
-      ui.notifications.error(`Sync failed: ${error.message}`);
+      await syncWithFeedback(this.sync);
     } finally {
       this.#busy = false;
       this.render();

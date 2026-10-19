@@ -21,7 +21,7 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 **On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
 
 - **Plan from anywhere:** the same planner on the website, from any computer or phone, even with Foundry closed.
-- **Two-way sync:** the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
+- **Two-way sync:** the campaign comes into your journals, and what you change in Foundry goes back. Changes are saved in your world straight away; **Sync** at the top of the Campaign Planner and Dashboard sends them and brings back the website's. If Dungeon Master Guru can't be reached, they wait for the next Sync. If the same thing changed in both places, you choose which to keep.
 - **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
 - **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
 - **Your maps** (with sync): a thumbnail of each scene in your world, so you can pick maps on the website and see them while Foundry is closed.
