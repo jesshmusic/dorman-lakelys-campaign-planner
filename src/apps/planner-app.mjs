@@ -1,6 +1,6 @@
 import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
-import { newRecord } from "../local.mjs";
+import { NPC_ROLES, newRecord } from "../local.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import {
   BRIEF_FIELDS,
@@ -17,6 +17,8 @@ import {
   applySessionPrep,
   formValues,
   gettingStarted,
+  ROLE_LABELS,
+  roleFromDisposition,
   linkedIds,
   revelationGroups,
   setLinks,
@@ -34,8 +36,6 @@ const TABS = [
 ];
 
 const MODE_LABELS = { arc: "Story arc", sandbox: "Sandbox", oneshot: "One-shot" };
-const ROLE_ORDER = ["bbeg", "villain", "lieutenant", "ally", "patron", "neutral"];
-const ROLE_LABELS = { bbeg: "BBEG", villain: "Villain", lieutenant: "Lieutenant", ally: "Ally", patron: "Patron", neutral: "Neutral" };
 const STATUS_LABELS = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 const SESSION_STATUS_LABELS = { planned: "Planned", prepped: "Prepped", played: "Played" };
 const NOUNS = { fronts: "threat", quests: "quest", npcs: "NPC", locations: "place", factions: "faction", secrets: "secret" };
@@ -588,7 +588,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   #renderCast(store) {
     const factionName = (id) => store.factions.find((f) => f.id === id)?.name;
     const npcs = [...store.npcs].sort(
-      (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name),
+      (a, b) => NPC_ROLES.indexOf(a.role) - NPC_ROLES.indexOf(b.role) || a.name.localeCompare(b.name),
     );
     const cards = npcs
       .map(
@@ -1024,7 +1024,12 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     if (kind === "newNpc") {
       const npc = newRecord(
         "npcs",
-        { name: document.name, foundryActorUuid: document.uuid, foundryActorName: document.name },
+        {
+          name: document.name,
+          role: roleFromDisposition(document.prototypeToken?.disposition),
+          foundryActorUuid: document.uuid,
+          foundryActorName: document.name,
+        },
         { id: () => foundry.utils.randomID(16), existing: this.sync.recordLists().npcs },
       );
       return this.#save("npcs", npc);

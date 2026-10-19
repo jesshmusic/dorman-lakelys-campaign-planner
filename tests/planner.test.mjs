@@ -18,6 +18,8 @@ import {
   referenceFromDocument,
   revelationGroups,
   setLinks,
+  ROLE_LABELS,
+  roleFromDisposition,
 } from "../src/planner.mjs";
 
 const ids = () => {
@@ -465,4 +467,26 @@ test("keeps an item's quantity when the session's links change", () => {
       ["r2", null],
     ],
   );
+});
+
+test("an actor dropped on the cast starts as an enemy, an ally or neutral, from its token", () => {
+  assert.equal(roleFromDisposition(-1), "villain");
+  assert.equal(roleFromDisposition(1), "ally");
+  assert.equal(roleFromDisposition(0), "neutral");
+  assert.equal(roleFromDisposition(-2), "neutral");
+  assert.equal(roleFromDisposition(undefined), "neutral");
+});
+
+test("the villain role is called Enemy", () => {
+  assert.equal(ROLE_LABELS.villain, "Enemy");
+  assert.deepEqual(
+    EDIT_FORMS.npcs.fields.find((f) => f.name === "role").options.find(([value]) => value === "villain"),
+    ["villain", "Enemy"],
+  );
+});
+
+test("a new NPC's form starts as Neutral, and an existing one keeps its role", () => {
+  assert.equal(formValues(EDIT_FORMS.npcs.fields, {}).role, "neutral");
+  assert.equal(formValues(EDIT_FORMS.npcs.fields, { name: "Kalvar", role: "bbeg" }).role, "bbeg");
+  assert.equal(formValues(EDIT_FORMS.npcs.fields, {}).name, "");
 });

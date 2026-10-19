@@ -5,6 +5,7 @@
 
 import { formatCr, PACK_NAMES } from "./compendium.mjs";
 import { NPC_ROLES } from "./local.mjs";
+import { NPC_ROLES as ROLE_LABELS } from "./render.mjs";
 import { MAX_TRUTHS, truthsOf } from "./setup.mjs";
 
 export const QUEST_STATUSES = ["available", "active", "completed", "failed"];
@@ -20,14 +21,21 @@ export const COINS = ["pp", "gp", "ep", "sp", "cp"];
 const SCENE_UUID = /^Scene\.[A-Za-z0-9]{16}$/;
 const ACTOR_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?Actor\.[A-Za-z0-9]{16}$/;
 const LIMITS = { stakes: 10, features: 20, scenes: 20, portents: 10 };
-const ROLE_LABELS = {
-  bbeg: "BBEG",
-  villain: "Villain",
-  lieutenant: "Lieutenant",
-  ally: "Ally",
-  patron: "Patron",
-  neutral: "Neutral",
-};
+// Foundry's token dispositions (CONST.TOKEN_DISPOSITIONS)
+const DISPOSITIONS = { secret: -2, hostile: -1, neutral: 0, friendly: 1 };
+
+export { ROLE_LABELS };
+
+/**
+ * The role an actor dropped on the cast starts with, from its token's
+ * disposition: hostile is an enemy, friendly an ally, anything else neutral.
+ * The DM can change it.
+ */
+export function roleFromDisposition(disposition) {
+  if (disposition === DISPOSITIONS.hostile) return "villain";
+  if (disposition === DISPOSITIONS.friendly) return "ally";
+  return "neutral";
+}
 
 // The link type for each collection, as Dungeon Master Guru names them. Sessions
 // link to any of them; quests to NPCs and references (monsters and reward items).
@@ -122,7 +130,13 @@ export const EDIT_FORMS = {
     title: "NPC",
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
-      { name: "role", label: "Role", type: "select", options: NPC_ROLES.map((role) => [role, ROLE_LABELS[role]]) },
+      {
+        name: "role",
+        label: "Role",
+        type: "select",
+        options: NPC_ROLES.map((role) => [role, ROLE_LABELS[role]]),
+        default: "neutral",
+      },
       { name: "description", label: "Who they are", type: "textarea" },
       { name: "motive", label: "What they want", type: "text" },
       { name: "secret", label: "Their secret", type: "text" },
@@ -181,11 +195,11 @@ export const BRIEF_FIELDS = [
   { name: "settingNotes", label: "Setting notes", type: "textarea" },
 ];
 
-/** A record's values as form strings */
+/** A record's values as form strings. A new record gets each field's default. */
 export function formValues(fields, record) {
   return Object.fromEntries(
     fields.map((field) => {
-      const value = record?.[field.name];
+      const value = record && field.name in record ? record[field.name] : field.default;
       if (field.name === "portents") return [field.name, (value ?? []).map((p) => p.text).join("\n")];
       if (Array.isArray(value)) return [field.name, value.join("\n")];
       return [field.name, value === null || value === undefined ? "" : String(value)];

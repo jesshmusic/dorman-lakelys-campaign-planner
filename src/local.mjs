@@ -270,7 +270,7 @@ export const ADD_FORMS = {
           ["ally", "Ally"],
           ["patron", "Patron"],
           ["lieutenant", "Lieutenant"],
-          ["villain", "Villain"],
+          ["villain", "Enemy"],
           ["bbeg", "BBEG"],
         ],
       },

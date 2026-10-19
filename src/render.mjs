@@ -21,7 +21,8 @@ const fact = (label, value) => (value ? `<p><strong>${escapeHtml(label)}:</stron
 
 export const NPC_ROLES = {
   bbeg: "BBEG",
-  villain: "Villain",
+  // Stored as "villain"; shown as Enemy
+  villain: "Enemy",
   lieutenant: "Lieutenant",
   ally: "Ally",
   patron: "Patron",
