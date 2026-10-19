@@ -34,16 +34,17 @@ export async function announce() {
   if (lastSeen !== current) await game.settings.set(MODULE_ID, SETTINGS.lastVersion, current);
 }
 
-/** Wires up the buttons in the welcome and what's-new messages */
+/**
+ * Makes the buttons in the welcome and what's-new messages work. One listener
+ * on the page catches them all, because Foundry draws the messages already in
+ * chat before modules finish loading, and again in pop-outs and notifications.
+ */
 export function watchAnnouncements(actions) {
-  Hooks.on("renderChatMessageHTML", (message, html) => {
-    if (!message.getFlag(MODULE_ID, "announcement")) return;
-    for (const element of html.querySelectorAll("[data-dlcp-action]")) {
-      element.addEventListener("click", (event) => {
-        event.preventDefault();
-        actions[element.dataset.dlcpAction]?.();
-      });
-    }
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest?.(".dlcp-announcement [data-dlcp-action]");
+    if (!button) return;
+    event.preventDefault();
+    actions[button.dataset.dlcpAction]?.();
   });
 }
 

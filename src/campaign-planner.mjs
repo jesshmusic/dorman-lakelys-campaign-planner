@@ -212,6 +212,14 @@ function watchScenes() {
   }
 }
 
+// The buttons in the welcome and what's-new messages
+watchAnnouncements({
+  help: () => openHelp(),
+  newCampaign: () => openNewCampaign(),
+  plan: () => openPlanner(),
+  reportBug: () => openBugReport(),
+});
+
 Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = {
     sync,
@@ -227,12 +235,6 @@ Hooks.once("ready", () => {
   if (!game.user.isGM) return;
 
   // The welcome message on first install, and what's new after an update
-  watchAnnouncements({
-    help: openHelp,
-    newCampaign: openNewCampaign,
-    plan: () => openPlanner(),
-    reportBug: openBugReport,
-  });
   announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));
 
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
