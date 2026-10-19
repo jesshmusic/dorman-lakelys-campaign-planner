@@ -54,6 +54,12 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 | Connect | Link this world to one of your campaigns, or disconnect. |
 | Sync automatically | Pull changes when the world loads and every 2 minutes while the GM is connected. |
 
+## Help and support
+
+- **Found a bug?** Click **Report a bug**: in the Campaign Planner's or Campaign Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
+- **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features. Premium members get campaign sync and AI help without their own OpenAI key.
+- After an update that adds features, a message in chat (for the GM) lists what's new.
+
 ## Development
 
 The module is built with [Vite](https://vite.dev): the code in `src/` becomes `dist/campaign-planner.js`, the file Foundry loads.

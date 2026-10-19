@@ -617,3 +617,61 @@
   flex: 0 0 auto;
   width: auto;
 }
+
+/* Welcome and what's-new messages in chat */
+
+.dlcp-announcement {
+  border: 3px solid #972c1d;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+}
+
+.dlcp-announcement h3 {
+  border-bottom: none;
+  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+}
+
+.dlcp-announcement h4 {
+  font-size: 0.95rem;
+  margin: 0.5rem 0 0.2rem;
+}
+
+.dlcp-announcement ul {
+  margin: 0.25rem 0;
+  padding-left: 1.2rem;
+}
+
+.dlcp-announcement li {
+  margin: 0.2rem 0;
+}
+
+.dlcp-announcement-buttons,
+.dlcp-announcement-support {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+}
+
+.dlcp-announcement-buttons button,
+.dlcp-announcement-support button {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.dlcp-announcement-support a {
+  flex: 1 1 auto;
+  font-weight: bold;
+}
+
+.dlcp-button-link {
+  align-items: center;
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 3px;
+  display: inline-flex;
+  gap: 0.35rem;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+}

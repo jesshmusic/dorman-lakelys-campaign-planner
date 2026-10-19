@@ -10,8 +10,10 @@ export const SETTINGS = {
   autoSync: "autoSync",
   // { [worldId]: draft } for the New campaign guide. Client scope, like the token.
   setupDraft: "setupDraft",
-  // Whether this GM has seen the "how it works" window
+  // Whether this GM has seen the "how it works" window (before the chat welcome)
   welcomed: "welcomed",
+  // The version the welcome or what's-new chat message was last posted for
+  lastVersion: "lastVersion",
 };
 
 // Fired after every pull or push so open windows can re-render

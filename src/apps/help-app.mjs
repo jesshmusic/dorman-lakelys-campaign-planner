@@ -1,6 +1,7 @@
 import { MODULE_ID } from "../constants.mjs";
+import { LINKS } from "../welcome.mjs";
 
-const SITE = "https://dungeonmaster.guru";
+const SITE = LINKS.site;
 
 /**
  * How to use the Campaign Planner: planning in this world, or on Dungeon
@@ -20,6 +21,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       dashboard: HelpApp.#onDashboard,
       plan: HelpApp.#onPlan,
       connect: HelpApp.#onConnect,
+      reportBug: HelpApp.#onReportBug,
     },
   };
 
@@ -127,10 +129,20 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <p>Dungeon Master Guru never stores stat blocks or book text. Links to your Player's Handbook, Dungeon Master's
         Guide and Monster Manual open your own licensed copies in Foundry.</p>
 
+      <h2>Help and support</h2>
+      <p>Found a bug? <strong>Report a bug</strong> opens a GitHub issue with your Foundry, system and module versions
+        filled in; add what happened and how to make it happen again. Your support on
+        <a href="${LINKS.patreon}" target="_blank" rel="noopener">Patreon</a> funds new features, and premium members
+        get campaign sync and AI help without their own OpenAI key.</p>
+
       <div class="dlcp-buttons">
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>
         <button type="button" data-action="plan"><i class="fas fa-feather-alt"></i> Campaign Planner</button>
         <button type="button" data-action="dashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>
+      </div>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="reportBug"><i class="fas fa-bug"></i> Report a bug</button>
+        <a class="dlcp-button-link" href="${LINKS.patreon}" target="_blank" rel="noopener"><i class="fab fa-patreon"></i> Support on Patreon</a>
       </div>`;
     return container;
   }
@@ -149,6 +161,10 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
 
   static #onDashboard() {
     game.modules.get(MODULE_ID).api.openDashboard();
+  }
+
+  static #onReportBug() {
+    game.modules.get(MODULE_ID).api.openBugReport();
   }
 
   static #onConnect() {

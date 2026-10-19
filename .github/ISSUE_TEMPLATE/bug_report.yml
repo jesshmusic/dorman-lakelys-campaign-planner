@@ -1,0 +1,119 @@
+name: Bug report
+description: Something in Dorman Lakely's Campaign Planner isn't working as it should.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+        **Tip:** the **Report a bug** button in Foundry fills in your versions for you. It's in the Campaign Planner's and Campaign Dashboard's window menu (⋮), in the module's settings, and in the "How it works" window.
+
+        Please check the [open issues](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) first, in case it's already been reported.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong? Include any message you saw.
+      placeholder: When I click Save the quest, the reward coins are cleared.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again?
+      description: The steps, starting from opening the world. The more exact, the faster it gets fixed.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did it happen?
+      options:
+        - In Foundry (the module)
+        - On the Dungeon Master Guru website
+        - Both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: campaign
+    attributes:
+      label: Which kind of campaign?
+      options:
+        - In this world (no account)
+        - On Dungeon Master Guru (synced)
+        - No campaign yet, or not sure
+
+  - type: input
+    id: module-version
+    attributes:
+      label: Module version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: foundry-version
+    attributes:
+      label: Foundry VTT version
+      placeholder: "14.369"
+    validations:
+      required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: Game system and version
+      placeholder: "D&D Fifth Edition 5.2.0 (dnd5e)"
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser or app
+      description: The browser you use Foundry in, or the Foundry desktop app.
+      placeholder: "Chrome on macOS"
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Errors in the browser console
+      description: |
+        Press F12 (Cmd+Option+I on a Mac), open the **Console** tab, make the bug happen, and paste any red errors here.
+      render: shell
+
+  - type: textarea
+    id: modules
+    attributes:
+      label: Other active modules
+      description: |
+        Another module can cause a bug. If you can, check whether it still happens with only this module active; [Find the Culprit](https://foundryvtt.com/packages/find-the-culprit) makes that quick.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or a video
+      description: Drag images or a short recording here.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the open issues, and this hasn't been reported yet.
+          required: true
+        - label: I tried it with only this module active, or listed my other modules above.

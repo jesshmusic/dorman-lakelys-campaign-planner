@@ -154,15 +154,22 @@ if (!changelog.startsWith('# Changelog')) {
     changelog;
 }
 
-const lines = changelog.split('\n');
-const headerEndIndex = lines.findIndex((line, i) => i > 0 && line.startsWith('## '));
-if (headerEndIndex > 0) {
-  lines.splice(headerEndIndex, 0, newEntry);
+// The notes written under [Unreleased] become this version's notes (they're
+// what the welcome message in Foundry lists), with a fresh [Unreleased] above
+// them. Without any, the entry comes from the commit messages.
+const unreleased = changelog.match(/^## \[Unreleased\][^\n]*\n([\s\S]*?)(?=^## \[|(?![\s\S]))/m);
+if (unreleased && /^\s*- /m.test(unreleased[1])) {
+  changelog = changelog.replace(/^## \[Unreleased\][^\n]*$/m, `## [Unreleased]\n\n## [${newVersion}] - ${date}`);
 } else {
-  lines.push('\n' + newEntry);
+  const lines = changelog.split('\n');
+  const headerEndIndex = lines.findIndex((line, i) => i > 0 && line.startsWith('## ') && !line.startsWith('## [Unreleased]'));
+  if (headerEndIndex > 0) {
+    lines.splice(headerEndIndex, 0, newEntry);
+  } else {
+    lines.push('\n' + newEntry);
+  }
+  changelog = lines.join('\n');
 }
-
-changelog = lines.join('\n');
 fs.writeFileSync(changelogPath, changelog);
 
 console.log('Updated package.json');

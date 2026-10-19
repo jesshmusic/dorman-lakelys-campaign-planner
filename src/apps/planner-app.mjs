@@ -89,6 +89,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         { icon: "fas fa-feather-alt", label: "New campaign", action: "newCampaign" },
         { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
+        { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
       ],
     },
     position: { width: 880, height: 760 },
@@ -123,6 +124,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       openCampaign: PlannerApp.#onOpenCampaign,
       connect: PlannerApp.#onConnect,
       help: PlannerApp.#onHelp,
+      reportBug: PlannerApp.#onReportBug,
     },
   };
 
@@ -1229,5 +1231,9 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
 
   static #onHelp() {
     game.modules.get(MODULE_ID).api.openHelp();
+  }
+
+  static #onReportBug() {
+    game.modules.get(MODULE_ID).api.openBugReport();
   }
 }

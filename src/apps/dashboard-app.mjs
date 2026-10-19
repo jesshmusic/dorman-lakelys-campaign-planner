@@ -24,6 +24,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
         { icon: "fas fa-link", label: "Connect to Dungeon Master Guru", action: "connect" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
+        { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
       ],
     },
     position: { width: 560, height: 720 },
@@ -32,6 +33,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       connect: DashboardApp.#onConnect,
       newCampaign: DashboardApp.#onNewCampaign,
       help: DashboardApp.#onHelp,
+      reportBug: DashboardApp.#onReportBug,
       plan: DashboardApp.#onPlan,
       viewScene: DashboardApp.#onViewScene,
       activateScene: DashboardApp.#onActivateScene,
@@ -379,6 +381,10 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onOpenCampaign() {
     game.modules.get(MODULE_ID).api.openCampaignPicker();
+  }
+
+  static #onReportBug() {
+    game.modules.get(MODULE_ID).api.openBugReport();
   }
 
   static #onHelp() {

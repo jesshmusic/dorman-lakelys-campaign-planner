@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **Welcome and what's new:** a message in chat welcomes the GM on first install, and lists what's new after each feature update, with links to Patreon and to report a bug.
+- **Report a bug:** opens a GitHub issue with your Foundry, system and module versions filled in. It's in the Campaign Planner's and Campaign Dashboard's window menus, the module's settings and the How it works window.
 - The **Dungeon Master Guru address** setting is gone: the module always connects to dungeonmaster.guru.
 - **Maps:** give a place its Foundry scene, and a session its maps, by dragging scenes from the Scenes directory. They're links in the journals, and the Dashboard can show a map to you or activate it for the players.
 - **NPC actors:** drop an actor (from the world or a compendium) on an NPC for their stat block, or drop one on the Cast tab to add them as a new NPC.

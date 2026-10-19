@@ -5,7 +5,8 @@ import { NewCampaignApp } from "./apps/new-campaign-app.mjs";
 import { HelpApp } from "./apps/help-app.mjs";
 import { openCampaignPicker } from "./apps/campaign-picker.mjs";
 import { PlannerApp } from "./apps/planner-app.mjs";
-import { DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
+import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
+import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
 const sync = new CampaignSync();
@@ -96,6 +97,14 @@ Hooks.once("init", () => {
     default: false,
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.lastVersion, {
+    name: "Version the welcome message was last posted for",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.campaign, {
     name: "Linked campaign",
     scope: "world",
@@ -130,6 +139,15 @@ Hooks.once("init", () => {
     hint: "Campaign sync is a Patreon premium feature. Your support funds new features and updates.",
     icon: "fab fa-patreon",
     type: PatreonLink,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, "reportBug", {
+    name: "Found a bug?",
+    label: "Report a bug",
+    hint: "Opens a bug report on GitHub with your Foundry, system and module versions filled in.",
+    icon: "fas fa-bug",
+    type: BugReportLink,
     restricted: true,
   });
 
@@ -203,14 +221,19 @@ Hooks.once("ready", () => {
     openNewCampaign,
     openHelp,
     openCampaignPicker,
+    bugReportLink,
+    openBugReport,
   };
   if (!game.user.isGM) return;
 
-  // The first time a GM loads the module, show how it works
-  if (!game.settings.get(MODULE_ID, SETTINGS.welcomed)) {
-    openHelp();
-    game.settings.set(MODULE_ID, SETTINGS.welcomed, true);
-  }
+  // The welcome message on first install, and what's new after an update
+  watchAnnouncements({
+    help: openHelp,
+    newCampaign: openNewCampaign,
+    plan: () => openPlanner(),
+    reportBug: openBugReport,
+  });
+  announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));
 
   if (game.settings.get(MODULE_ID, SETTINGS.autoSync)) autoSync();
   scheduleAutoSync();
