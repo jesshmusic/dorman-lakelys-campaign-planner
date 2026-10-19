@@ -169,10 +169,11 @@ test("the bug report form has a field for every value the link fills in", () => 
   }
 });
 
-test("the real changelog parses", () => {
+test("the real changelog has notes for the module's version, for the welcome message", () => {
   const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
-  const sections = parseChangelog(changelog);
+  const { version } = JSON.parse(readFileSync(new URL("../module.json", import.meta.url), "utf8"));
+  const current = parseChangelog(changelog).find((section) => section.version === version);
 
-  assert.equal(sections[0].version, "Unreleased");
-  assert.ok(sections[0].notes.length > 0);
+  assert.ok(current, `CHANGELOG.md has no [${version}] section`);
+  assert.ok(current.notes.length > 0);
 });

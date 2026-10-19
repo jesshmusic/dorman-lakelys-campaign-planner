@@ -1,5 +1,5 @@
 import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
-import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
+import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
 import { ADD_FORMS } from "../local.mjs";
 import { LINKS } from "../welcome.mjs";
 
@@ -80,6 +80,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     container.innerHTML = `${this.sync.linked ? this.#renderLinked() : this.#renderUnlinked()}${this.#renderFooter()}`;
     container.querySelector(".dlcp-quest-status")?.closest("ul")
       ?.addEventListener("change", (event) => this.#onQuestStatus(event));
+    container.querySelector("[data-open-on-startup]")?.addEventListener("change", (event) => {
+      game.settings.set(MODULE_ID, SETTINGS.openDashboard, event.target.checked);
+    });
     return container;
   }
 
@@ -87,7 +90,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     content.replaceChildren(result);
   }
 
-  // Always at the bottom: Patreon, the website, a bug report, and the version
+  // Always at the bottom: Patreon, the website, a bug report, opening at startup, and the version
   #renderFooter() {
     const api = game.modules.get(MODULE_ID);
     const link = (href, className, title, inner) =>
@@ -96,6 +99,10 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         ${link(LINKS.patreon, "dlcp-footer-patreon", "Support Dorman Lakely on Patreon", `<i class="fab fa-patreon"></i><span>Support on Patreon</span>`)}
         ${link(LINKS.site, "dlcp-footer-site", "Dungeon Master Guru: plan from anywhere, and DM tools", `<img src="modules/${MODULE_ID}/icons/dmguru-logo.svg" alt="" class="dlcp-footer-logo"><span>Dungeon Master Guru</span>`)}
         ${link(api.api.bugReportLink(), "dlcp-footer-bug", "Report a bug on GitHub, with your versions filled in", `<i class="fas fa-bug"></i><span>Report a bug</span>`)}
+        <label class="dlcp-footer-startup" title="Open the Campaign Dashboard when this world loads">
+          <input type="checkbox" data-open-on-startup ${game.settings.get(MODULE_ID, SETTINGS.openDashboard) ? "checked" : ""}>
+          Open at startup
+        </label>
         <span class="dlcp-footer-version">v${escapeHtml(api.version)}</span>
       </footer>`;
   }

@@ -14,6 +14,8 @@ export const SETTINGS = {
   welcomed: "welcomed",
   // The version the welcome or what's-new chat message was last posted for
   lastVersion: "lastVersion",
+  // Whether the Campaign Dashboard opens when the world loads. User scope: each GM chooses, per world.
+  openDashboard: "openDashboardOnStartup",
 };
 
 // Fired after every pull or push so open windows can re-render

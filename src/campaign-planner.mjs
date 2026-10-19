@@ -113,6 +113,17 @@ Hooks.once("init", () => {
     default: {},
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.openDashboard, {
+    name: "Open the Campaign Dashboard at startup",
+    hint: "Opens the Campaign Dashboard for you when this world loads. You can also turn this off in the Dashboard's footer.",
+    scope: "user",
+    config: true,
+    type: Boolean,
+    default: true,
+    // Keeps the Dashboard's checkbox in step when this is changed in the settings
+    onChange: () => dashboard?.rendered && dashboard.render(),
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.autoSync, {
     name: "Sync automatically",
     hint: `Pull changes from Dungeon Master Guru when the world loads and every ${AUTO_SYNC_MINUTES} minutes while the GM is connected.`,
@@ -233,6 +244,8 @@ Hooks.once("ready", () => {
     openBugReport,
   };
   if (!game.user.isGM) return;
+
+  if (game.settings.get(MODULE_ID, SETTINGS.openDashboard)) openDashboard();
 
   // The welcome message on first install, and what's new after an update
   announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));

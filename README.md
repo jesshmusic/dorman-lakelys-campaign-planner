@@ -32,7 +32,7 @@ The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 | Button | What it does |
 |---|---|
 | **Plan** | Opens the Campaign Planner: Overview, Party, Story, Quests, Cast, Places, Secrets and Sessions, with the Lazy Dungeon Master's eight steps of session prep. Drag monsters, items and roll tables in from your compendiums. |
-| **Run** | Opens the Campaign Dashboard, for the table. Also in the scene controls, under Journal Notes. |
+| **Run** | Opens the Campaign Dashboard, for the table. Also in the scene controls, under Journal Notes. It opens by itself when the world loads; untick **Open at startup** in its footer to stop that. |
 | **New** | Starts a new campaign, step by step. Your answers are kept as you go. |
 | **Open** | Opens another campaign: one in this world, or one on Dungeon Master Guru when you're connected. |
 | **?** | How it works. |
@@ -63,7 +63,7 @@ Planned a campaign in this world and want to plan on the website too? Connect, t
 
 ## Help and support
 
-- **Found a bug?** Click **Report a bug**: in the Campaign Planner's or Campaign Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
+- **Found a bug?** Click **Report a bug**: in the Campaign Dashboard's footer, the Campaign Planner's or Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
 - **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features. Premium members get campaign sync with Dungeon Master Guru.
 - After an update that adds features, a message in chat (for the GM) lists what's new.
 

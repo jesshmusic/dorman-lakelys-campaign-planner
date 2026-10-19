@@ -86,7 +86,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <p>Everything is saved to the campaign's journal pages, so you can also read and share them as journals.</p>
 
       <h2>Run it with the Campaign Dashboard</h2>
-      <p>Click <strong>Run</strong> in the Journal sidebar, or open it from the scene controls
+      <p>It opens when the world loads (untick <strong>Open at startup</strong> in its footer to stop that). Otherwise
+        click <strong>Run</strong> in the Journal sidebar, or open it from the scene controls
         (<i class="fas fa-bookmark"></i> Journal Notes, then <i class="fas fa-scroll"></i>).</p>
       <ul>
         <li><strong>Threats:</strong> click + when a threat moves closer to its goal, and tick its grim portents as they
