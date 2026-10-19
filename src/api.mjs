@@ -49,6 +49,14 @@ export class DmGuruApi {
     return this.#request("POST", "/v1/foundry/campaigns", body);
   }
 
+  /**
+   * Sends a campaign planned in Foundry, with all its records (see send.mjs):
+   * the new campaign, plus ids: { [Foundry id]: new uuid }
+   */
+  importCampaign(body) {
+    return this.#request("POST", "/v1/foundry/campaigns/import", body);
+  }
+
   /** The DM's campaigns: [{ uuid, name, slug, mode, status, syncVersion }] */
   campaigns() {
     return this.#request("GET", "/v1/foundry/campaigns");

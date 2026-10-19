@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **Send to Dungeon Master Guru:** a campaign planned in this world can go to Dungeon Master Guru, with its party and everything in it, from the Connect window or the Campaign Planner. With premium Patreon the world then syncs with it, keeping the same journal folder and pages.
 - **Welcome and what's new:** a message in chat welcomes the GM on first install, and lists what's new after each feature update, with links to Patreon and to report a bug.
 - **Report a bug:** opens a GitHub issue with your Foundry, system and module versions filled in. It's in the Campaign Planner's and Campaign Dashboard's window menus, the module's settings and the How it works window.
 - The **Dungeon Master Guru address** setting is gone: the module always connects to dungeonmaster.guru.

@@ -124,6 +124,17 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           can pick a place's, session's or quest's maps there, and see them while Foundry is closed.</li>
       </ul>
 
+      <h2>Send a campaign to Dungeon Master Guru</h2>
+      <p>Started in this world and want to plan on the website too? Connect, then click <strong>Send to Dungeon Master
+        Guru</strong>: in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. Everything
+        goes: the brief, the party, threats, quests, NPCs, places, secrets, sessions and book references.</p>
+      <ul>
+        <li><strong>With premium Patreon</strong>, this world then syncs with it. Its journal folder and pages stay
+          where they are, including anything you've shared with players.</li>
+        <li><strong>Without premium</strong>, Dungeon Master Guru gets a copy to plan on, and this world keeps its
+          own.</li>
+      </ul>
+
       <h2>Your books</h2>
       <p>Dungeon Master Guru never stores stat blocks or book text. Links to your Player's Handbook, Dungeon Master's
         Guide and Monster Manual open your own licensed copies in Foundry.</p>

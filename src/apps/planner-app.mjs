@@ -1,6 +1,7 @@
 import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { newRecord } from "../local.mjs";
+import { sendCampaign } from "./send-campaign.mjs";
 import {
   BRIEF_FIELDS,
   COINS,
@@ -89,6 +90,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         { icon: "fas fa-feather-alt", label: "New campaign", action: "newCampaign" },
         { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
+        { icon: "fas fa-cloud-arrow-up", label: "Send to Dungeon Master Guru", action: "sendCampaign" },
         { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
       ],
     },
@@ -125,6 +127,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       connect: PlannerApp.#onConnect,
       help: PlannerApp.#onHelp,
       reportBug: PlannerApp.#onReportBug,
+      sendCampaign: PlannerApp.#onSendCampaign,
     },
   };
 
@@ -297,7 +300,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           ${campaign.pitch ? `<h3>Pitch for your players</h3><p>${escapeHtml(campaign.pitch)}</p>` : ""}
           ${(campaign.truths ?? []).length ? `<h3>Truths of the setting</h3><ul>${campaign.truths.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : ""}
         </section>`;
-    return `${checklist}<h2>The brief</h2>${brief}`;
+    const send = this.#editable
+      ? `<section class="dlcp-card dlcp-send">
+          <header class="dlcp-card-header"><h3><i class="fas fa-cloud-arrow-up"></i> Plan it on Dungeon Master Guru too</h3></header>
+          <p class="dlcp-muted">Send this campaign to Dungeon Master Guru to plan it from any computer or phone. With premium
+            Patreon, this world then syncs with it, and its journals stay where they are.</p>
+          <div class="dlcp-buttons"><button type="button" data-action="sendCampaign"><i class="fas fa-cloud-arrow-up"></i> Send to Dungeon Master Guru</button></div>
+        </section>`
+      : "";
+    return `${checklist}<h2>The brief</h2>${brief}${send}`;
   }
 
   // Party ---------------------------------------------------------------------
@@ -1231,6 +1242,14 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
 
   static #onHelp() {
     game.modules.get(MODULE_ID).api.openHelp();
+  }
+
+  static async #onSendCampaign() {
+    if (!this.#editable) {
+      ui.notifications.info("This campaign is already on Dungeon Master Guru.");
+      return;
+    }
+    if (await sendCampaign()) this.render({ window: { title: this.title } });
   }
 
   static #onReportBug() {

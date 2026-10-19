@@ -1,4 +1,5 @@
 import { USING_DEV_SERVER } from "../env.mjs";
+import { sendCampaign } from "./send-campaign.mjs";
 import { escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
 
@@ -18,6 +19,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       linkCampaign: ConnectApp.#onLinkCampaign,
       newCampaign: ConnectApp.#onNewCampaign,
       sendIndex: ConnectApp.#onSendIndex,
+      sendCampaign: ConnectApp.#onSendCampaign,
       disconnect: ConnectApp.#onDisconnect,
     },
   };
@@ -78,10 +80,23 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       </div>`;
   }
 
+  // A campaign planned in this world can go to Dungeon Master Guru
+  #renderSend() {
+    if (!this.sync.isLocal) return "";
+    return `<section class="dlcp-card">
+      <h3><i class="fas fa-cloud-arrow-up"></i> Send ${escapeHtml(this.sync.linked.name)} to Dungeon Master Guru</h3>
+      <p class="hint">Plan it on the website too, from anywhere. With premium Patreon, this world then syncs with it; its
+        journals stay where they are.</p>
+      <div class="dlcp-buttons">
+        <button type="button" data-action="sendCampaign" ${this.#busy ? "disabled" : ""}><i class="fas fa-cloud-arrow-up"></i> Send to Dungeon Master Guru</button>
+      </div>
+    </section>`;
+  }
+
   #renderAccount() {
     if (!this.#account) return "";
     const { user, premium } = this.#account;
-    const header = `<p>Signed in as <strong>${escapeHtml(user.name ?? user.username)}</strong>.</p>`;
+    const header = `<p>Signed in as <strong>${escapeHtml(user.name ?? user.username)}</strong>.</p>${this.#renderSend()}`;
     const newCampaign = `<button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>`;
     if (!premium) {
       return `${header}<p class="dlcp-notice dlcp-notice--warning">Campaign sync needs a premium Patreon membership linked to
@@ -112,6 +127,17 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
         ${newCampaign}
       </div>
       ${this.#renderIndex()}`;
+  }
+
+  static async #onSendCampaign() {
+    this.#busy = true;
+    await this.render();
+    try {
+      if (await sendCampaign()) this.#campaigns = this.#account?.premium ? await this.sync.api().campaigns() : null;
+    } finally {
+      this.#busy = false;
+      await this.render();
+    }
   }
 
   static async #onCheckToken() {

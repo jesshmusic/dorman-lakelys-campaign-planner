@@ -54,6 +54,10 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 | Connect | Link this world to one of your campaigns, or disconnect. |
 | Sync automatically | Pull changes when the world loads and every 2 minutes while the GM is connected. |
 
+## Send a campaign to Dungeon Master Guru
+
+Planned a campaign in this world and want to plan on the website too? Connect, then click **Send to Dungeon Master Guru** in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. The brief, the party and every threat, quest, NPC, place, secret, session and book reference go with it. With premium Patreon the world then syncs with it, keeping the same journal folder and pages; without premium, Dungeon Master Guru gets a copy and the world keeps its own.
+
 ## Help and support
 
 - **Found a bug?** Click **Report a bug**: in the Campaign Planner's or Campaign Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.

@@ -167,3 +167,14 @@ test("reports when the server can't be reached", async () => {
 
   await assert.rejects(api.me(), (error) => error.status === 0 && /Could not reach/.test(error.message));
 });
+
+test("sends a campaign planned in Foundry", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ status: 201, body: { uuid: "u", ids: { a: "b" } } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const body = { request_id: "send-abc12345", campaign: { name: "Night" }, records: {} };
+
+  assert.deepEqual((await api.importCampaign(body)).ids, { a: "b" });
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/campaigns/import");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), body);
+});

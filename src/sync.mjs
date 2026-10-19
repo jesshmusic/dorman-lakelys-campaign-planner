@@ -7,6 +7,7 @@ import { characterPayload, isPlayerCharacter, partyOption } from "./characters.m
 import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
+import { importPayload } from "./send.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -523,6 +524,52 @@ export class CampaignSync {
   async useLocal(campaign) {
     await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, local: true });
     Hooks.callAll(SYNCED_HOOK);
+  }
+
+  /**
+   * Sends this world's campaign to Dungeon Master Guru. With premium, the
+   * world then syncs with it: the same journal folder and pages carry on,
+   * re-tagged with the new records' ids, so their sharing stays as it was.
+   * Without premium, Dungeon Master Guru gets a copy and this world keeps its own.
+   * @returns {Promise<{ campaign: object, linked: boolean }>}
+   */
+  async sendToDmGuru() {
+    if (!this.isLocal) throw new Error("This campaign is already on Dungeon Master Guru.");
+    const store = this.recordLists();
+    const campaign = store.campaign[0];
+    const world = { id: game.world.id, title: game.world.title };
+    const api = this.api();
+    const sent = await api.importCampaign(
+      importPayload({ campaign, store, world, characters: this.characterPayloads(campaign.partyActorUuids ?? []) }),
+    );
+    let premium = false;
+    try {
+      premium = Boolean((await api.me()).premium);
+    } catch {
+      // Treated as not premium: the campaign is on Dungeon Master Guru either way
+    }
+    if (premium) await this.#switchToSynced(sent);
+    return { campaign: sent, linked: premium };
+  }
+
+  // Turns the local campaign's folder into the synced campaign's: each page
+  // gets its new record's uuid, and the pull fills them in place
+  async #switchToSynced(sent) {
+    const ids = sent.ids ?? {};
+    const folder = this.folder;
+    for (const entry of this.#entriesInFolder()) {
+      const updates = entry.pages.contents
+        .filter((page) => ids[flag(page, "uuid")])
+        .map((page) => ({
+          _id: page.id,
+          [`flags.${MODULE_ID}.uuid`]: ids[flag(page, "uuid")],
+          [`flags.${MODULE_ID}.record`]: null,
+          [`flags.${MODULE_ID}.syncVersion`]: null,
+        }));
+      if (updates.length) await entry.updateEmbeddedDocuments("JournalEntryPage", updates);
+    }
+    await folder?.setFlag(MODULE_ID, "campaignUuid", sent.uuid);
+    return this.link(sent);
   }
 
   /** Links this world to a campaign and pulls it into the journals */
