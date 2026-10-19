@@ -148,8 +148,8 @@ export function announcementHtml({ kind, version, sections = [] }) {
       <ul>
         <li><strong>No account needed:</strong> click <strong>New</strong> in the Journal sidebar to start a campaign
           in this world.</li>
-        <li><strong>Want AI help?</strong> Connect a free <a href="${LINKS.site}" target="_blank" rel="noopener">Dungeon
-          Master Guru</a> account to plan on the website too.</li>
+        <li><strong>Plan from anywhere:</strong> connect a free <a href="${LINKS.site}" target="_blank" rel="noopener">Dungeon
+          Master Guru</a> account to plan on the website too, even with Foundry closed.</li>
       </ul>
       <p class="dlcp-announcement-buttons">
         ${button("help", "circle-question", "How it works")}

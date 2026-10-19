@@ -1,6 +1,6 @@
 # Dorman Lakely's Campaign Planner
 
-Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at the table from the Campaign Dashboard. No account needed. When you want AI help, connect to [Dungeon Master Guru](https://dungeonmaster.guru) and plan there too.
+Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at the table from the Campaign Dashboard. No account needed. To plan from anywhere, even with Foundry closed, connect to [Dungeon Master Guru](https://dungeonmaster.guru) and plan there too.
 
 ## Two ways to plan
 
@@ -17,7 +17,7 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 
 **On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
 
-- **AI planning:** draft a cast, threats, places, quests and clues from your brief, get ideas for each step of session prep, and turn your session log into a recap. Use your own OpenAI key, or a Patreon membership.
+- **Plan from anywhere:** the same planner on the website, from any computer or phone, even with Foundry closed.
 - **Two-way sync** ([Patreon](https://www.patreon.com/c/DormanLakely) premium): the campaign comes into your journals, and what you change at the table goes back. If the same thing changed in both places, you choose which to keep.
 - **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
 - **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
@@ -57,7 +57,7 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 ## Help and support
 
 - **Found a bug?** Click **Report a bug**: in the Campaign Planner's or Campaign Dashboard's window menu, the module's settings, or the How it works window. It opens a [GitHub issue](https://github.com/jesshmusic/dorman-lakelys-campaign-planner/issues) with your Foundry, system and module versions already filled in.
-- **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features. Premium members get campaign sync and AI help without their own OpenAI key.
+- **Support on [Patreon](https://www.patreon.com/c/DormanLakely)** to fund new features. Premium members get campaign sync with Dungeon Master Guru.
 - After an update that adds features, a message in chat (for the GM) lists what's new.
 
 ## Development

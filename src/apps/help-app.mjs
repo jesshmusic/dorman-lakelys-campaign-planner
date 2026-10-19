@@ -42,12 +42,12 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         </section>
         <section>
           <h3><i class="fas fa-globe"></i> On Dungeon Master Guru</h3>
-          <p>Plan on the website as well as here, with a free account. It adds AI that drafts your plan, suggests what to
-            prep and writes recaps from your session log.</p>
+          <p>Plan on the website as well as here, with a free account: from any computer or phone, even with Foundry
+            closed. With premium Patreon it syncs with this world.</p>
           <button type="button" data-action="connect"><i class="fas fa-link"></i> Connect</button>
         </section>
       </div>
-      <p class="dlcp-muted">Not sure? Start in this world. You can move to Dungeon Master Guru later if you want the AI.</p>
+      <p class="dlcp-muted">Not sure? Start in this world. You can move to Dungeon Master Guru later.</p>
 
       <h2>Start a campaign in this world</h2>
       <ol>
@@ -114,9 +114,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       </ol>
       <p><strong>What it adds:</strong></p>
       <ul>
-        <li><strong>AI planning:</strong> draft a cast, threats, places, quests and clues from your brief; get ideas for
-          each step of session prep; turn your session log into a recap. Use your own OpenAI key, free, or a Patreon
-          membership.</li>
+        <li><strong>Plan from anywhere:</strong> the same planner on the website, from any computer or phone, even with
+          Foundry closed.</li>
         <li><strong>Sync with this world</strong> (premium Patreon): link the campaign and it comes into your journals.
           Changes you make at the table, like clocks, secrets, quests and the session log, go back to the website.</li>
         <li><strong>Your books and your party:</strong> monsters and treasure you pick from your compendiums become links
@@ -133,7 +132,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <p>Found a bug? <strong>Report a bug</strong> opens a GitHub issue with your Foundry, system and module versions
         filled in; add what happened and how to make it happen again. Your support on
         <a href="${LINKS.patreon}" target="_blank" rel="noopener">Patreon</a> funds new features, and premium members
-        get campaign sync and AI help without their own OpenAI key.</p>
+        get campaign sync with Dungeon Master Guru.</p>
 
       <div class="dlcp-buttons">
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>

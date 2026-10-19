@@ -90,8 +90,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     return `<p>This world doesn't have a campaign yet.</p>
       <p><strong>Start one here</strong>, step by step: what kind of game, the pitch, the party, the world and your books.
         It lives in this world; no account needed.</p>
-      <p>Or <strong>connect to Dungeon Master Guru</strong> to plan on the website too, with AI that drafts the plan and
-        writes recaps, and link a campaign you've made there.</p>
+      <p>Or <strong>connect to Dungeon Master Guru</strong> to plan on the website too, from anywhere, and link a
+        campaign you've made there.</p>
       <div class="dlcp-buttons">
         <button type="button" data-action="newCampaign"><i class="fas fa-feather-alt"></i> New campaign</button>
         <button type="button" data-action="openCampaign"><i class="fas fa-folder-open"></i> Open a campaign</button>

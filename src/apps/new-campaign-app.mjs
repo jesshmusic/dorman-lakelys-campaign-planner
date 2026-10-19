@@ -323,9 +323,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         <h3>Where should it live?</h3>
         <p><strong>In this world:</strong> no account needed. Everything stays in Foundry: journals for the plan, and the
           Campaign Dashboard to run it.</p>
-        <p><strong>On Dungeon Master Guru:</strong> plan on the website as well as here, with a free account. It adds AI
-          that drafts the plan, suggests prep and writes recaps (with your own OpenAI key or a Patreon membership), and
-          with premium Patreon it syncs into this world.</p>
+        <p><strong>On Dungeon Master Guru:</strong> plan on the website as well as here, with a free account, from any
+          computer or phone. With premium Patreon it syncs into this world.</p>
         ${
           this.sync.token
             ? ""
@@ -359,7 +358,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       <h2 tabindex="-1">${escapeHtml(campaign.name)} is ready</h2>
       ${sync}
       <p>Next, plan the rest on Dungeon Master Guru: the villain's threat, the cast, secrets and clues, and the first
-        session. The campaign's Overview has a Getting started list to work through, and can draft a plan with AI.</p>
+        session. The campaign's Overview has a Getting started list to work through.</p>
       <div class="dlcp-buttons">
         <a class="button" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open on Dungeon Master Guru</a>
         ${linked ? `<button type="button" data-action="openDashboard"><i class="fas fa-scroll"></i> Campaign Dashboard</button>` : ""}
@@ -376,7 +375,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       <p>Open the <strong>Campaign Planner</strong> to fill it in. Its Overview tab has a Getting started list: choose
         the party, give your villain a threat, add the cast, hide some secrets, and prep the first session. Run it at
         the table from the <strong>Campaign Dashboard</strong>.</p>
-      <p class="dlcp-muted">Want AI help, or to plan from anywhere? You can move this campaign to Dungeon Master Guru later.
+      <p class="dlcp-muted">Want to plan from anywhere? You can move this campaign to Dungeon Master Guru later.
         <button type="button" class="dlcp-link-button" data-action="help">How it works</button></p>
       <div class="dlcp-buttons">
         <button type="button" data-action="openPlanner"><i class="fas fa-feather-alt"></i> Campaign Planner</button>
