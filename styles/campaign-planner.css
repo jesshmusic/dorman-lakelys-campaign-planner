@@ -701,3 +701,104 @@
 .dlcp-paste-token summary {
   cursor: pointer;
 }
+
+/* Dashboard footer: Patreon, the website and bug reports, like Dorman Lakely's Cartography but smaller */
+
+.dlcp-dashboard {
+  flex: 1 0 auto;
+}
+
+.dlcp-footer {
+  align-items: center;
+  background: var(--color-cool-5, #1a1a1e);
+  border-top: 1px solid var(--color-border-light-primary, #c9ad6a);
+  bottom: -0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  margin: auto -0.75rem -0.5rem;
+  padding: 0.5rem 0.75rem;
+  position: sticky;
+}
+
+.dlcp-footer-link {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  display: inline-flex;
+  flex: 1 1 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 0.4rem;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.3rem 0.6rem;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.dlcp-footer-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dlcp-footer-link:hover,
+.dlcp-footer-link:focus-visible {
+  text-shadow: none;
+  transform: translateY(-1px);
+}
+
+.dlcp-footer-patreon,
+.dlcp-footer-patreon:hover,
+.dlcp-footer-patreon:focus-visible {
+  background: #5b1d12;
+  border-color: #5b1d12;
+  color: #fff;
+}
+
+.dlcp-footer-patreon:hover,
+.dlcp-footer-patreon:focus-visible {
+  background: #7a2518;
+}
+
+.dlcp-footer-site,
+.dlcp-footer-site:hover,
+.dlcp-footer-site:focus-visible {
+  background: #f9f1dc;
+  border-color: #645e56;
+  color: #5b1d12;
+}
+
+.dlcp-footer-site:hover,
+.dlcp-footer-site:focus-visible {
+  background: #ece1c0;
+  color: #9a2d1e;
+}
+
+.dlcp-footer-bug,
+.dlcp-footer-bug:hover,
+.dlcp-footer-bug:focus-visible {
+  background: transparent;
+  border-color: #645e56;
+  color: var(--color-text-primary, #e7e1d6);
+}
+
+.dlcp-footer-bug:hover,
+.dlcp-footer-bug:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dlcp-footer-logo {
+  border: none;
+  flex-shrink: 0;
+  height: 16px;
+  width: 16px;
+}
+
+.dlcp-footer-version {
+  color: var(--color-text-secondary, #a39e93);
+  flex-shrink: 0;
+  font-family: monospace;
+  font-size: 0.7rem;
+}

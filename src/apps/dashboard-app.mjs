@@ -1,6 +1,7 @@
 import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { ADD_FORMS } from "../local.mjs";
+import { LINKS } from "../welcome.mjs";
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 
@@ -27,7 +28,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
       ],
     },
-    position: { width: 560, height: 720 },
+    position: { width: 760, height: 840 },
     actions: {
       sync: DashboardApp.#onSync,
       connect: DashboardApp.#onConnect,
@@ -76,7 +77,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   async _renderHTML() {
     const container = document.createElement("div");
     container.classList.add("dlcp-dashboard");
-    container.innerHTML = this.sync.linked ? this.#renderLinked() : this.#renderUnlinked();
+    container.innerHTML = `${this.sync.linked ? this.#renderLinked() : this.#renderUnlinked()}${this.#renderFooter()}`;
     container.querySelector(".dlcp-quest-status")?.closest("ul")
       ?.addEventListener("change", (event) => this.#onQuestStatus(event));
     return container;
@@ -84,6 +85,19 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   _replaceHTML(result, content) {
     content.replaceChildren(result);
+  }
+
+  // Always at the bottom: Patreon, the website, a bug report, and the version
+  #renderFooter() {
+    const api = game.modules.get(MODULE_ID);
+    const link = (href, className, title, inner) =>
+      `<a href="${escapeHtml(href)}" class="dlcp-footer-link ${className}" title="${title}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    return `<footer class="dlcp-footer">
+        ${link(LINKS.patreon, "dlcp-footer-patreon", "Support Dorman Lakely on Patreon", `<i class="fab fa-patreon"></i><span>Support on Patreon</span>`)}
+        ${link(LINKS.site, "dlcp-footer-site", "Dungeon Master Guru: plan from anywhere, and DM tools", `<img src="modules/${MODULE_ID}/icons/dmguru-logo.svg" alt="" class="dlcp-footer-logo"><span>Dungeon Master Guru</span>`)}
+        ${link(api.api.bugReportLink(), "dlcp-footer-bug", "Report a bug on GitHub, with your versions filled in", `<i class="fas fa-bug"></i><span>Report a bug</span>`)}
+        <span class="dlcp-footer-version">v${escapeHtml(api.version)}</span>
+      </footer>`;
   }
 
   #renderUnlinked() {

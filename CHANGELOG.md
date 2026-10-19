@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **Campaign Dashboard:** it opens bigger, and its footer has Support on Patreon, Dungeon Master Guru and Report a bug, with the module's version. The Campaign Planner's button to open it now says **Campaign Dashboard**.
 - **Fixed:** the Campaign Planner and Campaign Dashboard scroll when their content is taller than the window, and the session prep's Save bar no longer lets the page show beneath it.
 - **Cast roles:** the Villain role is now called **Enemy**. An actor dragged onto the cast starts as an Enemy if its token is hostile, an Ally if friendly, and Neutral otherwise, and a new NPC starts as Neutral, not BBEG.
 - **Connect with a code:** click **Get a code** in the Connect window and enter it on Dungeon Master Guru; no API token to copy and paste (pasting one still works).

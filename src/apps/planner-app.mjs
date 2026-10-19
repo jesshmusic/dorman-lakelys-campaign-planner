@@ -213,7 +213,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return `
       <header class="dlcp-toolbar">
         <span>${where} ${campaign.mode ? `<span class="dlcp-badge">${escapeHtml(MODE_LABELS[campaign.mode] ?? campaign.mode)}</span>` : ""}</span>
-        <span class="dlcp-buttons"><button type="button" data-action="run"><i class="fas fa-scroll"></i> Run it</button></span>
+        <span class="dlcp-buttons"><button type="button" data-action="run"><i class="fas fa-scroll"></i> Campaign Dashboard</button></span>
       </header>
       ${
         this.sync.isLocal
@@ -776,7 +776,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         )}
         <div class="dlcp-buttons dlcp-sticky">
           <button type="button" data-action="saveSession"><i class="fas fa-save"></i> Save the prep</button>
-          <button type="button" data-action="run"><i class="fas fa-scroll"></i> Run it</button>
+          <button type="button" data-action="run"><i class="fas fa-scroll"></i> Run it in the Dashboard</button>
         </div>
       </form>`;
   }
