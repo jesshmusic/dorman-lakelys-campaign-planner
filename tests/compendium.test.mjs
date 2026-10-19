@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COMPENDIUM_PACKS, PACK_NAMES, compendiumLookup, entryFromIndex, formatCr } from "../scripts/compendium.mjs";
+import { COMPENDIUM_PACKS, PACK_NAMES, compendiumLookup, entryFromIndex, formatCr } from "../src/compendium.mjs";
 
 test("indexes the core books before the SRD", () => {
   assert.ok(COMPENDIUM_PACKS.indexOf("dnd-monster-manual.actors") < COMPENDIUM_PACKS.indexOf("dnd5e.actors24"));

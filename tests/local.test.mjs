@@ -9,8 +9,8 @@ import {
   buildLocalCampaign,
   levelFor,
   newRecord,
-} from "../scripts/local.mjs";
-import { defaultDraft } from "../scripts/setup.mjs";
+} from "../src/local.mjs";
+import { defaultDraft } from "../src/setup.mjs";
 
 // Predictable ids: id1, id2, ...
 const ids = () => {

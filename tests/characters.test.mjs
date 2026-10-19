@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { characterPayload, isPlayerCharacter, partyOption, playersOf } from "../scripts/characters.mjs";
+import { characterPayload, isPlayerCharacter, partyOption, playersOf } from "../src/characters.mjs";
 
 const gm = { id: "gm", name: "Gamemaster", isGM: true, character: null };
 const sam = { id: "sam", name: "Sam", isGM: false, character: { id: "akra" } };

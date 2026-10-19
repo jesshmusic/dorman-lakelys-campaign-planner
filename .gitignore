@@ -2,6 +2,12 @@
 /node_modules
 npm-debug.log*
 
+# Build output (Vite)
+/dist
+
+# Local environment, e.g. VITE_DM_GURU_URL for a local Dungeon Master Guru
+.env*.local
+
 # IDE
 .vscode/*
 .idea/

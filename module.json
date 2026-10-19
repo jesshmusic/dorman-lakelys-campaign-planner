@@ -21,7 +21,7 @@
     }
   ],
   "esmodules": [
-    "scripts/campaign-planner.mjs"
+    "dist/campaign-planner.js"
   ],
   "styles": [
     "styles/campaign-planner.css"

@@ -15,7 +15,7 @@ import {
   truthsOf,
   validateAll,
   validateStep,
-} from "../scripts/setup.mjs";
+} from "../src/setup.mjs";
 
 test("walks through the same steps as the website", () => {
   assert.deepEqual(

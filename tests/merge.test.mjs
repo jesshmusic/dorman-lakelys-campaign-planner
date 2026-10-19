@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeChange } from "../scripts/merge.mjs";
+import { mergeChange } from "../src/merge.mjs";
 
 test("retries a change the server didn't touch", () => {
   const base = { clockFilled: 1, name: "Plague" };

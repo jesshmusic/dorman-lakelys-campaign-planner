@@ -23,9 +23,15 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
       - name: Verify module structure
         run: |
-          for file in module.json scripts/campaign-planner.mjs styles/campaign-planner.css lang/en.json; do
+          for file in module.json dist/campaign-planner.js styles/campaign-planner.css lang/en.json; do
             if [ ! -f "$file" ]; then
               echo "::error::Missing required file: $file"
               exit 1
@@ -40,7 +46,7 @@ jobs:
           echo "module.json and lang/en.json are valid JSON"
 
       - name: Check script syntax
-        run: for file in scripts/*.mjs scripts/apps/*.mjs; do node --check "$file"; done
+        run: for file in src/*.mjs src/apps/*.mjs; do node --check "$file"; done
 
       - name: Unit tests
         run: npm test

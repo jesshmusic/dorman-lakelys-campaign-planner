@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_BASE_URL, DEV_SERVER_KEY, DmGuruApi, DmGuruApiError, serverUrl } from "../scripts/api.mjs";
+import { DmGuruApi, DmGuruApiError } from "../src/api.mjs";
 
 function fakeFetch(responses) {
   const calls = [];
@@ -166,40 +166,4 @@ test("reports when the server can't be reached", async () => {
   });
 
   await assert.rejects(api.me(), (error) => error.status === 0 && /Could not reach/.test(error.message));
-});
-
-const storageWith = (value) => ({ getItem: (key) => (key === DEV_SERVER_KEY ? value : null) });
-
-test("uses dungeonmaster.guru unless a local development server is set", () => {
-  assert.equal(DEFAULT_BASE_URL, "https://dungeonmaster.guru");
-  assert.equal(serverUrl(storageWith(null)), DEFAULT_BASE_URL);
-  assert.equal(serverUrl(undefined), DEFAULT_BASE_URL);
-});
-
-test("uses a localhost development server from local storage", () => {
-  assert.equal(serverUrl(storageWith("http://localhost:3000")), "http://localhost:3000");
-  assert.equal(serverUrl(storageWith(" http://127.0.0.1:3000/ ")), "http://127.0.0.1:3000");
-  assert.equal(serverUrl(storageWith("http://localhost")), "http://localhost");
-});
-
-test("never sends the token to anything but localhost", () => {
-  for (const address of [
-    "https://evil.example",
-    "http://localhost.evil.example",
-    "http://localhost:3000@evil.example",
-    "http://evil.example/http://localhost:3000",
-    "javascript:alert(1)",
-  ]) {
-    assert.equal(serverUrl(storageWith(address)), DEFAULT_BASE_URL, address);
-  }
-});
-
-test("uses the real site when local storage is blocked", () => {
-  const blocked = {
-    getItem() {
-      throw new Error("SecurityError");
-    },
-  };
-
-  assert.equal(serverUrl(blocked), DEFAULT_BASE_URL);
 });

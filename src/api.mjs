@@ -2,29 +2,6 @@
 
 export const DEFAULT_BASE_URL = "https://dungeonmaster.guru";
 
-// For working on the module against a local copy of Dungeon Master Guru. In
-// the browser's console:
-//   localStorage.setItem("dorman-lakelys-campaign-planner.devServer", "http://localhost:3000")
-// and reload. Only a localhost address is accepted, so the API token can't be
-// sent anywhere else. Remove the item to go back to dungeonmaster.guru.
-export const DEV_SERVER_KEY = "dorman-lakelys-campaign-planner.devServer";
-const LOCAL_ADDRESS = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
-
-/**
- * Where Dungeon Master Guru is: dungeonmaster.guru, or a local development
- * server set in this browser's local storage.
- * @param {Storage} [storage]
- */
-export function serverUrl(storage = globalThis.localStorage) {
-  let dev = null;
-  try {
-    dev = storage?.getItem(DEV_SERVER_KEY)?.trim().replace(/\/+$/, "");
-  } catch {
-    // Storage can be blocked; use the real site
-  }
-  return dev && LOCAL_ADDRESS.test(dev) ? dev : DEFAULT_BASE_URL;
-}
-
 export class DmGuruApiError extends Error {
   /**
    * @param {string} message

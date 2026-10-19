@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clockSvg, compendiumLink, currencyText, escapeHtml, referenceLink, renderRecord } from "../scripts/render.mjs";
+import { clockSvg, compendiumLink, currencyText, escapeHtml, referenceLink, renderRecord } from "../src/render.mjs";
 
 const names = {
   factions: { 3: "The Cult" },

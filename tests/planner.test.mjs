@@ -18,7 +18,7 @@ import {
   referenceFromDocument,
   revelationGroups,
   setLinks,
-} from "../scripts/planner.mjs";
+} from "../src/planner.mjs";
 
 const ids = () => {
   let n = 0;

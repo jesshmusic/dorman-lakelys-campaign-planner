@@ -56,19 +56,22 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 
 ## Development
 
-The code that doesn't depend on Foundry (`scripts/api.mjs`, `scripts/render.mjs`, `scripts/merge.mjs`) has unit tests:
+The module is built with [Vite](https://vite.dev): the code in `src/` becomes `dist/campaign-planner.js`, the file Foundry loads.
 
 ```bash
-npm test
+npm install
+npm run dev     # development build, rebuilt on every change
+npm run build   # release build
+npm test        # unit tests for the code that doesn't depend on Foundry
 ```
 
-To work against a local copy of Dungeon Master Guru, set this in the browser's console and reload. Only a `localhost` address is accepted:
+To work against a local copy of Dungeon Master Guru, put its address in `.env.development.local` (git-ignored):
 
-```js
-localStorage.setItem("dorman-lakelys-campaign-planner.devServer", "http://localhost:3000")
+```bash
+VITE_DM_GURU_URL=http://localhost:3000
 ```
 
-Remove it with `localStorage.removeItem("dorman-lakelys-campaign-planner.devServer")` to go back to dungeonmaster.guru. The Connect window says when a local server is in use.
+`npm run dev` uses it, and the Connect window says so. Release builds (`npm run build`, and the release workflows) always use dungeonmaster.guru.
 
 ## License
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { campaignSceneUuids, hasThumbnail, sceneVersion } from "../scripts/scenes.mjs";
+import { campaignSceneUuids, hasThumbnail, sceneVersion } from "../src/scenes.mjs";
 
 const PASS = "Scene.QdI6Ix83ypmPq4lc";
 const MAP = "Scene.WVPcqI82sGV2YrXq";
