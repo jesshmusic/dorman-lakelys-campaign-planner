@@ -817,3 +817,26 @@
   font-family: monospace;
   font-size: 0.7rem;
 }
+
+/* Giving a reward or treasure to the characters */
+
+.dlcp-reward fieldset {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.dlcp-reward-items {
+  margin: 0.5rem 0;
+  width: 100%;
+}
+
+.dlcp-reward-items td:nth-child(2) {
+  white-space: nowrap;
+  width: 3rem;
+}
+
+.dlcp-reward-items select {
+  width: 100%;
+}

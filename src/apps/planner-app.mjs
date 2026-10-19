@@ -2,6 +2,7 @@ import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { NPC_ROLES, newRecord } from "../local.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
+import { exportAdventure } from "./export-adventure.mjs";
 import {
   BRIEF_FIELDS,
   COINS,
@@ -91,6 +92,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
         { icon: "fas fa-cloud-arrow-up", label: "Send to Dungeon Master Guru", action: "sendCampaign" },
+        { icon: "fas fa-box-archive", label: "Export as Adventure", action: "exportAdventure", visible: () => game.user.isGM },
         { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
       ],
     },
@@ -128,6 +130,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       help: PlannerApp.#onHelp,
       reportBug: PlannerApp.#onReportBug,
       sendCampaign: PlannerApp.#onSendCampaign,
+      exportAdventure: PlannerApp.#onExportAdventure,
     },
   };
 
@@ -312,7 +315,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           <div class="dlcp-buttons"><button type="button" data-action="sendCampaign"><i class="fas fa-cloud-arrow-up"></i> Send to Dungeon Master Guru</button></div>
         </section>`
       : "";
-    return `${checklist}<h2>The brief</h2>${brief}${send}`;
+    const share = game.user.isGM
+      ? `<section class="dlcp-card dlcp-send">
+          <header class="dlcp-card-header"><h3><i class="fas fa-box-archive"></i> Share it as an Adventure</h3></header>
+          <p class="dlcp-muted">Pack its journals, maps and actors into a Foundry Adventure in a compendium, to import into
+            another world with Foundry's Adventure importer. There it opens as a campaign of its own.</p>
+          <div class="dlcp-buttons"><button type="button" data-action="exportAdventure"><i class="fas fa-box-archive"></i> Export as Adventure</button></div>
+        </section>`
+      : "";
+    return `${checklist}<h2>The brief</h2>${brief}${send}${share}`;
   }
 
   // Party ---------------------------------------------------------------------
@@ -1261,6 +1272,10 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       return;
     }
     if (await sendCampaign()) this.render({ window: { title: this.title } });
+  }
+
+  static async #onExportAdventure() {
+    await exportAdventure();
   }
 
   static #onReportBug() {

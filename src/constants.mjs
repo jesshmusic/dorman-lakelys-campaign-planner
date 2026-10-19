@@ -16,6 +16,8 @@ export const SETTINGS = {
   lastVersion: "lastVersion",
   // Whether the Campaign Dashboard opens when the world loads. User scope: each GM chooses, per world.
   openDashboard: "openDashboardOnStartup",
+  // The New campaign guide's words as last fetched from Dungeon Master Guru. Client scope.
+  setupGuide: "setupGuide",
 };
 
 // Fired after every pull or push so open windows can re-render

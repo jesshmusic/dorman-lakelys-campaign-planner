@@ -2,6 +2,7 @@ import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
 import { ADD_FORMS } from "../local.mjs";
 import { LINKS } from "../welcome.mjs";
+import { giveReward } from "./give-reward.mjs";
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 
@@ -48,6 +49,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       hideSecret: DashboardApp.#onHideSecret,
       saveLog: DashboardApp.#onSaveLog,
       markPlayed: DashboardApp.#onMarkPlayed,
+      giveReward: DashboardApp.#onGiveReward,
     },
   };
 
@@ -188,7 +190,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         ${session.strongStart ? `<p><strong>Strong start:</strong> ${escapeHtml(session.strongStart)}</p>` : ""}
         ${scenes}
         ${this.#renderMaps(session.foundryScenes)}
-        ${this.#renderTreasure(session, { label: "Treasure", coins: session.treasureCurrency })}
+        ${this.#renderTreasure(session, { collection: "sessions", label: "Treasure", coins: session.treasureCurrency })}
         <label for="dlcp-log"><strong>Session log</strong></label>
         <textarea id="dlcp-log" rows="5" placeholder="What happened? Names you made up, promises, loose ends…">${escapeHtml(session.log ?? "")}</textarea>
         <div class="dlcp-buttons">
@@ -232,7 +234,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   // Coins and items to hand out; drag an item onto a character sheet to give it.
   // A quest's reward adds its XP or milestone.
-  #renderTreasure(owner, { label, coins, xp = null, milestone = false }) {
+  #renderTreasure(owner, { collection, label, coins, xp = null, milestone = false }) {
     const items = this.#referenceLinks(owner, (category) => category !== "monster");
     const parts = [
       currencyText(coins) && escapeHtml(currencyText(coins)),
@@ -241,8 +243,11 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       milestone && "level up (milestone)",
     ].filter(Boolean);
     if (!parts.length) return "";
+    const button = `<button type="button" data-action="giveReward" data-collection="${collection}" data-uuid="${escapeHtml(owner.uuid)}">
+        <i class="fas fa-gem"></i> ${label === "Reward" ? "Give the reward" : "Hand out the treasure"}</button>`;
     return `<p><strong>${escapeHtml(label)}:</strong> ${parts.join(", ")}</p>
-      ${items.length ? `<p class="dlcp-muted">Drag an item onto a character's sheet to give it to them.</p>` : ""}`;
+      <div class="dlcp-buttons">${button}</div>
+      ${items.length ? `<p class="dlcp-muted">Or drag an item onto a character's sheet to give it to them.</p>` : ""}`;
   }
 
   #renderClocks(fronts) {
@@ -316,6 +321,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         this.#renderMaps(quest.foundryScenes),
         monsters.length ? `<p><strong>Monsters:</strong> ${monsters.join(", ")}</p>` : "",
         this.#renderTreasure(quest, {
+          collection: "quests",
           label: "Reward",
           coins: quest.rewardCurrency,
           xp: quest.rewardXp,
@@ -402,6 +408,24 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onOpenCampaign() {
     game.modules.get(MODULE_ID).api.openCampaignPicker();
+  }
+
+  // Opens the dialog for handing out a quest's reward or a session's treasure
+  static #onGiveReward(_event, target) {
+    const { collection, uuid } = target.dataset;
+    const record = this.sync.recordLists()[collection]?.find((r) => r.uuid === uuid);
+    if (!record) return;
+    if (collection === "quests") {
+      return giveReward({
+        title: record.name,
+        label: "Reward",
+        owner: record,
+        coins: record.rewardCurrency,
+        xp: record.rewardXp,
+        milestone: record.milestone,
+      });
+    }
+    return giveReward({ title: record.displayTitle ?? record.title, label: "Treasure", owner: record, coins: record.treasureCurrency });
   }
 
   static #onReportBug() {

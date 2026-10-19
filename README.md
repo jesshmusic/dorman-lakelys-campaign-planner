@@ -13,7 +13,10 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
   - Threat clocks you can advance, and grim portents you can tick off.
   - Secrets and clues to reveal.
   - Quests and their status, with an active quest's maps, monsters and reward.
+  - **Give the reward:** hand a quest's reward or a session's treasure to the characters (items to whoever you choose, coins shared evenly, XP shared or given to each), with a summary in chat. With [Item Piles](https://foundryvtt.com/packages/item-piles) set up for your system, you can leave it on the scene as an item pile instead.
   - Add threats, secrets, quests, NPCs, places, factions and sessions as you go.
+
+- **Export as an Adventure:** pack the campaign's journals, maps and actors into a Foundry Adventure in a world compendium, to import into another world with Foundry's Adventure importer. There it opens as a campaign of its own.
 
 **On Dungeon Master Guru (free account).** Plan on the website as well as in Foundry. It adds:
 

@@ -7,6 +7,7 @@ import { openCampaignPicker } from "./apps/campaign-picker.mjs";
 import { PlannerApp } from "./apps/planner-app.mjs";
 import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
+import { useRememberedGuideWords } from "./guide-words.mjs";
 import { AUTO_SYNC_MINUTES, MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
 
 const sync = new CampaignSync();
@@ -112,6 +113,15 @@ Hooks.once("init", () => {
     type: Object,
     default: {},
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.setupGuide, {
+    name: "New campaign guide's words",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
+  });
+  useRememberedGuideWords();
 
   game.settings.register(MODULE_ID, SETTINGS.openDashboard, {
     name: "Open the Campaign Dashboard at startup",

@@ -49,6 +49,11 @@ export class DmGuruApi {
     return this.#request("POST", "/v1/foundry/link/token", { deviceCode });
   }
 
+  /** The New campaign guide's words, as an admin wrote them: { steps, templates, updatedAt }. Needs no token. */
+  setupGuide() {
+    return this.#request("GET", "/v1/setup_guide");
+  }
+
   /** The account the token belongs to: { user } */
   me() {
     return this.#request("GET", "/v1/foundry/me");

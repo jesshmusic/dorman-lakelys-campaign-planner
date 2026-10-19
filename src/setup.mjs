@@ -2,8 +2,9 @@
 // request that creates the campaign on Dungeon Master Guru. No Foundry
 // globals, so it can be tested in Node.
 //
-// The words match the website's guide (pages/campaigns/setup/setupSteps.ts);
-// keep the two in step.
+// The words come from Dungeon Master Guru (GET /v1/setup_guide), where an
+// admin edits them for the website and this module alike. STEPS and TEMPLATES
+// hold the words the module ships with, for worlds that have never reached it.
 
 export const MAX_TRUTHS = 6;
 
@@ -104,17 +105,64 @@ export const STEPS = [
     label: "Books",
     title: "Your books",
     intro: "Choose the compendiums this campaign uses for monsters, spells, items and tables.",
-    why: "On Dungeon Master Guru, monster and treasure searches use these, and each pick becomes a link in your session journals: click it to open the stat block, or drag it onto a scene to place a token. In this world, drag entries from these compendiums straight into your journals.",
+    why: "On Dungeon Master Guru, monster and treasure searches use these, and each pick becomes a link in your session journals: click it to open the stat block, or drag it onto a scene to place a token. In a Foundry world, drag entries from these compendiums straight into your journals.",
   },
   {
     id: "review",
     label: "Review",
     title: "Review and create",
-    intro: "Check your brief, then choose where the campaign lives. You can change any of it later.",
+    intro: "Check your brief. You can change any of it later.",
   },
 ];
 
 export const LAST_STEP = STEPS.length - 1;
+
+// The words an admin can change on Dungeon Master Guru; the rest (ids, fields) is the module's
+const STEP_WORDS = ["label", "title", "intro", "why", "example"];
+const TEMPLATE_WORDS = ["title", "description", "example"];
+// Words a step or template can do without
+const OPTIONAL_WORDS = ["why", "example"];
+
+function withWordsFrom(list, keyName, words, items) {
+  const found = new Map(
+    (Array.isArray(list) ? list : []).filter((entry) => typeof entry?.[keyName] === "string").map((entry) => [entry[keyName], entry]),
+  );
+  return items.map((item) => {
+    const entry = found.get(keyName === "id" ? item.id : item.value);
+    if (!entry) return item;
+    const merged = { ...item };
+    for (const word of words) {
+      const value = entry[word];
+      if (typeof value === "string" && value.trim()) merged[word] = value;
+      else if ((value === null || value === "") && OPTIONAL_WORDS.includes(word)) delete merged[word];
+    }
+    return merged;
+  });
+}
+
+/**
+ * The guide's steps and templates with Dungeon Master Guru's words in place
+ * of the built-in ones. Steps and templates it doesn't know, and empty
+ * required words, are ignored; an empty "why" or example is left out.
+ * @param {{ steps?: object[], templates?: object[] }|null} guide what GET /v1/setup_guide returns
+ */
+export function withWords(guide) {
+  return {
+    steps: withWordsFrom(guide?.steps, "id", STEP_WORDS, STEPS),
+    templates: withWordsFrom(guide?.templates, "value", TEMPLATE_WORDS, TEMPLATES),
+  };
+}
+
+let current = withWords(null);
+
+/** The steps and templates as the guide shows them now */
+export const guideSteps = () => current.steps;
+export const guideTemplates = () => current.templates;
+
+/** Uses Dungeon Master Guru's words, fetched now or remembered from last time */
+export function setGuideWords(guide) {
+  current = withWords(guide);
+}
 
 // Bump when the draft's shape changes, so an old draft starts fresh
 export const DRAFT_VERSION = 1;

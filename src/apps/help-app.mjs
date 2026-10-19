@@ -97,7 +97,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           shows its maps, its monsters to drag onto a map, and its reward to hand out.</li>
         <li><strong>Session log:</strong> jot down what happened, then click Mark played.</li>
         <li><strong>Maps and treasure:</strong> show the session's maps to yourself, or activate one for the players.
-          Drag treasure items onto a character's sheet to hand them out.</li>
+          <strong>Give the reward</strong> (or <strong>Hand out the treasure</strong>) gives the items, coins and XP to
+          the characters, or, with Item Piles, leaves them on the scene as a pile. You can also drag an item onto a
+          character's sheet.</li>
         <li><strong>Add:</strong> threats, secrets, quests, NPCs, places, factions and sessions each get their own journal
           page. Pages are for the GM until you share them, as with any journal.</li>
         <li><strong>On Dungeon Master Guru?</strong> Plan it on the website or in the Campaign Planner here: changes on

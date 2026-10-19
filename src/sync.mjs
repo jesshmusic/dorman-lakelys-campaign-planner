@@ -9,6 +9,18 @@ import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
 import { changedAttributes, createAttributes, uuidV4 } from "./editing.mjs";
+import {
+  ADVENTURE_PACK,
+  CAMPAIGN_FLAG,
+  adventureData,
+  adventureUuids,
+  foldersFor,
+  isPlayersCharacter,
+  localFolderName,
+  localJournal,
+  subfolderIds,
+  worldDocument,
+} from "./adventure.mjs";
 import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTIONS } from "./constants.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
@@ -622,6 +634,150 @@ export class CampaignSync {
     return this.pull({ full: true });
   }
 
+  /**
+   * What exporting the open campaign as an Adventure takes from this world:
+   * its journal folder (and the folders inside it), the scenes, actors, items
+   * and roll tables it uses, and the folders they're in. Players' characters
+   * stay out, and documents that are gone are counted.
+   */
+  adventureContents() {
+    const folder = this.folder;
+    if (!folder) throw new Error("This campaign's journals aren't in this world.");
+    const lists = this.recordLists();
+    const campaign = lists.campaign[0] ?? { uuid: this.linked.uuid, name: this.linked.name };
+    const worldFolders = game.folders.contents.map((f) => ({ _id: f.id, folder: f._source.folder ?? null }));
+    const journalFolders = [folder.id, ...subfolderIds(folder.id, worldFolders)];
+    const entries = game.journal.filter((entry) => journalFolders.includes(entry._source.folder));
+    const texts = entries.flatMap((entry) => entry.pages.contents.map((page) => page.text?.content ?? ""));
+    const wanted = adventureUuids(lists, { texts });
+
+    const users = game.users.contents;
+    const party = campaign.partyActorUuids ?? [];
+    const documents = {};
+    const missing = {};
+    let leftOut = 0;
+    for (const [documentName, uuids] of Object.entries(wanted)) {
+      const collection = game.collections.get(documentName);
+      documents[documentName] = [];
+      missing[documentName] = 0;
+      for (const uuid of uuids) {
+        const document = collection?.get(worldDocument(uuid).id);
+        if (!document) missing[documentName] += 1;
+        else if (documentName === "Actor" && isPlayersCharacter(document, { users, party })) leftOut += 1;
+        else documents[documentName].push(document);
+      }
+    }
+    const used = [...journalFolders, ...Object.values(documents).flat().map((document) => document._source.folder)];
+    return {
+      campaign,
+      folder,
+      folders: foldersFor(used, worldFolders).map((id) => game.folders.get(id)).filter(Boolean),
+      entries,
+      scenes: documents.Scene,
+      actors: documents.Actor,
+      items: documents.Item,
+      tables: documents.RollTable,
+      missing,
+      leftOut,
+    };
+  }
+
+  /** The world compendium campaigns are exported to; made when `create` and it doesn't exist yet */
+  async adventurePack({ create = false } = {}) {
+    const pack = game.packs.get(`world.${ADVENTURE_PACK.name}`);
+    if (pack) {
+      if (pack.documentName !== "Adventure") throw new Error(`The ${pack.title} compendium doesn't hold adventures.`);
+      return pack;
+    }
+    if (!create) return null;
+    return foundry.documents.collections.CompendiumCollection.createCompendium({
+      type: ADVENTURE_PACK.type,
+      label: ADVENTURE_PACK.label,
+      name: ADVENTURE_PACK.name,
+    });
+  }
+
+  /** The compendium index entry of a campaign's earlier export, or null */
+  async previousExport(campaignUuid) {
+    const pack = await this.adventurePack();
+    if (!pack) return null;
+    const index = await pack.getIndex({ fields: [CAMPAIGN_FLAG, `flags.${MODULE_ID}.exportedAt`] });
+    return index.find((entry) => foundry.utils.getProperty(entry, CAMPAIGN_FLAG) === campaignUuid) ?? null;
+  }
+
+  /**
+   * Exports the open campaign as an Adventure in this world's Campaign
+   * Planner Adventures compendium, making the compendium first if need be.
+   * Exporting again replaces the campaign's earlier export. The journals open
+   * as a campaign that lives in the world they're imported into, even when
+   * this one syncs with Dungeon Master Guru; this world's are left as they are.
+   * @param {object} [contents] what adventureContents() found
+   * @returns {Promise<{ pack: object, adventure: object, replaced: boolean, counts: object, missing: object, leftOut: number }>}
+   */
+  async exportAdventure(contents = this.adventureContents()) {
+    if (!game.user.isGM) throw new Error("Only a GM can export the campaign.");
+    const pack = await this.adventurePack({ create: true });
+    if (!pack) throw new Error("Couldn't make the compendium.");
+    if (pack.locked) throw new Error(`The ${pack.title} compendium is locked. Unlock it, then export again.`);
+
+    // Each document as Foundry's own Adventure exporter takes it, ids and folders kept
+    const options = {
+      clearSort: false,
+      clearFolder: false,
+      clearFlags: false,
+      clearSource: false,
+      clearOwnership: true,
+      clearState: true,
+      keepId: true,
+    };
+    const toData = (document) => {
+      const data = document.toCompendium(pack, options);
+      document.constructor._clearFieldsRecursively?.(data, ["_stats.duplicateSource", "_stats.exportSource"]);
+      return data;
+    };
+    const folders = contents.folders.map((folder) => {
+      const data = toData(folder);
+      if (folder.id === contents.folder.id) data.name = localFolderName(data.name);
+      return data;
+    });
+    const journal = localJournal(contents.entries.map(toData));
+    const data = adventureData({
+      campaign: contents.campaign,
+      folders,
+      journal,
+      scenes: contents.scenes.map(toData),
+      actors: contents.actors.map(toData),
+      items: contents.items.map(toData),
+      tables: contents.tables.map(toData),
+      exportedAt: new Date().toISOString(),
+      version: game.modules.get(MODULE_ID)?.version,
+    });
+
+    const previous = await this.previousExport(contents.campaign.uuid);
+    const existing = previous ? await pack.getDocument(previous._id) : null;
+    const operation = { keepId: true, keepEmbeddedIds: true, diff: false, recursive: false };
+    const adventure = existing
+      ? ((await existing.update(data, operation)) ?? existing)
+      : await CONFIG.Adventure.documentClass.create(data, { ...operation, pack: pack.collection });
+    if (!adventure) throw new Error("Foundry didn't save the adventure.");
+    return {
+      pack,
+      adventure,
+      replaced: Boolean(existing),
+      counts: {
+        entries: journal.length,
+        pages: journal.reduce((total, entry) => total + (entry.pages?.length ?? 0), 0),
+        scenes: data.scenes.length,
+        actors: data.actors.length,
+        items: data.items.length,
+        tables: data.tables.length,
+        folders: folders.length,
+      },
+      missing: contents.missing,
+      leftOut: contents.leftOut,
+    };
+  }
+
   // Finds compendium entries by name in the packs the campaign uses
   #compendiumLookup(store) {
     const campaign = [...store.campaign.values()][0];
@@ -705,9 +861,14 @@ export class CampaignSync {
       } else if (
         page.text.content !== content ||
         page.name !== data.name ||
-        flag(page, "syncVersion") !== record.syncVersion
+        flag(page, "syncVersion") !== record.syncVersion ||
+        JSON.stringify(flag(page, "record")) !== JSON.stringify(record)
       ) {
-        updates.push({ _id: page.id, ...data });
+        // Replace the stored record rather than merge into it, or a field that
+        // was emptied (coins set to {}, say) would keep its old keys
+        const flags = { uuid: record.uuid, collection, syncVersion: record.syncVersion };
+        flags.record = foundry.data.operators.ForcedReplacement.create(record);
+        updates.push({ _id: page.id, ...data, [`flags.${MODULE_ID}`]: flags });
       }
     }
     const removals = [...pages.entries()].filter(([uuid]) => deleted.has(uuid)).map(([, page]) => page.id);
@@ -732,6 +893,12 @@ export const FIELD_LABELS = {
   log: "the session log",
   recap: "the recap",
   revealed: "whether it's revealed",
+  rewardCurrency: "the reward's coins",
+  rewardXp: "the reward's XP",
+  milestone: "the milestone",
+  treasureCurrency: "the treasure's coins",
+  foundryScenes: "the maps",
+  links: "what's linked",
 };
 
 export const describeFields = (keys) => keys.map((key) => FIELD_LABELS[key] ?? key).join(", ");

@@ -22,6 +22,16 @@ test("sends the token and reads the account", async () => {
   assert.equal(calls[0].init.headers.Authorization, "Bearer dmg_abc");
 });
 
+test("reads the New campaign guide's words without a token", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { steps: [], templates: [] } }]);
+  const api = new DmGuruApi({ baseUrl: "http://localhost:3000", token: null, fetchImpl });
+
+  assert.deepEqual(await api.setupGuide(), { steps: [], templates: [] });
+  assert.equal(calls[0].url, "http://localhost:3000/v1/setup_guide");
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[0].init.headers.Authorization, undefined);
+});
+
 test("asks for changes since a cursor", async () => {
   const { calls, fetchImpl } = fakeFetch([{ body: { cursor: 9 } }]);
   const api = new DmGuruApi({ token: "t", fetchImpl });

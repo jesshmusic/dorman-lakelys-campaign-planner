@@ -4,9 +4,9 @@ import { MODULE_ID, SETTINGS } from "../constants.mjs";
 import {
   FIELDS,
   LAST_STEP,
-  STEPS,
-  TEMPLATES,
   defaultDraft,
+  guideSteps,
+  guideTemplates,
   hasProgress,
   normalizeDraft,
   stepForField,
@@ -15,6 +15,7 @@ import {
   validateAll,
   validateStep,
 } from "../setup.mjs";
+import { loadGuideWords } from "../guide-words.mjs";
 
 /**
  * The guided "New campaign" setup: what kind of game, the pitch, the table,
@@ -94,6 +95,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
 
   async _onFirstRender(context, options) {
     await super._onFirstRender?.(context, options);
+    // The latest words from Dungeon Master Guru; the ones already showing are fine until then
+    loadGuideWords().then((changed) => changed && this.rendered && this.render());
     // Typing updates the draft without re-rendering, so focus stays put
     this.element.addEventListener("input", (event) => this.#onInput(event));
     this.element.addEventListener("change", (event) => this.#onChange(event));
@@ -116,8 +119,8 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
 
   #renderStep() {
     const draft = this.#draft;
-    const step = STEPS[draft.step];
-    const progress = STEPS.map(
+    const step = guideSteps()[draft.step];
+    const progress = guideSteps().map(
       (s, index) => `<li><button type="button" data-action="goTo" data-step="${index}"
         ${index === draft.step ? 'aria-current="step"' : ""} ${index > draft.furthest ? "disabled" : ""}>${index + 1}. ${escapeHtml(s.label)}</button></li>`,
     ).join("");
@@ -131,7 +134,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         : "";
     const forward =
       draft.step < LAST_STEP
-        ? `<button type="button" data-action="next">Next: ${escapeHtml(STEPS[draft.step + 1].title)} <i class="fas fa-arrow-right"></i></button>`
+        ? `<button type="button" data-action="next">Next: ${escapeHtml(guideSteps()[draft.step + 1].title)} <i class="fas fa-arrow-right"></i></button>`
         : `${
             this.sync.token
               ? `<button type="button" data-action="create" ${this.#busy ? "disabled" : ""}>
@@ -171,7 +174,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #renderKinds() {
-    return `<div class="dlcp-kinds" role="radiogroup" aria-label="Campaign template">${TEMPLATES.map(
+    return `<div class="dlcp-kinds" role="radiogroup" aria-label="Campaign template">${guideTemplates().map(
       (option) => `
       <label class="dlcp-kind ${this.#draft.template === option.value ? "dlcp-kind--selected" : ""}">
         <span><input type="radio" name="template" value="${option.value}" ${this.#draft.template === option.value ? "checked" : ""}>
@@ -271,9 +274,9 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const fact = (label, value) =>
       value ? `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>` : "";
     const block = (id, body) => {
-      const index = STEPS.findIndex((step) => step.id === id);
+      const index = guideSteps().findIndex((step) => step.id === id);
       return `<section class="dlcp-summary">
-        <header><h3>${escapeHtml(STEPS[index].title)}</h3>
+        <header><h3>${escapeHtml(guideSteps()[index].title)}</h3>
           <button type="button" class="dlcp-link-button" data-action="goTo" data-step="${index}">Edit</button></header>
         ${body}
       </section>`;
@@ -290,7 +293,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const linked = this.sync.linked;
 
     return `
-      ${block("kind", `<p>${escapeHtml(TEMPLATES.find((option) => option.value === this.#draft.template)?.title ?? "")}</p>`)}
+      ${block("kind", `<p>${escapeHtml(guideTemplates().find((option) => option.value === this.#draft.template)?.title ?? "")}</p>`)}
       ${block(
         "pitch",
         fact("Name", text("name") || "Not named yet") +
@@ -451,7 +454,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   }
 
   static #onNext() {
-    const error = validateStep(STEPS[this.#draft.step].id, this.#draft.values);
+    const error = validateStep(guideSteps()[this.#draft.step].id, this.#draft.values);
     if (error) return this.#goTo(this.#draft.step, error);
     return this.#goTo(Math.min(this.#draft.step + 1, LAST_STEP));
   }

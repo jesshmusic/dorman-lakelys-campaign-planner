@@ -15,6 +15,10 @@ import {
   truthsOf,
   validateAll,
   validateStep,
+  withWords,
+  setGuideWords,
+  guideSteps,
+  guideTemplates,
 } from "../src/setup.mjs";
 
 test("walks through the same steps as the website", () => {
@@ -155,4 +159,40 @@ test("knows when a draft is worth picking up", () => {
   assert.equal(hasProgress(defaultDraft()), false);
   assert.equal(hasProgress({ ...defaultDraft(), step: 2 }), true);
   assert.equal(hasProgress({ ...defaultDraft(), values: { name: "Zombie Siege" } }), true);
+});
+
+test("Dungeon Master Guru's words replace the built-in ones, and the steps keep their fields", () => {
+  const guide = withWords({
+    steps: [
+      { id: "pitch", label: "Pitch", title: "Your pitch", intro: "Say it in a sentence.", why: null, example: "A haunted lighthouse." },
+      { id: "nonsense", title: "Ignored" },
+      { id: "table", title: "", intro: "   " },
+    ],
+    templates: [{ value: "sandbox", title: "Open world", description: "Go anywhere.", example: "The Wild Coast." }],
+  });
+  const pitch = guide.steps.find((step) => step.id === "pitch");
+
+  assert.equal(pitch.title, "Your pitch");
+  assert.equal(pitch.intro, "Say it in a sentence.");
+  assert.equal("why" in pitch, false, "an empty why is left out");
+  assert.equal(pitch.example, "A haunted lighthouse.");
+  assert.deepEqual(pitch.fields, STEPS.find((step) => step.id === "pitch").fields);
+  // Empty required words keep the built-in ones; unknown steps are ignored
+  assert.deepEqual(guide.steps.find((step) => step.id === "table"), STEPS.find((step) => step.id === "table"));
+  assert.deepEqual(guide.steps.map((step) => step.id), STEPS.map((step) => step.id));
+  assert.equal(guide.templates.find((t) => t.value === "sandbox").title, "Open world");
+  assert.deepEqual(guide.templates.find((t) => t.value === "blank"), TEMPLATES.find((t) => t.value === "blank"));
+});
+
+test("without Dungeon Master Guru's words the guide uses the module's own", () => {
+  assert.deepEqual(withWords(null), { steps: STEPS, templates: TEMPLATES });
+  assert.deepEqual(withWords({ steps: "nope" }).steps, STEPS);
+});
+
+test("the guide shows the words it was last given", () => {
+  setGuideWords({ steps: [{ id: "kind", title: "What game?" }] });
+  assert.equal(guideSteps()[0].title, "What game?");
+  assert.deepEqual(guideTemplates(), TEMPLATES);
+  setGuideWords(null);
+  assert.equal(guideSteps()[0].title, STEPS[0].title);
 });
