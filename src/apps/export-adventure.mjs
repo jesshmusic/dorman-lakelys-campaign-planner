@@ -59,7 +59,7 @@ export async function exportAdventure() {
         ...(included.length > 1 ? [`${listText(included.slice(1))} from this world that it uses`] : []),
       ])}
       <p class="dlcp-muted">${escapeHtml(notes.join(" "))}</p>
-      <p>Imported, it's a campaign that lives in that world: open it with <strong>Open</strong> at the top of the Journal
+      <p>Imported, it's a campaign that lives in that world: open it with <strong>Switch</strong> at the top of the Journal
         sidebar, no Dungeon Master Guru account needed.${sync.isLocal ? "" : " This world keeps syncing as before."}</p>
       ${
         previous

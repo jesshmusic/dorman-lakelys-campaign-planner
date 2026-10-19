@@ -36,7 +36,7 @@ export async function openCampaignPicker() {
   </div>`;
 
   const choice = await foundry.applications.api.DialogV2.prompt({
-    window: { title: "Open a campaign", icon: "fas fa-folder-open" },
+    window: { title: "Switch campaign", icon: "fas fa-right-left" },
     content,
     ok: {
       label: "Open",

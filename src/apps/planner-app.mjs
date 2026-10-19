@@ -98,7 +98,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       controls: [
         { icon: "fas fa-scroll", label: "Run it (Campaign Dashboard)", action: "run" },
         { icon: "fas fa-feather-alt", label: "New campaign", action: "newCampaign" },
-        { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
+        { icon: "fas fa-right-left", label: "Switch campaign", action: "openCampaign" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
         { icon: "fas fa-cloud-arrow-up", label: "Send to Dungeon Master Guru", action: "sendCampaign" },
         { icon: "fas fa-box-archive", label: "Export as Adventure", action: "exportAdventure", visible: () => game.user.isGM },
@@ -234,7 +234,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return `
       <header class="dlcp-toolbar">
         <span>${where} ${campaign.mode ? `<span class="dlcp-badge">${escapeHtml(MODE_LABELS[campaign.mode] ?? campaign.mode)}</span>` : ""}</span>
-        <span class="dlcp-buttons">${syncButton(this.sync, { busy: this.#syncing })}<button type="button" data-action="run"><i class="fas fa-scroll"></i> Campaign Dashboard</button></span>
+        <span class="dlcp-buttons"><button type="button" data-action="openCampaign" data-tooltip="Switch to another campaign"><i class="fas fa-right-left"></i> Switch campaign</button>${syncButton(this.sync, { busy: this.#syncing })}<button type="button" data-action="run"><i class="fas fa-scroll"></i> Campaign Dashboard</button></span>
       </header>
       ${
         this.sync.isLocal

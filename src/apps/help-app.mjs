@@ -77,8 +77,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         Threats, Quests, Secrets and Clues, Places, Factions and Book References. A story arc starts with its sessions,
         three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.</p>
 
-      <h2>Open a campaign you've already made</h2>
-      <p>In the <strong>Journal</strong> sidebar, click <strong>Open</strong>. It lists the campaigns in this world, and
+      <h2>Switch to another campaign</h2>
+      <p>Click <strong>Switch campaign</strong> at the top of the Campaign Planner, <strong>Switch</strong> on the
+        Dashboard, or <strong>Switch</strong> in the Journal sidebar. It lists the campaigns in this world, and
         the ones on Dungeon Master Guru when you're connected. The one you pick is the one the Dashboard shows; the others'
         journals stay where they are.</p>
 

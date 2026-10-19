@@ -25,7 +25,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       controls: [
         { icon: "fas fa-feather-alt", label: "Plan it (Campaign Planner)", action: "plan" },
         { icon: "fas fa-plus", label: "New campaign", action: "newCampaign" },
-        { icon: "fas fa-folder-open", label: "Open another campaign", action: "openCampaign" },
+        { icon: "fas fa-right-left", label: "Switch campaign", action: "openCampaign" },
         { icon: "fas fa-link", label: "Connect to Dungeon Master Guru", action: "connect" },
         { icon: "fas fa-circle-question", label: "Help", action: "help" },
         { icon: "fas fa-bug", label: "Report a bug", action: "reportBug" },
@@ -153,6 +153,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       <header class="dlcp-toolbar">
         ${status}
         <span class="dlcp-buttons">
+          <button type="button" data-action="openCampaign" data-tooltip="Switch to another campaign"><i class="fas fa-right-left"></i> Switch</button>
           <button type="button" data-action="plan"><i class="fas fa-feather-alt"></i> Plan</button>
           <button type="button" data-action="openJournals"><i class="fas fa-book-open"></i> Journals</button>
           ${syncButton(this.sync, { busy: this.#busy })}

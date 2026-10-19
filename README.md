@@ -37,7 +37,7 @@ The Journal sidebar has the Campaign Planner's buttons, for the GM only:
 | **Plan** | Opens the Campaign Planner: Overview, Party, Story, Quests, Cast, Places, Secrets and Sessions, with the Lazy Dungeon Master's eight steps of session prep. Drag monsters, items and roll tables in from your compendiums. |
 | **Run** | Opens the Campaign Dashboard, for the table. Also in the scene controls, under Journal Notes. It opens by itself when the world loads; untick **Open at startup** in its footer to stop that. |
 | **New** | Starts a new campaign, step by step. Your answers are kept as you go. |
-| **Open** | Opens another campaign: one in this world, or one on Dungeon Master Guru when you're connected. |
+| **Switch** | Switches to another campaign: one in this world, or one on Dungeon Master Guru when you're connected. Also at the top of the Campaign Planner and Dashboard. |
 | **?** | How it works. |
 
 ## Connecting to Dungeon Master Guru

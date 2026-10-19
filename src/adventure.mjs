@@ -251,7 +251,7 @@ export function adventureText(campaign) {
     premise && pitch ? `<h3>Pitch for the players</h3><p>${html(pitch)}</p>` : "",
     facts.map(([label, value]) => `<p><strong>${label}:</strong> ${html(value)}</p>`).join(""),
     `<h3>Running it</h3><p>Plan and run it with Dorman Lakely's Campaign Planner. After importing, click
-      <strong>Open</strong> at the top of the Journal sidebar and pick <em>${escapeHtml(campaign.name)}</em>. It lives in
+      <strong>Switch</strong> at the top of the Journal sidebar and pick <em>${escapeHtml(campaign.name)}</em>. It lives in
       the world it's imported into: no Dungeon Master Guru account needed.</p>`,
   ].join("");
   return { caption: caption ? `<p>${html(caption)}</p>` : "", description };

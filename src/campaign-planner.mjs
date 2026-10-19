@@ -283,7 +283,7 @@ Hooks.on("renderJournalDirectory", (_app, html) => {
     <button type="button" data-dlcp="plan" data-tooltip="Plan the campaign"><i class="fas fa-feather-alt"></i> Plan</button>
     <button type="button" data-dlcp="dashboard" data-tooltip="Run it at the table"><i class="fas fa-scroll"></i> Run</button>
     <button type="button" data-dlcp="new" data-tooltip="Start a new campaign"><i class="fas fa-plus"></i> New</button>
-    <button type="button" data-dlcp="open" data-tooltip="Open another campaign"><i class="fas fa-folder-open"></i> Open</button>
+    <button type="button" data-dlcp="open" data-tooltip="Switch to another campaign, in this world or on Dungeon Master Guru"><i class="fas fa-right-left"></i> Switch</button>
     <button type="button" data-dlcp="help" class="dlcp-icon-button" aria-label="Campaign Planner help" data-tooltip="Campaign Planner help">
       <i class="fas fa-circle-question"></i></button>`;
   row.addEventListener("click", (event) => {
