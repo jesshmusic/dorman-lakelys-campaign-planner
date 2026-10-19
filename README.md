@@ -2,6 +2,17 @@
 
 Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at the table from the Campaign Dashboard. No account needed. To plan from anywhere, even with Foundry closed, connect to [Dungeon Master Guru](https://dungeonmaster.guru) and plan there too.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![The Campaign Planner's Overview tab, with the Getting started checklist and the brief](docs/screenshots/planner-overview.png) | ![The Story tab: threats with their clocks and grim portents, and factions](docs/screenshots/planner-story.png) |
+| **Campaign Planner.** The brief and a Getting started checklist. | **Story.** Threats with clocks and grim portents. |
+| ![Session prep: the eight steps, with the strong start, scenes and secrets](docs/screenshots/session-prep.png) | ![The Campaign Dashboard at the table: the session, its log, threat clocks and secrets](docs/screenshots/dashboard.png) |
+| **Session prep.** The eight steps, one card each. | **Campaign Dashboard.** What you need at the table. |
+| ![The New campaign guide's first step: what kind of game](docs/screenshots/new-campaign.png) | ![Giving a quest's reward: who gets the item, coins shared evenly](docs/screenshots/give-reward.png) |
+| **New campaign guide.** Six short steps. | **Give the reward.** Items, coins and XP to the characters. |
+
 ## Two ways to plan
 
 **In your world (free, no account).** Click **New** in the Journal sidebar. A step-by-step guide walks you through what kind of game, the pitch, your table (party, levels, sessions), the world and its truths, and your books, explaining why each step matters. Click **Create in this world**, and you get:
