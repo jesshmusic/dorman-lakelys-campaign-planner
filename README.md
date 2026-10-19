@@ -52,7 +52,6 @@ The compendium index is sent when the GM loads the world, and again whenever a b
 | Setting | What it does |
 |---|---|
 | Connect | Link this world to one of your campaigns, or disconnect. |
-| Dungeon Master Guru address | Leave as is unless you run your own copy of Dungeon Master Guru. |
 | Sync automatically | Pull changes when the world loads and every 2 minutes while the GM is connected. |
 
 ## Development
@@ -62,6 +61,14 @@ The code that doesn't depend on Foundry (`scripts/api.mjs`, `scripts/render.mjs`
 ```bash
 npm test
 ```
+
+To work against a local copy of Dungeon Master Guru, set this in the browser's console and reload. Only a `localhost` address is accepted:
+
+```js
+localStorage.setItem("dorman-lakelys-campaign-planner.devServer", "http://localhost:3000")
+```
+
+Remove it with `localStorage.removeItem("dorman-lakelys-campaign-planner.devServer")` to go back to dungeonmaster.guru. The Connect window says when a local server is in use.
 
 ## License
 

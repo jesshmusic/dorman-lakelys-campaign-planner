@@ -1,4 +1,3 @@
-import { DEFAULT_BASE_URL } from "./api.mjs";
 import { CampaignSync } from "./sync.mjs";
 import { ConnectApp } from "./apps/connect-app.mjs";
 import { DashboardApp } from "./apps/dashboard-app.mjs";
@@ -103,16 +102,6 @@ Hooks.once("init", () => {
     config: false,
     type: Object,
     default: {},
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.baseUrl, {
-    name: "Dungeon Master Guru address",
-    hint: "Leave as is unless you run your own copy of Dungeon Master Guru.",
-    scope: "world",
-    config: true,
-    restricted: true,
-    type: String,
-    default: DEFAULT_BASE_URL,
   });
 
   game.settings.register(MODULE_ID, SETTINGS.autoSync, {

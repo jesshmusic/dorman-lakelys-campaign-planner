@@ -1,4 +1,4 @@
-import { DmGuruApi, DEFAULT_BASE_URL } from "./api.mjs";
+import { DmGuruApi, serverUrl } from "./api.mjs";
 import { escapeHtml, renderRecord } from "./render.mjs";
 import { mergeChange } from "./merge.mjs";
 import { COMPENDIUM_PACKS, INDEX_FIELDS, INDEX_FORMAT, compendiumLookup, entryFromIndex } from "./compendium.mjs";
@@ -113,8 +113,9 @@ export class CampaignSync {
     return game.settings.get(MODULE_ID, SETTINGS.apiToken);
   }
 
+  // dungeonmaster.guru, or a local server while developing (see serverUrl)
   get baseUrl() {
-    return game.settings.get(MODULE_ID, SETTINGS.baseUrl) || DEFAULT_BASE_URL;
+    return serverUrl();
   }
 
   /** True for a campaign that lives only in this world */

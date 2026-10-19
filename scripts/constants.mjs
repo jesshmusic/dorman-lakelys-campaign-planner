@@ -5,7 +5,6 @@ export const SETTINGS = {
   // The DM's personal API token. Client scope: kept in this browser only,
   // because world settings are sent to every player.
   apiToken: "apiToken",
-  baseUrl: "baseUrl",
   // { uuid, name, cursor, lastSynced } for the campaign linked to this world
   campaign: "campaign",
   autoSync: "autoSync",

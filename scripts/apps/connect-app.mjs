@@ -1,3 +1,4 @@
+import { DEFAULT_BASE_URL } from "../api.mjs";
 import { escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
 
@@ -41,6 +42,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
     container.innerHTML = `
       ${this.#error ? `<p class="dlcp-notice dlcp-notice--error">${escapeHtml(this.#error)}</p>` : ""}
       ${linked ? `<p class="dlcp-notice">This world is linked to <strong>${escapeHtml(linked.name)}</strong>.</p>` : ""}
+      ${this.sync.baseUrl === DEFAULT_BASE_URL ? "" : `<p class="dlcp-notice dlcp-notice--warning">Development: using the Dungeon Master Guru at ${baseUrl}.</p>`}
       <p>Create an API token on your <a href="${baseUrl}/app/user-dashboard" target="_blank" rel="noopener">Dungeon Master Guru dashboard</a>
          (Connections → API tokens) and paste it here. It is saved in this browser only.</p>
       <div class="form-group">

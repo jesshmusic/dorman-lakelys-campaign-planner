@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The **Dungeon Master Guru address** setting is gone: the module always connects to dungeonmaster.guru.
 - **Maps:** give a place its Foundry scene, and a session its maps, by dragging scenes from the Scenes directory. They're links in the journals, and the Dashboard can show a map to you or activate it for the players.
 - **NPC actors:** drop an actor (from the world or a compendium) on an NPC for their stat block, or drop one on the Cast tab to add them as a new NPC.
 - **Treasure:** coins and item quantities in session prep. The Dashboard lists them, and items can be dragged onto a character's sheet to hand them out.
