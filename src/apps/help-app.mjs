@@ -69,8 +69,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <ol>
         <li>In the <strong>Journal</strong> sidebar, click <strong>New</strong>.</li>
         <li>Work through the steps: what kind of game, the pitch, the table (your party and their levels), the world and
-          its truths, and your books. Each step explains why it matters, with an example. Your answers are kept as you go,
-          so you can close the window and come back.</li>
+          its truths, and your books. Add the truths one at a time, each a short name and a description, and move or
+          remove them as you like; about six is plenty. Each step explains why it matters, with an example. Your answers
+          are kept as you go, so you can close the window and come back.</li>
         <li>On the last step, click <strong>Create in this world</strong>.</li>
       </ol>
       <p>You get a journal folder named after the campaign, with an entry for each part of it: Overview, Sessions, Cast,
@@ -86,7 +87,8 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
       <h2>Plan it with the Campaign Planner</h2>
       <p>Click <strong>Plan</strong> in the Journal sidebar. The planner has a tab for each part of the campaign:</p>
       <ul>
-        <li><strong>Overview:</strong> the brief, and a Getting started list of what to do next.</li>
+        <li><strong>Overview:</strong> the brief, with the truths of the setting as a numbered list to add to and
+          reorder, and a Getting started list of what to do next.</li>
         <li><strong>Party:</strong> pick the player characters from this world.</li>
         <li><strong>Story:</strong> threats, each with grim portents and a clock, and factions.</li>
         <li><strong>Quests:</strong> main and side quests, who gives them and where. Click <strong>Plan the quest</strong>

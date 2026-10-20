@@ -4,7 +4,7 @@
 // local campaign can be sent to Dungeon Master Guru later. No Foundry
 // globals, so it can be tested in Node.
 
-import { truthsOf } from "./setup.mjs";
+import { linesOf, normalizeTruths } from "./setup.mjs";
 import { ALL_ON, visibleFields } from "./techniques.mjs";
 
 // The starting structures, as Dungeon Master Guru's CampaignTemplate builds them
@@ -158,7 +158,7 @@ export function buildLocalCampaign(draft, { id }) {
     pitch: blankToNull(values.pitch),
     settingName: blankToNull(values.setting_name),
     settingNotes: blankToNull(values.setting_notes),
-    truths: truthsOf(values.truths),
+    truths: normalizeTruths(values.truths),
     mode: MODES[draft.template] ?? "arc",
     template: draft.template,
     status: "planning",
@@ -351,7 +351,7 @@ export function newRecord(collection, values, { id, existing = [] }) {
           name: text("name"),
           goal: text("goal"),
           doom: text("doom"),
-          portents: portentsFrom(truthsOf(values.portents)),
+          portents: portentsFrom(linesOf(values.portents)),
           clockSegments: segments,
         },
         id,
@@ -374,7 +374,7 @@ export function newRecord(collection, values, { id, existing = [] }) {
     case "locations":
       return record(
         collection,
-        { name: text("name"), description: text("description"), features: truthsOf(values.features) },
+        { name: text("name"), description: text("description"), features: linesOf(values.features) },
         id,
       );
     case "factions":

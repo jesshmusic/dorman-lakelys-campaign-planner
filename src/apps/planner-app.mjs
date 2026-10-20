@@ -1,4 +1,6 @@
-import { clockSvg, creditHtml, currencyText, escapeHtml } from "../render.mjs";
+import { clockSvg, creditHtml, currencyText, escapeHtml, truthsHtml } from "../render.mjs";
+import { changeTruthRows, readTruthRows, truthsFieldHtml } from "../truths-editor.mjs";
+import { normalizeTruths } from "../setup.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { NPC_ROLES, newRecord } from "../local.mjs";
 import { prepSteps } from "../techniques.mjs";
@@ -67,9 +69,11 @@ const BRIEF_CREDITS = { pitch: ["pitch"], truths: ["truths"] };
 const contentLink = (uuid, name, icon) =>
   `<a class="content-link" draggable="true" data-uuid="${escapeHtml(uuid)}" data-link><i class="fas fa-${icon}"></i>${escapeHtml(name)}</a>`;
 
-// A form field; `extra` is markup that's already safe, shown under its hint
+// A form field; `extra` is markup that's already safe, shown under its hint.
+// Truths are a list editor, its value the rows.
 const field = (f, value, extra = "") => {
   const id = `dlcp-planner-${f.name}`;
+  if (f.type === "truths") return truthsFieldHtml({ label: f.label, hint: f.hint, rows: value, idPrefix: id, extra });
   const label = `<label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>`;
   const hint = `${f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : ""}${extra}`;
   if (f.type === "textarea" || f.type === "lines") {
@@ -115,6 +119,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       openPage: PlannerApp.#onOpenPage,
       openSheet: PlannerApp.#onOpenSheet,
       saveBrief: PlannerApp.#onSaveBrief,
+      editTruth: PlannerApp.#onEditTruth,
       advanceClock: PlannerApp.#onAdvanceClock,
       windBackClock: PlannerApp.#onWindBackClock,
       togglePortent: PlannerApp.#onTogglePortent,
@@ -320,7 +325,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           <div class="dlcp-grid">${fields.filter((f) => f.type === "text" || f.type === "number")
             .map((f) => field(f, values[f.name]))
             .join("")}</div>
-          ${fields.filter((f) => f.type === "textarea" || f.type === "lines")
+          ${fields.filter((f) => ["textarea", "lines", "truths"].includes(f.type))
             .map((f) => field(f, values[f.name], credit(f)))
             .join("")}
           <div class="dlcp-buttons"><button type="button" data-action="saveBrief"><i class="fas fa-save"></i> Save the brief</button></div>
@@ -328,7 +333,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       : `<section class="dlcp-card">
           ${campaign.premise ? `<h3>Premise</h3><p>${escapeHtml(campaign.premise)}</p>` : ""}
           ${campaign.pitch ? `<h3>Pitch for your players</h3><p>${escapeHtml(campaign.pitch)}</p>${creditHtml(["pitch"], techniques)}` : ""}
-          ${techniques.truths && (campaign.truths ?? []).length ? `<h3>Truths of the setting</h3><ul>${campaign.truths.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>${creditHtml(["truths"], techniques)}` : ""}
+          ${techniques.truths && normalizeTruths(campaign.truths).length ? `<h3>Truths of the setting</h3>${truthsHtml(campaign.truths)}${creditHtml(["truths"], techniques)}` : ""}
         </section>`;
     const send = this.sync.isLocal
       ? `<section class="dlcp-card dlcp-send">
@@ -1168,9 +1173,18 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
   static async #onSaveBrief() {
     const form = this.element.querySelector('[data-form="brief"]');
     const campaign = this.sync.recordLists().campaign[0];
-    const result = applyBrief(campaign, Object.fromEntries(new FormData(form).entries()), this.#techniques);
+    const values = Object.fromEntries(new FormData(form).entries());
+    // The truths editor's inputs have no names; its rows are read in order
+    const truths = form.querySelector("[data-truths-editor]");
+    if (truths) values.truths = readTruthRows(truths);
+    const result = applyBrief(campaign, values, this.#techniques);
     if (result.error) return ui.notifications.warn(result.error);
     if (await this.#save("campaign", result.record)) ui.notifications.info("Saved the brief.");
+  }
+
+  // Adds, moves or removes one of the brief's truths. Saved with the brief.
+  static #onEditTruth(_event, target) {
+    changeTruthRows(target);
   }
 
   static #onAdvanceClock(_event, target) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.0] - 2026-10-20
+
+- **Truths as a list:** each truth of the setting now has a name and a description. Add them one at a time, move or remove them, and see them numbered in the planner, the New campaign guide and the Overview journal page. There's no limit of six any more (about six is still plenty), and truths saved before are kept, each split into a name and a description at its first sentence.
+
 ## [1.0.0]
 
 The first release.

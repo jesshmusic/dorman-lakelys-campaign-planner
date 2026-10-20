@@ -6,7 +6,7 @@
 import { formatCr, PACK_NAMES } from "./compendium.mjs";
 import { NPC_ROLES } from "./local.mjs";
 import { NPC_ROLES as ROLE_LABELS } from "./render.mjs";
-import { MAX_TRUTHS, truthsOf } from "./setup.mjs";
+import { TRUTHS_HINT, linesOf, normalizeTruths, truthRows, truthsError } from "./setup.mjs";
 import { ALL_ON, visibleFields } from "./techniques.mjs";
 
 export const QUEST_STATUSES = ["available", "active", "completed", "failed"];
@@ -192,7 +192,7 @@ export const BRIEF_FIELDS = [
   { name: "cadence", label: "How often you play", type: "text" },
   { name: "premise", label: "Premise", type: "textarea" },
   { name: "pitch", label: "Pitch for your players", type: "textarea" },
-  { name: "truths", label: "Truths of the setting", type: "lines", hint: "Up to six, one per line." },
+  { name: "truths", label: "Truths of the setting", type: "truths", hint: TRUTHS_HINT },
   { name: "settingNotes", label: "Setting notes", type: "textarea" },
 ];
 
@@ -208,11 +208,15 @@ export function editForm(collection, techniques = ALL_ON) {
 /** The brief's fields, without the truths when they're switched off */
 export const briefFields = (techniques = ALL_ON) => visibleFields(BRIEF_FIELDS, techniques);
 
-/** A record's values as form strings. A new record gets each field's default. */
+/**
+ * A record's values as form strings, and truths as the editor's rows. A new
+ * record gets each field's default.
+ */
 export function formValues(fields, record) {
   return Object.fromEntries(
     fields.map((field) => {
       const value = record && field.name in record ? record[field.name] : field.default;
+      if (field.type === "truths") return [field.name, truthRows(value)];
       if (field.name === "portents") return [field.name, (value ?? []).map((p) => p.text).join("\n")];
       if (Array.isArray(value)) return [field.name, value.join("\n")];
       return [field.name, value === null || value === undefined ? "" : String(value)];
@@ -220,8 +224,9 @@ export function formValues(fields, record) {
   );
 }
 
-// Checks and converts form values for these fields. A choice that isn't
-// allowed keeps the record's current value. Returns { values } or { error }.
+// Checks and converts form values for these fields: strings, and truths as
+// the editor's rows. A choice that isn't allowed keeps the record's current
+// value. Returns { values } or { error }.
 function readFields(fields, values, store, current = {}) {
   const out = {};
   for (const field of fields) {
@@ -237,8 +242,14 @@ function readFields(fields, values, store, current = {}) {
         break;
       }
       case "lines":
-        out[field.name] = truthsOf(raw);
+        out[field.name] = linesOf(raw);
         break;
+      case "truths": {
+        const error = truthsError(raw);
+        if (error) return { error };
+        out[field.name] = normalizeTruths(raw);
+        break;
+      }
       case "select":
         out[field.name] = field.options.some(([value]) => value === raw)
           ? raw
@@ -320,9 +331,6 @@ export function applyBrief(campaign, values, techniques = ALL_ON) {
   const read = readFields(briefFields(techniques), values);
   if (read.error) return read;
   const changes = read.values;
-  if (changes.truths && changes.truths.length > MAX_TRUTHS) {
-    return { error: `Keep it to ${MAX_TRUTHS} truths. You have ${changes.truths.length}.` };
-  }
   if (changes.startLevel && changes.targetLevel && changes.targetLevel < changes.startLevel) {
     return { error: "The target level can't be lower than the starting level." };
   }
@@ -419,7 +427,7 @@ export function applySessionPrep(session, values) {
   }
   const title = text(values.title);
   if (title && title.length > MAX_NAME) return { error: `The title can be at most ${MAX_NAME} characters.` };
-  const scenes = truthsOf(values.scenes);
+  const scenes = linesOf(values.scenes);
   if (scenes.length > LIMITS.scenes) return { error: `Up to ${LIMITS.scenes} scenes.` };
   const scheduledOn = text(values.scheduledOn);
   if (scheduledOn && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledOn)) return { error: "Pick a date for the session." };

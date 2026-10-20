@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EDITABLE, changedAttributes, createAttributes, describeFields, linksForSync, uuidV4 } from "../src/editing.mjs";
+import { EDITABLE, changedAttributes, createAttributes, describeFields, linksForSync, syncValue, uuidV4 } from "../src/editing.mjs";
 
 const quest = {
   id: "12",
@@ -83,6 +83,30 @@ test("makes a version 4 UUID without crypto.randomUUID", () => {
 test("sets the version and variant bits whatever the random bytes are", () => {
   assert.equal(uuidV4((bytes) => bytes.fill(0xff)), "ffffffff-ffff-4fff-bfff-ffffffffffff");
   assert.equal(uuidV4((bytes) => bytes.fill(0)), "00000000-0000-4000-8000-000000000000");
+});
+
+test("sends a campaign's truths as names and descriptions", () => {
+  const campaign = { id: "1", uuid: "c1", name: "Zombie Siege", truths: [{ name: "The dead walk", description: "" }] };
+  const truths = [
+    { name: "The dead walk", description: "Even in Hommlet." },
+    { name: "Greyhawk runs on gold.", description: "" },
+  ];
+
+  assert.ok(EDITABLE.campaign.includes("truths"));
+  assert.deepEqual(changedAttributes("campaign", campaign, { ...campaign, truths }), { truths });
+  assert.deepEqual(changedAttributes("campaign", campaign, { ...campaign }), {});
+  assert.deepEqual(createAttributes("campaign", { ...campaign, truths }).truths, truths);
+});
+
+test("truths an older version kept as text are sent as names and descriptions", () => {
+  assert.deepEqual(syncValue("truths", { truths: ["The dead walk. Even here.", "Gold rules"] }), [
+    { name: "The dead walk.", description: "Even here." },
+    { name: "Gold rules", description: "" },
+  ]);
+  assert.equal(syncValue("truths", {}), null);
+  // The same truths kept either way aren't a change
+  const before = { truths: ["The dead walk"] };
+  assert.deepEqual(changedAttributes("campaign", before, { truths: [{ name: "The dead walk", description: "" }] }), {});
 });
 
 test("sends a secret being revealed, and when", () => {

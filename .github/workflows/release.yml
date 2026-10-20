@@ -57,7 +57,8 @@ jobs:
       - name: Extract latest changelog entry
         id: changelog
         run: |
-          CHANGELOG=$(awk '/^## \[/{if(++n==1) flag=1; else flag=0} flag' CHANGELOG.md)
+          # The newest released section; [Unreleased] holds notes for the next release
+          CHANGELOG=$(awk '/^## \[/{ if ($0 ~ /Unreleased/) { flag=0; next } if (++n==1) flag=1; else flag=0 } flag' CHANGELOG.md)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

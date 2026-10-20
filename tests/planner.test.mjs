@@ -168,20 +168,54 @@ test("won't put a quest or place inside itself", () => {
   );
 });
 
-test("saves the campaign brief, with six truths at most", () => {
+test("saves the campaign brief, with its truths as names and descriptions", () => {
   const campaign = { name: "Old", truths: [] };
+  const many = Array.from({ length: 21 }, (_, index) => ({ name: `Truth ${index + 1}`, description: "" }));
 
-  assert.deepEqual(applyBrief(campaign, { name: "Zombie Siege", truths: "1\n2\n3\n4\n5\n6\n7" }), {
-    error: "Keep it to 6 truths. You have 7.",
+  assert.deepEqual(applyBrief(campaign, { name: "Zombie Siege", truths: many }), {
+    error: "Keep it to 20 truths. You have 21.",
+  });
+  assert.deepEqual(applyBrief(campaign, { name: "Zombie Siege", truths: [{ name: "", description: "Who rules?" }] }), {
+    error: "Each truth needs a name. Truth 1 has only a description.",
   });
   assert.deepEqual(applyBrief(campaign, { name: "Z", startLevel: "5", targetLevel: "3" }), {
     error: "The target level can't be lower than the starting level.",
   });
-  const { record } = applyBrief(campaign, { name: " Zombie Siege ", partySize: "4", truths: "The dead walk" });
+  // More than six is fine
+  assert.equal(applyBrief(campaign, { name: "Zombie Siege", truths: many.slice(0, 7) }).record.truths.length, 7);
+  const { record } = applyBrief(campaign, {
+    name: " Zombie Siege ",
+    partySize: "4",
+    truths: [
+      { name: " Greyhawk runs on gold. ", description: "Nearly anything can be bought. " },
+      { name: "", description: "" },
+      { name: "The dead walk", description: "" },
+    ],
+  });
   assert.deepEqual(
     [record.name, record.partySize, record.truths, record.tone],
-    ["Zombie Siege", 4, ["The dead walk"], null],
+    [
+      "Zombie Siege",
+      4,
+      [
+        { name: "Greyhawk runs on gold.", description: "Nearly anything can be bought." },
+        { name: "The dead walk", description: "" },
+      ],
+      null,
+    ],
   );
+});
+
+test("the brief's truths start as the editor's rows, even ones an older version kept as text", () => {
+  const field = briefFields().find((f) => f.name === "truths");
+  assert.equal(field.type, "truths");
+  assert.equal(field.hint, "About six is plenty: short facts everyone at the table knows.");
+
+  assert.deepEqual(formValues([field], { truths: ["The dead walk. Even here.", { name: "Gold rules", description: "" }] }).truths, [
+    { name: "The dead walk.", description: "Even here." },
+    { name: "Gold rules", description: "" },
+  ]);
+  assert.deepEqual(formValues([field], {}).truths, []);
 });
 
 test("saves a session's prep", () => {
@@ -535,9 +569,9 @@ test("the brief leaves out the truths when they're switched off, and keeps them"
   assert.ok(briefFields().some((f) => f.name === "truths"));
   assert.ok(!briefFields(without("truths")).some((f) => f.name === "truths"));
 
-  const campaign = { name: "Old", truths: ["The dead walk"] };
+  const campaign = { name: "Old", truths: [{ name: "The dead walk", description: "" }] };
   const { record } = applyBrief(campaign, { name: "Zombie Siege" }, without("truths"));
-  assert.deepEqual([record.name, record.truths], ["Zombie Siege", ["The dead walk"]]);
+  assert.deepEqual([record.name, record.truths], ["Zombie Siege", [{ name: "The dead walk", description: "" }]]);
   assert.deepEqual(applyBrief(campaign, { name: "Zombie Siege" }).record.truths, []);
 });
 

@@ -8,6 +8,7 @@ import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
+import { normalizeTruths } from "./setup.mjs";
 import { changedAttributes, createAttributes, describeFields, syncValue, uuidV4 } from "./editing.mjs";
 import { pendingCount, pendingUuids, pushPayload, queueCreate, queueDelete, queueUpdate, withRealIds } from "./outbox.mjs";
 import {
@@ -26,6 +27,13 @@ import { MODULE_ID, PUSH_TYPES, SECTIONS, SETTINGS, SYNCED_HOOK, TYPE_COLLECTION
 import { currentTechniques } from "./technique-settings.mjs";
 
 const flag = (document, key) => document.getFlag(MODULE_ID, key);
+
+// A campaign record with its truths as [{ name, description }], however they
+// were kept: older versions of the module and of Dungeon Master Guru kept text
+const withTruths = (campaign) =>
+  campaign && "truths" in campaign ? { ...campaign, truths: normalizeTruths(campaign.truths) } : campaign;
+// A record as the planner, Dashboard and journals use it
+const readable = (collection, record) => (collection === "campaign" ? withTruths(record) : record);
 
 // The cache key of an image Foundry has loaded, or null
 function loadedKey(src) {
@@ -165,7 +173,7 @@ export class CampaignSync {
       for (const page of entry.pages) {
         const collection = flag(page, "collection");
         const record = flag(page, "record");
-        if (collection && record && store[collection]) store[collection].set(String(record.id), record);
+        if (collection && record && store[collection]) store[collection].set(String(record.id), readable(collection, record));
       }
     }
     return store;
@@ -195,7 +203,9 @@ export class CampaignSync {
     const pending = pendingUuids(this.outbox);
     const waiting = (uuid) => pending.updated.has(uuid) || pending.deleted.has(uuid) || pending.created.has(uuid);
     const incomingUuids = new Set();
-    if (changes.campaign && !waiting(changes.campaign.uuid)) store.campaign.set(String(changes.campaign.id), changes.campaign);
+    if (changes.campaign && !waiting(changes.campaign.uuid)) {
+      store.campaign.set(String(changes.campaign.id), withTruths(changes.campaign));
+    }
     for (const [collection, records] of Object.entries(changes.records)) {
       for (const record of records) {
         incomingUuids.add(record.uuid);
@@ -429,7 +439,8 @@ export class CampaignSync {
     await this.#saveRecord(collection, record);
   }
 
-  async #saveRecord(collection, record) {
+  async #saveRecord(collection, saving) {
+    const record = readable(collection, saving);
     const store = this.records();
     store[collection].set(String(record.id), record);
     const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === collection);

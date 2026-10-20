@@ -2,6 +2,8 @@
 // kind of record can send, and what an edit changed. No Foundry globals, so
 // it can be tested in Node.
 
+import { normalizeTruths } from "./setup.mjs";
+
 // The fields Foundry can change on Dungeon Master Guru, as the sync names them
 export const EDITABLE = {
   campaign: [
@@ -82,8 +84,16 @@ export const linksForSync = (links) =>
     quantity: link.quantity ?? null,
   }));
 
-/** A field's value as the sync sends it (links in their short form) */
-export const syncValue = (field, record) => (field === "links" ? linksForSync(record[field]) : (record[field] ?? null));
+/**
+ * A field's value as the sync sends it: links in their short form, and a
+ * campaign's truths as [{ name, description }], even ones an older version
+ * kept as text
+ */
+export function syncValue(field, record) {
+  if (field === "links") return linksForSync(record[field]);
+  if (field === "truths" && record.truths !== null && record.truths !== undefined) return normalizeTruths(record.truths);
+  return record[field] ?? null;
+}
 const value = syncValue;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 

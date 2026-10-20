@@ -41,7 +41,12 @@ test("makes the campaign from the guide's answers", () => {
   const { campaign } = buildLocalCampaign(
     draft(
       "sandbox",
-      { tone: " grim ", truths: "The dead walk\n\nThe temple is corrupt", start_level: "3", target_level: "" },
+      {
+        tone: " grim ",
+        truths: [{ name: "The dead walk ", description: "" }, { name: "", description: "" }, { name: "The temple is corrupt", description: " Its priests feed the dead. " }],
+        start_level: "3",
+        target_level: "",
+      },
       { excludedPacks: ["dnd5e.actors24"], party: ["Actor.akra"] },
     ),
     { id: ids() },
@@ -57,7 +62,10 @@ test("makes the campaign from the guide's answers", () => {
     pitch: null,
     settingName: null,
     settingNotes: null,
-    truths: ["The dead walk", "The temple is corrupt"],
+    truths: [
+      { name: "The dead walk", description: "" },
+      { name: "The temple is corrupt", description: "Its priests feed the dead." },
+    ],
     mode: "sandbox",
     template: "sandbox",
     status: "planning",
@@ -71,6 +79,18 @@ test("makes the campaign from the guide's answers", () => {
     excludedCompendiumPacks: ["dnd5e.actors24"],
     partyActorUuids: ["Actor.akra"],
   });
+});
+
+test("makes the campaign from a draft an older version saved, with its truths as text", () => {
+  const { campaign } = buildLocalCampaign(draft("blank", { truths: "The dead walk. Even here.\n\nThe temple is corrupt" }), {
+    id: ids(),
+  });
+
+  assert.deepEqual(campaign.truths, [
+    { name: "The dead walk.", description: "Even here." },
+    { name: "The temple is corrupt", description: "" },
+  ]);
+  assert.deepEqual(buildLocalCampaign(draft("blank"), { id: ids() }).campaign.truths, []);
 });
 
 test("builds a story arc's sessions, acts and main threat", () => {
