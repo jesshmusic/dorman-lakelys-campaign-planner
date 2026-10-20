@@ -2,6 +2,8 @@
 // (POST /v1/foundry/campaigns/import). No Foundry globals, so it can be
 // tested in Node.
 
+import { normalizeTruths } from "./setup.mjs";
+
 // What gets sent, in the same shapes Dungeon Master Guru sends back. Each
 // record keeps its id, so Dungeon Master Guru can keep the references between
 // them (an NPC's faction, a session's linked secrets) and return the new ids.
@@ -31,7 +33,8 @@ export function importPayload({ campaign, store, world, characters = [] }) {
   );
   return {
     request_id: sendRequestId(campaign),
-    campaign: strip(campaign),
+    // Truths an older version kept as text go as { name, description }, like the rest
+    campaign: { ...strip(campaign), truths: normalizeTruths(campaign.truths) },
     records,
     ...(characters.length ? { party: { world, characters } } : {}),
   };

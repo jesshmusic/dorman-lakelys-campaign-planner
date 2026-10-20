@@ -8,6 +8,7 @@ import {
   escapeHtml,
   referenceLink,
   renderRecord,
+  truthsHtml,
 } from "../src/render.mjs";
 import { ALL_ON } from "../src/techniques.mjs";
 
@@ -356,13 +357,42 @@ test("leaves out a quest's empty sections", () => {
 
 const without = (...keys) => ({ ...ALL_ON, ...Object.fromEntries(keys.map((key) => [key, false])) });
 
-test("shows the truths on the Overview page unless they're switched off", () => {
-  const campaign = { name: "Zombie Siege", pitch: "Survive", truths: ["The dead walk"] };
+test("shows the truths on the Overview page as a numbered list, unless they're switched off", () => {
+  const campaign = {
+    name: "Zombie Siege",
+    pitch: "Survive",
+    truths: [{ name: "The dead walk", description: "Even in Hommlet." }],
+  };
 
-  assert.match(renderRecord("campaign", campaign, context), /Truths of the setting.*The dead walk/);
+  assert.match(
+    renderRecord("campaign", campaign, context),
+    /<h3>Truths of the setting<\/h3><ol class="dlcp-truths"><li><strong>The dead walk<\/strong> Even in Hommlet\.<\/li><\/ol>/,
+  );
   const html = renderRecord("campaign", campaign, { ...context, techniques: without("truths") });
   assert.doesNotMatch(html, /Truths of the setting|The dead walk/);
   assert.match(html, /Survive/);
+});
+
+test("numbers the truths, each name in bold before its description", () => {
+  assert.equal(
+    truthsHtml([
+      { name: "Greyhawk runs on gold.", description: "Nearly anything can be bought." },
+      { name: "The city has walls within walls.", description: "" },
+    ]),
+    '<ol class="dlcp-truths"><li><strong>Greyhawk runs on gold.</strong> Nearly anything can be bought.</li>' +
+      "<li><strong>The city has walls within walls.</strong></li></ol>",
+  );
+  assert.equal(truthsHtml([]), "");
+  assert.equal(truthsHtml(null), "");
+});
+
+test("shows truths an older version kept as text, and escapes them", () => {
+  assert.equal(
+    truthsHtml(["The dead walk. <b>Even</b> here.", { name: "Gold & <i>favors</i>", description: "Line one\nline two" }]),
+    '<ol class="dlcp-truths"><li><strong>The dead walk.</strong> &lt;b&gt;Even&lt;/b&gt; here.</li>' +
+      "<li><strong>Gold &amp; &lt;i&gt;favors&lt;/i&gt;</strong> Line one<br>line two</li></ol>",
+  );
+  assert.match(renderRecord("campaign", { name: "Z", truths: ["The dead walk"] }, context), /<strong>The dead walk<\/strong>/);
 });
 
 test("leaves a threat's clock or portents off its page when they're switched off", () => {

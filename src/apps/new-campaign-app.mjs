@@ -1,4 +1,5 @@
-import { creditHtml, escapeHtml } from "../render.mjs";
+import { creditHtml, escapeHtml, truthsHtml } from "../render.mjs";
+import { changeTruthRows, readTruthRows, truthsFieldHtml } from "../truths-editor.mjs";
 import { PACK_NAMES } from "../compendium.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
 import {
@@ -13,7 +14,6 @@ import {
   stepForField,
   stepsFor,
   toPayload,
-  truthsOf,
   validateAll,
   validateStep,
 } from "../setup.mjs";
@@ -45,6 +45,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       connect: NewCampaignApp.#onConnect,
       openDashboard: NewCampaignApp.#onOpenDashboard,
       openPlanner: NewCampaignApp.#onOpenPlanner,
+      editTruth: NewCampaignApp.#onEditTruth,
     },
   };
 
@@ -208,6 +209,15 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       .map((name) => {
         const field = FIELDS[name];
         const id = `dlcp-setup-${name}`;
+        if (field.type === "truths") {
+          return truthsFieldHtml({
+            label: field.label,
+            hint: field.hint,
+            rows: this.#draft.values[name],
+            idPrefix: id,
+            extra: creditHtml(["truths"], techniques),
+          });
+        }
         const value = escapeHtml(this.#draft.values[name] ?? "");
         const placeholder = field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : "";
         const control =
@@ -220,7 +230,6 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
           <label for="${id}">${escapeHtml(field.label)}${field.required ? " (required)" : ""}</label>
           ${control}
           ${field.hint ? `<p class="hint">${escapeHtml(field.hint)}</p>` : ""}
-          ${name === "truths" ? creditHtml(["truths"], techniques) : ""}
         </div>`;
       })
       .join("");
@@ -308,7 +317,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     const start = text("start_level");
     const target = text("target_level");
     // Truths typed before they were switched off still go with the campaign, but aren't shown
-    const truths = this.#techniques.truths ? truthsOf(values.truths) : [];
+    const truths = this.#techniques.truths ? truthsHtml(values.truths) : "";
     const packs = this.#packChoices();
     const on = packs.filter((pack) => !this.#draft.excludedPacks.includes(pack.id)).length;
     const linked = this.sync.linked;
@@ -333,7 +342,7 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
       ${block(
         "world",
         fact("Setting", text("setting_name")) +
-          (truths.length ? `<ul>${truths.map((truth) => `<li>${escapeHtml(truth)}</li>`).join("")}</ul>` : "") +
+          truths +
           fact("Setting notes", text("setting_notes")) ||
           `<p class="dlcp-muted">Nothing yet. You can add it later.</p>`,
       )}
@@ -408,6 +417,13 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
   // Input ---------------------------------------------------------------------
 
   #onInput(event) {
+    // The truths are kept as rows, blank ones too, in the order they're shown
+    const truths = event.target.closest?.("[data-truths-editor]");
+    if (truths) {
+      this.#draft.values.truths = readTruthRows(truths);
+      this.#saveSoon();
+      return;
+    }
     const field = event.target.dataset?.field;
     if (!field) return;
     this.#draft.values[field] = event.target.value;
@@ -495,6 +511,14 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
     this.#error = null;
     await this.#writeDraft(null);
     return this.render();
+  }
+
+  // Adds, moves or removes a truth. Only the list is drawn again, so focus goes where the DM expects.
+  static #onEditTruth(_event, target) {
+    const rows = changeTruthRows(target);
+    if (!rows) return;
+    this.#draft.values.truths = rows;
+    this.#saveSoon();
   }
 
   static #onConnect() {

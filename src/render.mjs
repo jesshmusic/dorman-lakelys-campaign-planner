@@ -1,6 +1,7 @@
 // Journal page HTML for each kind of Dungeon Master Guru record. No Foundry
 // globals, so it can be tested in Node. Every value from the server is escaped.
 
+import { normalizeTruths } from "./setup.mjs";
 import { ALL_ON, creditsFor, prepSteps } from "./techniques.mjs";
 
 export function escapeHtml(value) {
@@ -20,6 +21,19 @@ const para = (value) => (value ? `<p>${text(value)}</p>` : "");
 const list = (items) =>
   items && items.length ? `<ul>${items.map((item) => `<li>${text(item)}</li>`).join("")}</ul>` : "";
 const fact = (label, value) => (value ? `<p><strong>${escapeHtml(label)}:</strong> ${text(value)}</p>` : "");
+
+/**
+ * A campaign's truths as a numbered list, each name in bold before its
+ * description. Empty when there are none. Takes truths kept by older
+ * versions too (see normalizeTruths).
+ */
+export function truthsHtml(truths) {
+  const items = normalizeTruths(truths).map(({ name, description }) => {
+    const parts = [name ? `<strong>${text(name)}</strong>` : "", description ? text(description) : ""];
+    return `<li>${parts.filter(Boolean).join(" ")}</li>`;
+  });
+  return items.length ? `<ol class="dlcp-truths">${items.join("")}</ol>` : "";
+}
 
 export const NPC_ROLES = {
   bbeg: "BBEG",
@@ -165,7 +179,7 @@ const RENDERERS = {
       ),
       section("Premise", para(c.premise)),
       section("Pitch for the players", para(c.pitch)),
-      techniques.truths ? section("Truths of the setting", list(c.truths)) : "",
+      techniques.truths ? section("Truths of the setting", truthsHtml(c.truths)) : "",
       section("Setting notes", para(c.settingNotes)),
     ].join(""),
 

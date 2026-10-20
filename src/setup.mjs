@@ -8,7 +8,12 @@
 
 import { ALL_ON, visibleFields } from "./techniques.mjs";
 
-export const MAX_TRUTHS = 6;
+// A campaign's truths, as Dungeon Master Guru checks them: at most this many,
+// each with a name and an optional description of at most these lengths
+export const MAX_TRUTHS = 20;
+export const MAX_TRUTH_NAME = 120;
+export const MAX_TRUTH_DESCRIPTION = 1000;
+export const TRUTHS_HINT = "About six is plenty: short facts everyone at the table knows.";
 
 export const TEMPLATES = [
   {
@@ -57,11 +62,7 @@ export const FIELDS = {
   },
   cadence: { label: "How often you play", type: "text", placeholder: "e.g. weekly" },
   setting_name: { label: "Setting", type: "text", placeholder: "e.g. Greyhawk, Eberron, or your own world" },
-  truths: {
-    label: "Truths of the setting",
-    hint: "Up to six facts everyone at the table knows, one per line",
-    type: "lines",
-  },
+  truths: { label: "Truths of the setting", hint: TRUTHS_HINT, type: "truths" },
   setting_notes: { label: "Setting notes", type: "textarea" },
 };
 
@@ -203,18 +204,86 @@ export function defaultDraft() {
   };
 }
 
-export const truthsOf = (text) =>
+/** Text with one item per line, as a list: " One \n\nTwo" -> ["One", "Two"] */
+export const linesOf = (text) =>
   String(text ?? "")
     .split("\n")
-    .map((truth) => truth.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
+
+const trimmed = (value) => (value === null || value === undefined ? "" : String(value).trim());
+
+// A sentence end with more text after it: ". ", "! " or "? "
+const SENTENCE_END = /^([\s\S]+?[.!?])\s+(\S[\s\S]*)$/;
+
+// A truth an older version kept as one line of text: its first sentence is the name, the rest the description
+function truthFromText(value) {
+  const line = trimmed(value);
+  const match = line.match(SENTENCE_END);
+  return match ? { name: match[1].trim(), description: match[2].trim() } : { name: line, description: "" };
+}
+
+/**
+ * A campaign's truths as [{ name, description }], in order, from wherever
+ * they're kept: that list, or what older versions kept, a line of text per
+ * truth (in a string, or a list of strings, or mixed with truths). A line's
+ * first sentence becomes its name and the rest its description; a line with
+ * one sentence is all name. Trimmed, without truths that have neither.
+ * @param {unknown} value
+ * @returns {{ name: string, description: string }[]}
+ */
+export function normalizeTruths(value) {
+  const items = typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+  return items
+    .flatMap((item) => {
+      if (typeof item === "string") return item.split("\n").map(truthFromText);
+      if (item && typeof item === "object") return [{ name: trimmed(item.name), description: trimmed(item.description) }];
+      return [];
+    })
+    .filter((truth) => truth.name || truth.description);
+}
+
+/**
+ * The rows of a truths editor: like normalizeTruths, but rows the GM is
+ * still filling in stay as they are, blank ones too.
+ */
+export function truthRows(value) {
+  if (!Array.isArray(value)) return normalizeTruths(value);
+  return value.flatMap((item) =>
+    item && typeof item === "object"
+      ? [{ name: String(item.name ?? ""), description: String(item.description ?? "") }]
+      : normalizeTruths([item]),
+  );
+}
+
+/**
+ * Why these truths can't be saved, or null: the checks Dungeon Master Guru
+ * makes. Blank rows don't count; the others are numbered as the editor shows them.
+ */
+export function truthsError(value) {
+  const rows = truthRows(value).map((row, index) => ({
+    number: index + 1,
+    name: row.name.trim(),
+    description: row.description.trim(),
+  }));
+  const truths = rows.filter((row) => row.name || row.description);
+  if (truths.length > MAX_TRUTHS) return `Keep it to ${MAX_TRUTHS} truths. You have ${truths.length}.`;
+  for (const { number, name, description } of truths) {
+    if (!name) return `Each truth needs a name. Truth ${number} has only a description.`;
+    if (name.length > MAX_TRUTH_NAME) return `The name of truth ${number} can be at most ${MAX_TRUTH_NAME} characters.`;
+    if (description.length > MAX_TRUTH_DESCRIPTION) {
+      return `The description of truth ${number} can be at most ${MAX_TRUTH_DESCRIPTION.toLocaleString("en")} characters.`;
+    }
+  }
+  return null;
+}
 
 const text = (values, name) => String(values?.[name] ?? "").trim();
 
 /**
  * Why the DM can't leave a step yet, or null when they can.
  * @param {string} stepId
- * @param {Record<string, string>} values
+ * @param {Record<string, string>} values the answers; truths are rows of { name, description }
  * @param {object} techniques the ones this world uses. Truths typed before
  *   they were switched off still go with the campaign, so they're still checked.
  */
@@ -237,10 +306,10 @@ export function validateStep(stepId, values, techniques = ALL_ON) {
     }
   }
   if (stepId === "world") {
-    const count = truthsOf(values?.truths).length;
-    if (count > MAX_TRUTHS) {
+    const error = truthsError(values?.truths);
+    if (error) {
       const hidden = techniques.truths ? "" : " Turn the six truths back on in Module Settings to change them.";
-      return `Keep it to ${MAX_TRUTHS} truths. You have ${count}.${hidden}`;
+      return `${error}${hidden}`;
     }
   }
   return null;
@@ -272,9 +341,12 @@ export function stepForField(field) {
 export function toPayload(draft, { world, characters = [], requestId }) {
   const campaign = {};
   for (const [name, field] of Object.entries(FIELDS)) {
+    if (field.type === "truths") {
+      campaign[name] = normalizeTruths(draft.values?.[name]);
+      continue;
+    }
     const value = text(draft.values, name);
-    if (field.type === "lines") campaign[name] = truthsOf(value);
-    else if (field.type === "number") campaign[name] = value === "" ? null : Number(value);
+    if (field.type === "number") campaign[name] = value === "" ? null : Number(value);
     else campaign[name] = value === "" ? null : value;
   }
   campaign.excluded_compendium_packs = [...draft.excludedPacks];
@@ -296,12 +368,15 @@ export function normalizeDraft(saved, actorUuids) {
   const fresh = defaultDraft();
   if (!saved || typeof saved !== "object" || saved.version !== DRAFT_VERSION) return fresh;
   const step = Math.min(Math.max(Number(saved.step) || 0, 0), LAST_STEP);
+  const values = { ...fresh.values, ...(saved.values && typeof saved.values === "object" ? saved.values : {}) };
+  // Older drafts kept the truths as text, one per line
+  if ("truths" in values) values.truths = truthRows(values.truths);
   return {
     ...fresh,
     step,
     furthest: Math.min(Math.max(Number(saved.furthest) || step, step), LAST_STEP),
     template: TEMPLATES.some((option) => option.value === saved.template) ? saved.template : fresh.template,
-    values: { ...fresh.values, ...(saved.values && typeof saved.values === "object" ? saved.values : {}) },
+    values,
     party: Array.isArray(saved.party) ? saved.party.filter((uuid) => actorUuids.includes(uuid)) : [],
     excludedPacks: Array.isArray(saved.excludedPacks)
       ? saved.excludedPacks.filter((pack) => typeof pack === "string")

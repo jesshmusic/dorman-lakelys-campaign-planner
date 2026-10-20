@@ -5,6 +5,8 @@ import {
   FIELDS,
   LAST_STEP,
   MAX_TRUTHS,
+  MAX_TRUTH_DESCRIPTION,
+  MAX_TRUTH_NAME,
   STEPS,
   TEMPLATES,
   defaultDraft,
@@ -12,7 +14,10 @@ import {
   normalizeDraft,
   stepForField,
   toPayload,
-  truthsOf,
+  linesOf,
+  normalizeTruths,
+  truthRows,
+  truthsError,
   validateAll,
   validateStep,
   withWords,
@@ -70,12 +75,115 @@ test("checks the table's numbers", () => {
   assert.equal(validateStep("table", { party_size: "", start_level: "3", target_level: "8" }), null);
 });
 
-test("keeps the truths to six", () => {
-  assert.equal(MAX_TRUTHS, 6);
-  const seven = ["1", "2", "3", "4", "5", "6", "7"].join("\n");
-  assert.equal(validateStep("world", { truths: seven }), "Keep it to 6 truths. You have 7.");
+const truth = (name, description = "") => ({ name, description });
+// Truths as the editor holds them: n of them, each with a name
+const truths = (n) => Array.from({ length: n }, (_, index) => truth(`Truth ${index + 1}`));
+
+test("reads truths as names and descriptions", () => {
+  assert.deepEqual(
+    normalizeTruths([
+      { name: " Greyhawk runs on gold. ", description: " Nearly anything can be bought. " },
+      { name: "The city has walls within walls.", description: null },
+      { name: "The dead walk." },
+    ]),
+    [
+      truth("Greyhawk runs on gold.", "Nearly anything can be bought."),
+      truth("The city has walls within walls."),
+      truth("The dead walk."),
+    ],
+  );
+});
+
+test("reads a truth an older version kept as text: the first sentence is its name", () => {
+  assert.deepEqual(
+    normalizeTruths([
+      "Greyhawk runs on gold. The Directing Oligarchy governs the Free City. Nearly anything can be bought.",
+      "Beware the Old City! Its gates shut at dusk.",
+      "Who rules the Free City? The Directing Oligarchy, in name.",
+      "The dead do not rest easy in the Flanaess.",
+      "Hommlet’s walls were built for bandits, not armies",
+    ]),
+    [
+      truth("Greyhawk runs on gold.", "The Directing Oligarchy governs the Free City. Nearly anything can be bought."),
+      truth("Beware the Old City!", "Its gates shut at dusk."),
+      truth("Who rules the Free City?", "The Directing Oligarchy, in name."),
+      truth("The dead do not rest easy in the Flanaess."),
+      truth("Hommlet’s walls were built for bandits, not armies"),
+    ],
+  );
+  // Punctuation with no space after it isn't the end of a sentence
+  assert.deepEqual(normalizeTruths(["The ward costs 2.5 gp...or a favor. Ask Ostler."]), [
+    truth("The ward costs 2.5 gp...or a favor.", "Ask Ostler."),
+  ]);
+});
+
+test("reads truths kept as lines of text, and lists that mix text and truths", () => {
+  assert.deepEqual(normalizeTruths(" The dead walk. Even here. \n\n  \nThe temple is corrupt\n"), [
+    truth("The dead walk.", "Even here."),
+    truth("The temple is corrupt"),
+  ]);
+  assert.deepEqual(normalizeTruths(["The dead walk", { name: "The temple is corrupt", description: "Its priests feed the dead." }, "  "]), [
+    truth("The dead walk"),
+    truth("The temple is corrupt", "Its priests feed the dead."),
+  ]);
+});
+
+test("reads missing truths as none, and leaves out blank ones", () => {
+  for (const value of [null, undefined, "", "  \n ", [], 42, { name: "Not a list" }]) {
+    assert.deepEqual(normalizeTruths(value), [], String(value));
+  }
+  assert.deepEqual(normalizeTruths([null, 7, { name: " ", description: "" }, {}]), []);
+  // A description with no name is kept, for the check to point out
+  assert.deepEqual(normalizeTruths([{ name: "", description: "No name" }]), [truth("", "No name")]);
+});
+
+test("the editor keeps rows the GM is still filling in", () => {
+  const rows = [truth(""), truth("The dead walk ", "Even here"), truth("", " ")];
+
+  assert.deepEqual(truthRows(rows), rows);
+  assert.deepEqual(truthRows([{ name: "A" }, "B. More.", null]), [truth("A"), truth("B.", "More.")]);
+  assert.deepEqual(truthRows("One\n\nTwo"), [truth("One"), truth("Two")]);
+  assert.deepEqual(truthRows(undefined), []);
+});
+
+test("checks the truths as Dungeon Master Guru does", () => {
+  assert.equal(MAX_TRUTHS, 20);
+  assert.equal(truthsError(truths(20)), null);
+  assert.equal(truthsError(truths(21)), "Keep it to 20 truths. You have 21.");
+  // Blank rows don't count, and aren't checked
+  assert.equal(truthsError([...truths(20), truth(""), truth("  ", " ")]), null);
+  assert.equal(truthsError([]), null);
+  assert.equal(truthsError(null), null);
+
+  // Numbered as the editor shows them, blank rows too
+  assert.equal(
+    truthsError([truth("The dead walk"), truth(""), truth("", "A description")]),
+    "Each truth needs a name. Truth 3 has only a description.",
+  );
+  assert.equal(truthsError([truth("x".repeat(MAX_TRUTH_NAME))]), null);
+  assert.equal(
+    truthsError([truth("ok"), truth(` ${"x".repeat(MAX_TRUTH_NAME + 1)} `)]),
+    "The name of truth 2 can be at most 120 characters.",
+  );
+  assert.equal(truthsError([truth("ok", "x".repeat(MAX_TRUTH_DESCRIPTION))]), null);
+  assert.equal(
+    truthsError([truth("ok", "x".repeat(MAX_TRUTH_DESCRIPTION + 1))]),
+    "The description of truth 1 can be at most 1,000 characters.",
+  );
+});
+
+test("there's no limit of six truths any more, and the World step checks them", () => {
+  assert.equal(validateStep("world", { truths: truths(7) }), null);
+  assert.equal(validateStep("world", { truths: truths(21) }), "Keep it to 20 truths. You have 21.");
+  assert.equal(validateStep("world", { truths: [truth("", "A description")] }), "Each truth needs a name. Truth 1 has only a description.");
   assert.equal(validateStep("world", { truths: "One\n\n  \nTwo" }), null);
-  assert.deepEqual(truthsOf(" One \n\nTwo\n"), ["One", "Two"]);
+  assert.equal(validateStep("world", {}), null);
+  assert.equal(FIELDS.truths.hint, "About six is plenty: short facts everyone at the table knows.");
+});
+
+test("splits text into lines", () => {
+  assert.deepEqual(linesOf(" One \n\nTwo\n"), ["One", "Two"]);
+  assert.deepEqual(linesOf(null), []);
 });
 
 test("finds the first step that isn't ready", () => {
@@ -101,7 +209,7 @@ test("builds the create request", () => {
       party_size: "4",
       start_level: "3",
       target_level: "",
-      truths: "The dead walk\n\nThe temple is corrupt",
+      truths: [truth(" The dead walk "), truth("", ""), truth("The temple is corrupt", "Its priests feed the dead.")],
       tone: "",
     },
     excludedPacks: ["dnd5e.actors24"],
@@ -122,7 +230,7 @@ test("builds the create request", () => {
       planned_sessions: null,
       cadence: null,
       setting_name: null,
-      truths: ["The dead walk", "The temple is corrupt"],
+      truths: [truth("The dead walk"), truth("The temple is corrupt", "Its priests feed the dead.")],
       setting_notes: null,
       excluded_compendium_packs: ["dnd5e.actors24"],
     },
@@ -152,6 +260,27 @@ test("picks a saved draft up safely", () => {
   assert.deepEqual(draft.party, ["Actor.kept"]);
   assert.deepEqual(draft.excludedPacks, ["dnd5e.actors24"]);
   assert.equal(draft.partySizeEdited, true);
+});
+
+test("builds the create request from a draft an older version saved", () => {
+  const draft = normalizeDraft(
+    { ...defaultDraft(), values: { name: "Zombie Siege", truths: "The dead walk. Even here.\n\nThe temple is corrupt" } },
+    [],
+  );
+
+  assert.deepEqual(draft.values.truths, [truth("The dead walk.", "Even here."), truth("The temple is corrupt")]);
+  assert.deepEqual(toPayload(draft, { world: { id: "w", title: "W" }, requestId: "r" }).campaign.truths, draft.values.truths);
+  assert.deepEqual(toPayload(defaultDraft(), { world: { id: "w", title: "W" }, requestId: "r" }).campaign.truths, []);
+});
+
+test("a saved draft keeps the truths rows the GM was filling in", () => {
+  const rows = [truth("The dead walk"), truth("", "")];
+
+  assert.deepEqual(normalizeDraft({ ...defaultDraft(), values: { truths: rows } }, []).values.truths, rows);
+  assert.deepEqual(normalizeDraft({ ...defaultDraft(), values: { truths: ["A. B.", "C"] } }, []).values.truths, [
+    truth("A.", "B."),
+    truth("C"),
+  ]);
 });
 
 test("starts fresh from a missing or older draft", () => {
@@ -220,10 +349,8 @@ test("the World step doesn't ask for truths when they're switched off", () => {
 });
 
 test("truths typed before they were switched off are still checked, with a way to change them", () => {
-  const seven = ["1", "2", "3", "4", "5", "6", "7"].join("\n");
-
-  assert.match(validateStep("world", { truths: seven }, withoutTruths), /You have 7\. Turn the six truths back on/);
-  assert.equal(validateAll({ name: "Zombie Siege", truths: seven }, withoutTruths).step, stepForField("truths"));
+  assert.match(validateStep("world", { truths: truths(21) }, withoutTruths), /You have 21\. Turn the six truths back on/);
+  assert.equal(validateAll({ name: "Zombie Siege", truths: truths(21) }, withoutTruths).step, stepForField("truths"));
   assert.equal(validateStep("world", { truths: "One" }, withoutTruths), null);
 });
 

@@ -60,6 +60,17 @@ test("uses one request id per campaign, so sending again doesn't make a second c
   assert.match(sendRequestId(campaign), /^[\w-]{8,64}$/);
 });
 
+test("sends the truths as names and descriptions, even ones an older version kept as text", () => {
+  const { campaign, store } = local();
+
+  assert.deepEqual(importPayload({ campaign, store, world }).campaign.truths, []);
+  const old = { ...campaign, truths: ["Greyhawk runs on gold. Nearly anything can be bought.", "The dead walk"] };
+  assert.deepEqual(importPayload({ campaign: old, store, world }).campaign.truths, [
+    { name: "Greyhawk runs on gold.", description: "Nearly anything can be bought." },
+    { name: "The dead walk", description: "" },
+  ]);
+});
+
 test("needs a campaign name", () => {
   assert.throws(() => importPayload({ campaign: { name: "" }, store: {}, world }), /needs a name/);
 });

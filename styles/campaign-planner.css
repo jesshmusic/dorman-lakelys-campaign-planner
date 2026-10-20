@@ -187,6 +187,104 @@
   width: auto;
 }
 
+/* For screen readers only: a label the layout already makes clear */
+.dlcp-visually-hidden {
+  border: 0;
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* Truths of the setting: a numbered list, and the editor that builds it */
+.dlcp-truths {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.dlcp-truths li {
+  margin-bottom: 0.25rem;
+}
+
+.dlcp-truths-field {
+  border: none;
+  margin: 0.5rem 0 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.dlcp-truths-field legend {
+  padding: 0;
+}
+
+.dlcp-truths-field .hint {
+  margin: 0 0 0.35rem;
+}
+
+.dlcp-truths-editor {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dlcp-truth-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.dlcp-truth-row {
+  align-items: flex-start;
+  border-left: 3px solid var(--color-border-light-tertiary, #b5b3a4);
+  display: flex;
+  gap: 0.4rem;
+  padding-left: 0.4rem;
+}
+
+.dlcp-truth-row:focus-within {
+  border-left-color: #972c1d;
+}
+
+.dlcp-truth-number {
+  flex: 0 0 1.5rem;
+  font-weight: bold;
+  line-height: var(--input-height, 1.75rem);
+  text-align: right;
+}
+
+.dlcp-truth-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.dlcp-truth-fields input,
+.dlcp-truth-fields textarea {
+  width: 100%;
+}
+
+.dlcp-truth-fields textarea {
+  min-height: 2.75rem;
+  resize: vertical;
+}
+
+.dlcp-truth-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.15rem;
+}
+
 /* New campaign guide */
 
 .dlcp-setup-body {
