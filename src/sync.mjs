@@ -12,7 +12,6 @@ import { encounterSort, planQuestEncounters, questSort } from "./encounters.mjs"
 import { SRD_TABLES, systemTables } from "./difficulty.mjs";
 import {
   MONSTER_FOLDER,
-  WORLD_ACTORS,
   chosenSources,
   droppedSources,
   homebrewOptions,
@@ -20,6 +19,7 @@ import {
   importedActorUuid,
   monsterActorData,
   worldActorEntries,
+  worldActorsSource,
 } from "./homebrew.mjs";
 import { normalizeTruths } from "./setup.mjs";
 import { changedAttributes, createAttributes, describeFields, syncValue, uuidV4 } from "./editing.mjs";
@@ -533,6 +533,7 @@ export class CampaignSync {
   homebrewOptions() {
     return homebrewOptions(
       game.packs.contents.map((pack) => ({ id: pack.collection, label: pack.title, documentName: pack.documentName })),
+      { id: game.world.id, title: game.world.title },
     );
   }
 
@@ -582,7 +583,9 @@ export class CampaignSync {
 
   // A homebrew source's monsters as index entries, or null when it isn't in this world
   async #homebrewEntries(id) {
-    if (id === WORLD_ACTORS.id) return worldActorEntries(game.actors.contents);
+    // This world's actors; another world's (in a copied world, say) aren't here
+    const world = worldActorsSource({ id: game.world.id, title: game.world.title });
+    if (id === world.id) return worldActorEntries(game.actors.contents, id);
     const pack = game.packs.get(id);
     if (!pack || pack.documentName !== "Actor") return null;
     const index = await pack.getIndex({ fields: INDEX_FIELDS });

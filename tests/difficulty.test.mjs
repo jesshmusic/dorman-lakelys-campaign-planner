@@ -73,6 +73,7 @@ test("an encounter's monsters with their CR and how many", () => {
       link("Monster", "m1", { name: "Zombie", detail: "CR 1/4" }),
       link("Monster", "m2", { name: "Bandit", challengeRating: "1/8", quantity: 3 }),
       link("Monster", "m3", { name: "Mystery" }),
+      link("Monster", "m4", { name: "Ogre", challengeRating: "2", detail: "CR 1/4" }),
       link("CampaignReference", "r4"),
       link("CampaignNpc", "n1"),
     ],
@@ -83,6 +84,8 @@ test("an encounter's monsters with their CR and how many", () => {
     { name: "Zombie", cr: 0.25, quantity: 1 },
     { name: "Bandit", cr: 0.125, quantity: 3 },
     { name: "Mystery", cr: null, quantity: 1 },
+    // The CR the website sends with the link wins over the one in its detail
+    { name: "Ogre", cr: 2, quantity: 1 },
   ]);
 });
 
@@ -96,10 +99,11 @@ test("measures against the campaign's party, at the quest's level or the startin
   assert.deepEqual(partyFor({ partySize: 6, local: true, partyActorUuids: ["a"] }), { size: 6, level: null });
 });
 
-test("names the difficulty band, from Trivial to Over High", () => {
+test("names the difficulty band: each budget is the most XP for its difficulty", () => {
   const budget = { low: 600, moderate: 900, high: 1600 };
 
-  assert.equal(band(599, budget), "Trivial");
+  assert.equal(band(0, budget), "Low");
+  assert.equal(band(599, budget), "Low");
   assert.equal(band(600, budget), "Low");
   assert.equal(band(601, budget), "Moderate");
   assert.equal(band(900, budget), "Moderate");
@@ -160,4 +164,13 @@ test("shows big numbers with thousands separators", () => {
   const text = difficultyText(encounterDifficulty(encounter, { campaign: { partySize: 5, startLevel: 15 } }));
 
   assert.equal(text, "Over High: 50,000 XP (budget for 5 level-15 characters: Low 16,500 · Moderate 27,000 · High 39,000).");
+});
+
+test("an encounter over the Moderate budget is High", () => {
+  const encounter = { kind: "combat", links: [link("CampaignReference", "r1", { quantity: 5 }), link("CampaignReference", "r2")] };
+
+  assert.equal(
+    difficultyText(encounterDifficulty(encounter, { references, campaign })),
+    "High: 1,050 XP (budget for 4 level-3 characters: Low 600 · Moderate 900 · High 1,600).",
+  );
 });

@@ -3,6 +3,7 @@ import { nextPoll, timeLeft } from "../link.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import { escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS } from "../constants.mjs";
+import { isWorldActors } from "../homebrew.mjs";
 
 /**
  * Connects to Dungeon Master Guru and links this world to a campaign. To
@@ -185,7 +186,7 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
       .homebrewOptions()
       .map(
         (option) => `<label class="dlcp-check"><input type="checkbox" data-homebrew value="${escapeHtml(option.id)}" ${chosen.has(option.id) ? "checked" : ""} ${this.#busy ? "disabled" : ""}>
-          ${escapeHtml(option.label)}${option.id === "world.actors" ? ` <span class="dlcp-muted">(this world's NPC actors)</span>` : ""}</label>`,
+          ${escapeHtml(option.label)}${isWorldActors(option.id) ? ` <span class="dlcp-muted">(its NPC actors)</span>` : ""}</label>`,
       )
       .join("");
     return `

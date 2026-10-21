@@ -9,24 +9,35 @@ import { COMPENDIUM_PACKS, INDEX_FORMAT, entryFromIndex } from "./compendium.mjs
 import { MODULE_ID } from "./constants.mjs";
 import { hash } from "./scenes.mjs";
 
-/** The world's own NPC actors, as a homebrew source */
-export const WORLD_ACTORS = { id: "world.actors", label: "World actors" };
+/**
+ * This world's own NPC actors, as a homebrew source. Dungeon Master Guru
+ * keeps one index for all of a DM's worlds, so the pack is named for the world.
+ * @param {{ id: string, title?: string }} world
+ */
+export const worldActorsSource = (world) => ({
+  id: `world-actors.${world?.id ?? "world"}`,
+  label: `World actors (${world?.title || world?.id || "this world"})`,
+});
+
+/** True for a world's actors as a homebrew source: "world-actors.<world id>" */
+export const isWorldActors = (id) => String(id ?? "").startsWith("world-actors.");
 
 /** The Actor folder that monsters imported from Dungeon Master Guru go in */
 export const MONSTER_FOLDER = "Dungeon Master Guru";
 
 /**
- * The homebrew sources a GM can choose: World actors, then each Actor
+ * The homebrew sources a GM can choose: this world's actors, then each Actor
  * compendium the index doesn't already have, by name.
  * @param {{ id: string, label: string, documentName: string }[]} packs the world's compendiums
+ * @param {{ id: string, title?: string }} world
  * @returns {{ id: string, label: string }[]}
  */
-export function homebrewOptions(packs = []) {
+export function homebrewOptions(packs = [], world = {}) {
   const extra = packs
-    .filter((pack) => pack.documentName === "Actor" && !COMPENDIUM_PACKS.includes(pack.id) && pack.id !== WORLD_ACTORS.id)
+    .filter((pack) => pack.documentName === "Actor" && !COMPENDIUM_PACKS.includes(pack.id) && !isWorldActors(pack.id))
     .map((pack) => ({ id: pack.id, label: String(pack.label || pack.id) }))
     .sort((a, b) => a.label.localeCompare(b.label));
-  return [WORLD_ACTORS, ...extra];
+  return [worldActorsSource(world), ...extra];
 }
 
 /** The sources chosen, as the setting keeps them: ids, once each */
@@ -43,11 +54,12 @@ export const droppedSources = (before, after) => {
  * CR and creature type. Player characters stay out, and so do monsters
  * imported from Dungeon Master Guru, which it has already.
  * @param {{ uuid: string, name: string, type: string, system?: object, flags?: object }[]} actors
+ * @param {string} [packId] the world's source id (see worldActorsSource)
  */
-export function worldActorEntries(actors = []) {
+export function worldActorEntries(actors = [], packId = "world-actors") {
   return actors
     .filter((actor) => actor.type === "npc" && !actor.flags?.[MODULE_ID]?.monsterId)
-    .map((actor) => entryFromIndex(WORLD_ACTORS.id, "Actor", actor))
+    .map((actor) => entryFromIndex(packId, "Actor", actor))
     .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name));
 }

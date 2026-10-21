@@ -215,18 +215,18 @@ test("polls for the token, with the reason it isn't ready as the error code", as
 });
 
 test("sends a homebrew pack's index with its name", async () => {
-  const { calls, fetchImpl } = fakeFetch([{ body: { pack: "world.actors", count: 1, skipped: 0 } }]);
+  const { calls, fetchImpl } = fakeFetch([{ body: { pack: "world-actors.green-sky", count: 1, skipped: 0 } }]);
   const api = new DmGuruApi({ token: "t", fetchImpl });
   const entries = [{ uuid: "Actor.aa0000000000000", name: "Ash Wraith", category: "monster", challengeRating: "1/2", detail: null }];
 
-  await api.sendCompendiumPack("world.actors", "homebrew-abc+2", entries, { homebrew: true, label: "World actors" });
+  await api.sendCompendiumPack("world-actors.green-sky", "homebrew-abc+2", entries, { homebrew: true, label: "World actors (Night of the Green Sky)" });
 
   assert.deepEqual(JSON.parse(calls[0].init.body), {
-    pack: "world.actors",
+    pack: "world-actors.green-sky",
     version: "homebrew-abc+2",
     entries,
     homebrew: true,
-    label: "World actors",
+    label: "World actors (Night of the Green Sky)",
   });
 });
 

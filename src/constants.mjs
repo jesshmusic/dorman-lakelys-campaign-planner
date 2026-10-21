@@ -24,7 +24,7 @@ export const SETTINGS = {
   useSecrets: "useSecrets",
   useThreeClueRule: "useThreeClueRule",
   useGettingStarted: "useGettingStarted",
-  // The homebrew monster sources whose index goes to Dungeon Master Guru: "world.actors" and Actor
+  // The homebrew monster sources whose index goes to Dungeon Master Guru: "world-actors.<world id>" and Actor
   // compendium ids (see homebrew.mjs). World scope, GM only.
   homebrewSources: "homebrewSources",
 };

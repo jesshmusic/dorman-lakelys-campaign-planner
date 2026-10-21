@@ -114,7 +114,8 @@ export function crValue(cr) {
 /**
  * An encounter's monsters with their CR and how many: from a book
  * reference's challenge rating (an actor dropped in keeps the CR it had),
- * or the CR a Dungeon Master Guru monster's link carries.
+ * or the CR a Dungeon Master Guru monster's link carries (its
+ * challengeRating, or else the "CR 1/4" in its detail).
  * @returns {{ name: string, cr: number|null, quantity: number }[]}
  */
 export function monstersWithCr(encounter, references) {
@@ -142,13 +143,12 @@ export function partyFor(campaign, quest) {
 }
 
 /**
- * The difficulty band for some XP against a party's budget:
- * under Low "Trivial", up to Low "Low", up to Moderate "Moderate", up to
- * High "High", and above it "Over High".
+ * The difficulty band for some XP against a party's budget. Each 2024 budget
+ * is the most XP for that difficulty: up to Low is "Low", up to Moderate
+ * "Moderate", up to High "High", and above it "Over High".
  * @param {{ low: number, moderate: number, high: number }} budget
  */
 export function band(xp, { low, moderate, high }) {
-  if (xp < low) return "Trivial";
   if (xp <= low) return "Low";
   if (xp <= moderate) return "Moderate";
   if (xp <= high) return "High";

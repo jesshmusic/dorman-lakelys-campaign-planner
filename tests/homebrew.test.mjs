@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MONSTER_FOLDER,
-  WORLD_ACTORS,
   chosenSources,
   droppedSources,
   homebrewOptions,
@@ -11,13 +10,27 @@ import {
   importedActorUuid,
   monsterActorData,
   monsterImportError,
+  isWorldActors,
   monsterLinkState,
   worldActorEntries,
+  worldActorsSource,
 } from "../src/homebrew.mjs";
 import { INDEX_FORMAT } from "../src/compendium.mjs";
 import { MODULE_ID } from "../src/constants.mjs";
 
-test("offers World actors and the Actor compendiums the index doesn't have yet", () => {
+const world = { id: "green-sky", title: "Night of the Green Sky" };
+const WORLD = { id: "world-actors.green-sky", label: "World actors (Night of the Green Sky)" };
+
+test("names a world's actors for the world, since Dungeon Master Guru keeps one index for all of a DM's worlds", () => {
+  assert.deepEqual(worldActorsSource(world), WORLD);
+  assert.notEqual(worldActorsSource({ id: "other", title: "Other" }).id, WORLD.id);
+  assert.equal(worldActorsSource({ id: "untitled" }).label, "World actors (untitled)");
+  assert.ok(isWorldActors(WORLD.id));
+  assert.ok(!isWorldActors("world.villains"));
+  assert.ok(!isWorldActors(undefined));
+});
+
+test("offers this world's actors and the Actor compendiums the index doesn't have yet", () => {
   const packs = [
     { id: "dnd-monster-manual.actors", label: "Monsters", documentName: "Actor" },
     { id: "dnd5e.actors24", label: "Actors (SRD)", documentName: "Actor" },
@@ -27,21 +40,20 @@ test("offers World actors and the Actor compendiums the index doesn't have yet",
     { id: "world.campaign-planner-adventures", label: "Campaign Planner Adventures", documentName: "Adventure" },
   ];
 
-  assert.deepEqual(homebrewOptions(packs), [
-    { id: "world.actors", label: "World actors" },
+  assert.deepEqual(homebrewOptions(packs, world), [
+    WORLD,
     { id: "kobold-press.tome", label: "Tome of Beasts" },
     { id: "world.villains", label: "Villains" },
   ]);
-  assert.deepEqual(homebrewOptions(), [WORLD_ACTORS]);
-  assert.deepEqual(WORLD_ACTORS, { id: "world.actors", label: "World actors" });
+  assert.deepEqual(homebrewOptions([], world), [WORLD]);
 });
 
 test("keeps the chosen sources once each, and finds the ones unticked", () => {
-  assert.deepEqual(chosenSources(["world.actors", "world.villains", "world.actors", 3, ""]), ["world.actors", "world.villains"]);
+  assert.deepEqual(chosenSources([WORLD.id, "world.villains", WORLD.id, 3, ""]), [WORLD.id, "world.villains"]);
   assert.deepEqual(chosenSources(undefined), []);
   assert.deepEqual(chosenSources({}), []);
-  assert.deepEqual(droppedSources(["world.actors", "world.villains"], ["world.villains", "kobold-press.tome"]), ["world.actors"]);
-  assert.deepEqual(droppedSources([], ["world.actors"]), []);
+  assert.deepEqual(droppedSources([WORLD.id, "world.villains"], ["world.villains", "kobold-press.tome"]), [WORLD.id]);
+  assert.deepEqual(droppedSources([], [WORLD.id]), []);
 });
 
 test("indexes the world's NPC actors like a compendium's, leaving out characters and imported monsters", () => {
@@ -61,9 +73,17 @@ test("indexes the world's NPC actors like a compendium's, leaving out characters
 
 test("sends a homebrew pack with its name, marked as homebrew, and a version that follows its entries", () => {
   const entries = [{ uuid: "Actor.aa0000000000000", name: "Ash Wraith", category: "monster", challengeRating: "1/2", detail: null }];
-  const pack = homebrewPack(WORLD_ACTORS, entries);
+  const pack = homebrewPack(WORLD, entries);
 
-  assert.deepEqual(pack, { pack: "world.actors", version: homebrewVersion(entries), entries, homebrew: true, label: "World actors" });
+  assert.deepEqual(pack, {
+    pack: "world-actors.green-sky",
+    version: homebrewVersion(entries),
+    entries,
+    homebrew: true,
+    label: "World actors (Night of the Green Sky)",
+  });
+  // This world's actors unticked: sent under the same id with no entries, so Dungeon Master Guru drops them
+  assert.deepEqual([homebrewPack(WORLD).pack, homebrewPack(WORLD).entries], ["world-actors.green-sky", []]);
   assert.ok(pack.version.endsWith(`+${INDEX_FORMAT}`));
   assert.equal(homebrewVersion(entries), homebrewVersion(structuredClone(entries)));
   assert.notEqual(homebrewVersion(entries), homebrewVersion([{ ...entries[0], challengeRating: "1" }]));
