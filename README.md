@@ -17,13 +17,16 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 
 **In your world (free, no account).** Click **New** in the Journal sidebar. A step-by-step guide walks you through what kind of game, the pitch, your table (party, levels, sessions), the world and its truths, and your books, explaining why each step matters. Truths are a numbered list you build one at a time, each a short name and a description, and move or remove as you go; about six is plenty. Click **Create in this world**, and you get:
 
-- **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it. A story arc starts with its sessions, three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.
-- **Campaign Planner:** a tab for each part of the campaign, with editing, a Three Clue Rule check, eight-step session prep, and a plan for each quest: its maps, NPCs, monsters and reward. Drag monsters, items and roll tables in from your compendiums.
+- **Journals:** a folder for the campaign with an entry for each part of it: Overview, Sessions, Cast, Threats, Quests, Encounters, Secrets and Clues, Places, Factions and Book References. Each record is its own page, visible to the GM only until you share it. A story arc starts with its sessions, three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.
+- **Campaign Planner:** a tab for each part of the campaign, with editing, a Three Clue Rule check, eight-step session prep, and a plan for each quest: its maps, NPCs, encounters, handouts and reward. Drag monsters, items and roll tables in from your compendiums.
+  - **Encounters:** the fights, talks, traps and puzzles of a quest, in order. Each has a type (combat, social, exploration, puzzle, trap or other), its monsters with how many, the NPCs in it, its own maps and its own reward (items, coins and XP), and a journal page of its own. A combat encounter shows how hard it is by the 2024 rules: its monsters' XP against the party's Low, Moderate and High budgets. A quest's monsters from before encounters move into one called "Encounter".
+  - **Handouts:** drag journal entries or pages onto a quest, from the Journal sidebar or a compendium, to show the players later.
+  - **Random encounters:** drop roll tables on a place. **Roll** draws from one, and only GMs see the result.
 - **Campaign Dashboard:** your at-the-table view.
   - The next session and its log.
   - Threat clocks you can advance, and grim portents you can tick off.
   - Secrets and clues to reveal.
-  - Quests and their status, with an active quest's maps, monsters and reward.
+  - Quests and their status. An active quest shows its maps, its place's random encounter tables to roll on, each encounter's difficulty, monsters (drag them onto a map), maps and a **Give the reward** button, and its handouts with **Show to players**.
   - **Give the reward:** hand a quest's reward or a session's treasure to the characters (items to whoever you choose, coins shared evenly, XP shared or given to each), with a summary in chat. With [Item Piles](https://foundryvtt.com/packages/item-piles) set up for your system, you can leave it on the scene as an item pile instead.
   - Add threats, secrets, quests, NPCs, places, factions and sessions as you go.
 
@@ -36,6 +39,8 @@ Plan a campaign the Lazy Dungeon Master way, right in Foundry VTT, and run it at
 - **Your compendiums:** the module sends Dungeon Master Guru the index of your SRD 5.2 compendiums and the 2024 Player's Handbook, Dungeon Master's Guide and Monster Manual modules you own: names, challenge ratings and IDs, never stat blocks or book text. Monsters and treasure you pick while planning become links in your session journals. Drag one onto a scene to place a token.
 - **Your party:** your world's Player Character actors and their sheets, for prep on the website. Spell, feature and item descriptions stay in Foundry.
 - **Your maps** (with sync): a thumbnail of each scene in your world, so you can pick maps on the website and see them while Foundry is closed.
+- **Your homebrew monsters:** tick this world's NPC actors or your own Actor compendiums in the Connect window's Compendiums section, and pick them on the website too. Only names, CRs and IDs go; untick one and the website forgets it.
+- **The website's monsters in Foundry:** a monster made on Dungeon Master Guru with no compendium entry of the same name has an **Import into this world** button in the planner and the Dashboard. It becomes an actor in a "Dungeon Master Guru" folder, and links to it point at that actor from then on.
 
 The **How it works** window (the **?** button in the Journal sidebar) explains both, step by step. It opens once the first time a GM loads the module.
 
@@ -80,7 +85,7 @@ The six **Use …** settings are for the whole world, set by a GM, and on to beg
 
 ## Send a campaign to Dungeon Master Guru
 
-Planned a campaign in this world and want to plan on the website too? Connect, then click **Send to Dungeon Master Guru** in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. The brief, the party and every threat, quest, NPC, place, secret, session and book reference go with it. The world then syncs with it, keeping the same journal folder and pages.
+Planned a campaign in this world and want to plan on the website too? Connect, then click **Send to Dungeon Master Guru** in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. The brief, the party and every threat, quest (with its encounters), NPC, place, secret, session and book reference go with it. The world then syncs with it, keeping the same journal folder and pages.
 
 ## Help and support
 

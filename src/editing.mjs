@@ -22,7 +22,7 @@ export const EDITABLE = {
     "status",
   ],
   factions: ["name", "goal", "description", "notes"],
-  locations: ["name", "description", "features", "notes", "parentId", "foundrySceneUuid", "foundrySceneName"],
+  locations: ["name", "description", "features", "notes", "parentId", "foundrySceneUuid", "foundrySceneName", "rollTables"],
   npcs: [
     "name",
     "role",
@@ -56,6 +56,20 @@ export const EDITABLE = {
     "rewardXp",
     "milestone",
     "links",
+    "handouts",
+  ],
+  // A quest's encounters: links to its monsters (with how many), NPCs and reward items
+  encounters: [
+    "name",
+    "kind",
+    "description",
+    "notes",
+    "position",
+    "questId",
+    "foundryScenes",
+    "rewardCurrency",
+    "rewardXp",
+    "links",
   ],
   secrets: ["text", "revelation", "revealed", "revealedSessionUuid", "position"],
   sessions: [
@@ -76,7 +90,7 @@ export const EDITABLE = {
   references: ["name", "book", "category", "page", "challengeRating", "foundryUuid", "notes"],
 };
 
-// A session's or quest's links as the sync takes them: what's linked, in order, and how many
+// A session's, quest's or encounter's links as the sync takes them: what's linked, in order, and how many
 export const linksForSync = (links) =>
   (links ?? []).map((link) => ({
     linkableType: link.linkableType,
@@ -156,6 +170,10 @@ export const FIELD_LABELS = {
   parentId: "what it's part of",
   npcId: "who's behind it",
   statBlockReferenceId: "the stat block",
+  questId: "the quest it's in",
+  handouts: "the handouts",
+  rollTables: "the random encounter tables",
+  position: "the order",
 };
 
 // Other fields by their name: "settingNotes" is "the setting notes"

@@ -10,6 +10,7 @@ import {
   describeContents,
   describeMissing,
   foldersFor,
+  handoutEntryIds,
   isPlayersCharacter,
   listText,
   localFolderName,
@@ -419,4 +420,48 @@ test("says what the adventure holds and what's missing", () => {
   assert.equal(describeMissing({ Scene: 1, Actor: 1, RollTable: 3 }), "1 scene, 1 actor and 3 roll tables");
   assert.equal(describeMissing({}), "");
   assert.equal(listText(["one"]), "one");
+});
+
+// Encounters, handouts and roll tables ---------------------------------------
+
+test("an encounter made local points at its quest's new id, and its maps and tables go in the adventure", () => {
+  const lists = synced();
+  lists.encounters = [
+    {
+      id: "3",
+      uuid: U(801),
+      questId: "1",
+      name: "Ambush",
+      foundryScenes: [{ uuid: "Scene.Ambu5hAmbu5hAmbu", name: "Bridge" }],
+      links: [{ id: "20", uuid: U(906), linkableType: "CampaignReference", linkableId: "5", name: "Goblin", quantity: 4 }],
+      syncVersion: 10,
+    },
+  ];
+  lists.locations[0].rollTables = [{ uuid: LOOT, name: "Hommlet encounters" }, { uuid: "Compendium.dnd5e.tables24.RollTable.packedpackedpack", name: "Packed" }];
+
+  const [encounter] = localRecords(lists).encounters;
+  assert.deepEqual([encounter.id, encounter.questId, encounter.links[0].linkableId], [U(801), U(501), U(105)]);
+
+  const uuids = adventureUuids(lists);
+  assert.ok(uuids.Scene.includes("Scene.Ambu5hAmbu5hAmbu"));
+  assert.deepEqual(uuids.RollTable, [LOOT]);
+});
+
+test("takes along the world journal entries used as handouts, and leaves compendium ones as links", () => {
+  const quests = [
+    {
+      handouts: [
+        { uuid: "JournalEntry.Hand0utHand0utHa", name: "Letter" },
+        { uuid: "JournalEntry.Hand0utHand0utHa.JournalEntryPage.PagePagePagePage", name: "Page of it" },
+        { uuid: "JournalEntry.Sec0ndSec0ndSec0.JournalEntryPage.PagePagePagePage", name: "Another" },
+        { uuid: "Compendium.world.lore.JournalEntry.Hand0utHand0utHa", name: "In a compendium" },
+        { uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Not a handout" },
+      ],
+    },
+    {},
+  ];
+
+  assert.deepEqual(handoutEntryIds({ quests }), ["Hand0utHand0utHa", "Sec0ndSec0ndSec0"]);
+  assert.deepEqual(handoutEntryIds({}), []);
+  assert.deepEqual(handoutEntryIds(), []);
 });

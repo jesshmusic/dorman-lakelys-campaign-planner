@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-21
+
+- **Encounters:** a quest's plan is now its encounters, in order, instead of one list of monsters. Each is combat, social, exploration, puzzle, trap or other, with what happens, its monsters (with how many), the NPCs in it, its own maps and its own reward (items with how many, coins and XP). Add, move and remove them on the quest's plan; each has its own page in a new Encounters journal, and the quest's page lists them. A quest's monsters from before are moved into an encounter called "Encounter" (for a Dungeon Master Guru campaign, when the website moves them and you Sync).
+- **Encounter difficulty:** a combat encounter shows its monsters' XP against the party's 2024 XP budget (Low, Moderate and High), on its card, its journal page and the Dashboard.
+- **Handouts:** drag journal entries or pages from the Journal sidebar or a compendium onto a quest's Handouts. The quest's page links them, and the Dashboard's **Show to players** button shows one to the players you choose.
+- **Running encounters:** an active quest on the Dashboard shows each encounter's monsters to drag onto a map, its maps to view or activate, and a **Give the reward** button for its reward.
+- **Random encounter tables:** drop roll tables on a place in the Places tab. **Roll** (in the planner, and on the Dashboard for an active quest's place or the next session's places) draws from one for the GMs only. The place's journal page links them.
+- **Homebrew monsters on Dungeon Master Guru:** in the Connect window's Compendiums section, tick this world's NPC actors or your own Actor compendiums to pick them on the website too. Only names, CRs and IDs are sent, never stat blocks; untick one and the website forgets it.
+- **Import monsters from Dungeon Master Guru:** a monster from the website with no compendium entry of the same name gets an **Import into this world** button in the planner and the Dashboard. It becomes an actor in a "Dungeon Master Guru" folder, and links to that monster point at it from then on.
+
 ## [1.1.0] - 2026-10-20
 
 - **Truths as a list:** each truth of the setting now has a name and a description. Add them one at a time, move or remove them, and see them numbered in the planner, the New campaign guide and the Overview journal page. There's no limit of six any more (about six is still plenty), and truths saved before are kept, each split into a name and a description at its first sentence.

@@ -75,7 +75,7 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li>On the last step, click <strong>Create in this world</strong>.</li>
       </ol>
       <p>You get a journal folder named after the campaign, with an entry for each part of it: Overview, Sessions, Cast,
-        Threats, Quests, Secrets and Clues, Places, Factions and Book References. A story arc starts with its sessions,
+        Threats, Quests, Encounters, Secrets and Clues, Places, Factions and Book References. A story arc starts with its sessions,
         three acts and a main threat; a sandbox with a villain and a questline; a one-shot with a five-room dungeon.</p>
 
       <h2>Switch to another campaign</h2>
@@ -92,9 +92,17 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
         <li><strong>Party:</strong> pick the player characters from this world.</li>
         <li><strong>Story:</strong> threats, each with grim portents and a clock, and factions.</li>
         <li><strong>Quests:</strong> main and side quests, who gives them and where. Click <strong>Plan the quest</strong>
-          to give it maps, the NPCs involved, monsters dragged in from your compendiums, and a reward: items (with how
-          many), coins, and XP or a milestone.</li>
-        <li><strong>Cast</strong> and <strong>Places:</strong> NPCs, and places inside other places.</li>
+          to give it maps, the NPCs involved, its encounters, handouts, and a reward: items (with how many), coins, and
+          XP or a milestone.</li>
+        <li><strong>Encounters:</strong> the fights, talks, traps and puzzles of a quest, in order. Each has a type,
+          what happens, monsters dragged in from your compendiums or the Actors directory (with how many), the NPCs in
+          it, its own maps and its own reward. A combat encounter shows how hard it is: the monsters' XP against the
+          party's 2024 XP budget, at the quest's lowest level or the campaign's starting level. Each encounter gets a
+          journal page of its own.</li>
+        <li><strong>Handouts:</strong> drag journal entries or pages onto a quest's Handouts, from the Journal sidebar or
+          a compendium, to show the players when the time comes.</li>
+        <li><strong>Cast</strong> and <strong>Places:</strong> NPCs, and places inside other places. Drop roll tables on
+          a place for its random encounters; <strong>Roll</strong> draws from one, and only GMs see the result.</li>
         <li><strong>Secrets:</strong> clues grouped by what they reveal, with a warning when one has fewer than three.</li>
         <li><strong>Sessions:</strong> prep each session with the Lazy Dungeon Master's eight steps. Drag monsters,
           items and roll tables straight in from your compendiums; they become links in the session's journal page. Add
@@ -116,7 +124,9 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           come true.</li>
         <li><strong>Secrets and clues:</strong> click Reveal when the party learns one.</li>
         <li><strong>Quests:</strong> set each one's status as the party takes it on and finishes it. An active quest
-          shows its maps, its monsters to drag onto a map, and its reward to hand out.</li>
+          shows its maps, its place's random encounter tables to roll on, and each encounter: its difficulty, its
+          monsters to drag onto a map, its maps, and <strong>Give the reward</strong> for its reward. Its handouts each
+          have <strong>Show to players</strong>.</li>
         <li><strong>Session log:</strong> jot down what happened, then click Mark played.</li>
         <li><strong>Maps and treasure:</strong> show the session's maps to yourself, or activate one for the players.
           <strong>Give the reward</strong> (or <strong>Hand out the treasure</strong>) gives the items, coins and XP to
@@ -150,12 +160,18 @@ export class HelpApp extends foundry.applications.api.ApplicationV2 {
           you can drag onto a scene, and your players' character sheets are there while you prep.</li>
         <li><strong>Your maps:</strong> a thumbnail of each scene in this world goes to the website, so you
           can pick a place's, session's or quest's maps there, and see them while Foundry is closed.</li>
+        <li><strong>Your homebrew monsters:</strong> in the Connect window's Compendiums section, tick this world's NPC
+          actors or your own Actor compendiums, and you can pick them on the website too (names, CRs and IDs only).</li>
+        <li><strong>The website's monsters:</strong> a monster made on Dungeon Master Guru, with no compendium entry of the
+          same name, has an <strong>Import into this world</strong> button in the planner and the Dashboard. It becomes
+          an actor in the Dungeon Master Guru folder of the Actors directory.</li>
       </ul>
 
       <h2>Send a campaign to Dungeon Master Guru</h2>
       <p>Started in this world and want to plan on the website too? Connect, then click <strong>Send to Dungeon Master
         Guru</strong>: in the Connect window, on the Campaign Planner's Overview tab, or in its window menu. Everything
-        goes: the brief, the party, threats, quests, NPCs, places, secrets, sessions and book references. This world then
+        goes: the brief, the party, threats, quests and their encounters, NPCs, places, secrets, sessions and book
+        references. This world then
         syncs with it, and its journal folder and pages stay where they are, including anything you've shared with
         players.</p>
 

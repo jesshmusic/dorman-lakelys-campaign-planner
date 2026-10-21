@@ -1,10 +1,13 @@
-import { clockSvg, currencyText, escapeHtml } from "../render.mjs";
+import { ENCOUNTER_KIND_LABELS, clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
 import { addForm } from "../local.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { LINKS } from "../welcome.mjs";
 import { giveReward } from "./give-reward.mjs";
 import { syncButton, syncStatus, syncWithFeedback } from "./sync-button.mjs";
+import { contentLink, importMonster, monsterHtml, rollTable, rollTablesHtml, showHandout } from "./shared.mjs";
+import { encountersOf, legacyEncounter, monsterLinks } from "../encounters.mjs";
+import { difficultyText, encounterDifficulty } from "../difficulty.mjs";
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 
@@ -53,11 +56,16 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       saveLog: DashboardApp.#onSaveLog,
       markPlayed: DashboardApp.#onMarkPlayed,
       giveReward: DashboardApp.#onGiveReward,
+      importMonster: DashboardApp.#onImportMonster,
+      rollTable: DashboardApp.#onRollTable,
+      showHandout: DashboardApp.#onShowHandout,
     },
   };
 
   #hookId = null;
   #busy = false;
+  // The compendium name lookup, made once for each render
+  #lookup = null;
 
   get sync() {
     return game.modules.get(MODULE_ID).api.sync;
@@ -82,7 +90,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
   async _renderHTML() {
     const container = document.createElement("div");
     container.classList.add("dlcp-dashboard");
+    this.#lookup = this.sync.linked ? this.sync.compendiumUuid() : null;
     container.innerHTML = `${this.sync.linked ? this.#renderLinked() : this.#renderUnlinked()}${this.#renderFooter()}`;
+    this.#lookup = null;
     container.querySelector(".dlcp-quest-status")?.closest("ul")
       ?.addEventListener("change", (event) => this.#onQuestStatus(event));
     container.querySelector("[data-open-on-startup]")?.addEventListener("change", (event) => {
@@ -195,6 +205,10 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         ${session.strongStart ? `<p><strong>Strong start:</strong> ${escapeHtml(session.strongStart)}</p>` : ""}
         ${scenes}
         ${this.#renderMaps(session.foundryScenes)}
+        ${this.#renderMonsters(session)}
+        ${this.#renderPlaces(
+          (session.links ?? []).filter((link) => link.linkableType === "CampaignLocation").map((link) => link.linkableId),
+        )}
         ${this.#renderTreasure(session, { collection: "sessions", label: "Treasure", coins: session.treasureCurrency })}
         <label for="dlcp-log"><strong>Session log</strong></label>
         <textarea id="dlcp-log" rows="5" placeholder="What happened? Names you made up, promises, loose ends…">${escapeHtml(session.log ?? "")}</textarea>
@@ -218,6 +232,66 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
         </span>`,
       )
       .join("")}</p>`;
+  }
+
+  // A session's or encounter's monsters, with how many, to drag onto a map.
+  // One of Dungeon Master Guru's own with no compendium entry can be imported.
+  #renderMonsters(owner, { label = "Monsters" } = {}) {
+    const store = this.sync.records();
+    const lookup = this.#lookup ?? this.sync.compendiumUuid();
+    const parts = monsterLinks(owner, store.references).map((link) => {
+      const count = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
+      if (link.linkableType === "Monster") return `${monsterHtml(this.sync, { id: link.linkableId, name: link.name }, lookup)}${count}`;
+      const reference = store.references.get(String(link.linkableId));
+      const name = reference.foundryUuid ? contentLink(reference.foundryUuid, reference.name, "user") : escapeHtml(reference.name);
+      return `${name}${count}`;
+    });
+    return parts.length ? `<p><strong>${escapeHtml(label)}:</strong> ${parts.join(", ")}</p>` : "";
+  }
+
+  // Places with random encounter tables, each table with a Roll button
+  #renderPlaces(locationIds) {
+    const locations = this.sync.records().locations;
+    return [...new Set(locationIds.map(String))]
+      .map((id) => locations.get(id))
+      .filter((location) => (location?.rollTables ?? []).length)
+      .map((location) => `<div class="dlcp-place"><p><strong>Random encounters at ${escapeHtml(location.name)}:</strong></p>${rollTablesHtml(location)}</div>`)
+      .join("");
+  }
+
+  // An active quest's encounters, in order: what each needs at the table, and its reward to give
+  #renderEncounters(quest) {
+    const store = this.sync.records();
+    const campaign = [...store.campaign.values()][0];
+    const legacy = legacyEncounter(quest, store.references);
+    const encounters = encountersOf([...store.encounters.values()], quest.id);
+    if (!legacy && !encounters.length) return "";
+    const card = (encounter) => {
+      const difficulty = encounter.legacy
+        ? null
+        : encounterDifficulty(encounter, { references: store.references, campaign, quest, tables: this.sync.xpTables });
+      const title = encounter.legacy ? "Encounter" : `${ENCOUNTER_KIND_LABELS[encounter.kind] ?? "Other"}: ${encounter.name}`;
+      return `<li class="dlcp-encounter">
+        <h4>${escapeHtml(title)}</h4>
+        ${difficulty ? `<p class="dlcp-difficulty"><strong>Difficulty:</strong> ${escapeHtml(difficultyText(difficulty))}</p>` : ""}
+        ${this.#renderMonsters(encounter)}
+        ${this.#renderMaps(encounter.foundryScenes)}
+        ${encounter.legacy ? "" : this.#renderTreasure(encounter, { collection: "encounters", label: "Reward", coins: encounter.rewardCurrency, xp: encounter.rewardXp })}
+      </li>`;
+    };
+    return `<p><strong>Encounters:</strong></p><ul class="dlcp-list dlcp-encounters">${[legacy, ...encounters].filter(Boolean).map(card).join("")}</ul>`;
+  }
+
+  // A quest's handouts, each with a button to show it to the players
+  #renderHandouts(quest) {
+    const handouts = quest.handouts ?? [];
+    if (!handouts.length) return "";
+    return `<p><strong>Handouts:</strong></p><ul class="dlcp-list dlcp-handouts">${handouts
+      .map(
+        (handout) => `<li><span class="dlcp-grow">${contentLink(handout.uuid, handout.name, "book-open")}</span>
+          <button type="button" data-action="showHandout" data-uuid="${escapeHtml(handout.uuid)}" data-tooltip="Choose which players see it"><i class="fas fa-eye"></i> Show to players</button></li>`,
+      )
+      .join("")}</ul>`;
   }
 
   // A session's or quest's book references of some kind, as links you can drag
@@ -323,13 +397,16 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   #renderQuests(quests) {
     if (!quests.length && !this.sync.editable) return "";
-    // An active quest shows what it needs at the table: its maps, monsters to drag onto them, and its reward
+    // An active quest shows what it needs at the table: its maps, its place's
+    // random encounters, its encounters (monsters to drag onto a map, and each
+    // one's reward), its handouts to show, and its reward
     const details = (quest) => {
       if (quest.status !== "active") return "";
-      const monsters = this.#referenceLinks(quest, (category) => category === "monster");
       return [
         this.#renderMaps(quest.foundryScenes),
-        monsters.length ? `<p><strong>Monsters:</strong> ${monsters.join(", ")}</p>` : "",
+        quest.locationId ? this.#renderPlaces([quest.locationId]) : "",
+        this.#renderEncounters(quest),
+        this.#renderHandouts(quest),
         this.#renderTreasure(quest, {
           collection: "quests",
           label: "Reward",
@@ -423,6 +500,9 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     const { collection, uuid } = target.dataset;
     const record = this.sync.recordLists()[collection]?.find((r) => r.uuid === uuid);
     if (!record) return;
+    if (collection === "encounters") {
+      return giveReward({ title: record.name, label: "Reward", owner: record, coins: record.rewardCurrency, xp: record.rewardXp });
+    }
     if (collection === "quests") {
       return giveReward({
         title: record.name,
@@ -438,6 +518,18 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
 
   static #onReportBug() {
     game.modules.get(MODULE_ID).api.openBugReport();
+  }
+
+  static #onImportMonster(_event, target) {
+    return importMonster(this.sync, target.dataset.monsterId, target);
+  }
+
+  static #onRollTable(_event, target) {
+    return rollTable(target.dataset.uuid);
+  }
+
+  static #onShowHandout(_event, target) {
+    return showHandout(target.dataset.uuid);
   }
 
   static #onHelp() {

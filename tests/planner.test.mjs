@@ -23,7 +23,15 @@ import {
   briefFields,
   editForm,
   threatsIntro,
+  addHandout,
+  removeHandout,
+  isHandoutUuid,
+  MAX_HANDOUTS,
+  addRollTable,
+  removeRollTable,
+  MAX_ROLL_TABLES,
 } from "../src/planner.mjs";
+import { EDITABLE, changedAttributes } from "../src/editing.mjs";
 import { ALL_ON } from "../src/techniques.mjs";
 
 const without = (...keys) => ({ ...ALL_ON, ...Object.fromEntries(keys.map((key) => [key, false])) });
@@ -611,4 +619,148 @@ test("describes threats with the techniques that are on", () => {
   assert.equal(threatsIntro(without("clocks")), "Each threat has a goal, and grim portents that show it getting closer.");
   assert.equal(threatsIntro(without("portents")), "Each threat has a goal, and a clock that fills if no one stops it.");
   assert.doesNotMatch(threatsIntro(without("clocks", "portents")), /portents|clock/);
+});
+
+const withEncounters = {
+  ...store,
+  references: [{ id: "r1", name: "Ghoul", category: "monster" }],
+  encounters: [
+    {
+      id: "e1",
+      questId: "q2",
+      name: "Ambush",
+      links: [
+        { id: "k5", linkableType: "CampaignNpc", linkableId: "n1", name: "Kalvar", position: 0 },
+        { id: "k6", linkableType: "CampaignReference", linkableId: "r1", name: "Ghoul", position: 1, quantity: 4 },
+      ],
+    },
+    { id: "e2", questId: "q2", name: "Riddle", links: [] },
+    { id: "e3", questId: "q1", name: "Elsewhere", links: [{ id: "k7", linkableType: "CampaignNpc", linkableId: "n1", name: "Kalvar" }] },
+  ],
+};
+
+test("deleting a quest deletes its encounters too", () => {
+  const plan = planDelete(withEncounters, "quests", "q2");
+
+  assert.deepEqual(plan.remove, [
+    { collection: "quests", id: "q2" },
+    { collection: "encounters", id: "e1" },
+    { collection: "encounters", id: "e2" },
+  ]);
+  assert.deepEqual(plan.updates, []);
+  assert.deepEqual(planDelete(withEncounters, "encounters", "e2"), { remove: [{ collection: "encounters", id: "e2" }], updates: [] });
+});
+
+test("deleting an NPC or a book reference drops it from encounters", () => {
+  const npc = planDelete(withEncounters, "npcs", "n1");
+  const encounters = npc.updates.filter((u) => u.collection === "encounters");
+
+  assert.deepEqual(encounters.map((u) => [u.record.id, u.record.links.map((l) => l.linkableId)]), [
+    ["e1", ["r1"]],
+    ["e3", []],
+  ]);
+  const reference = planDelete(withEncounters, "references", "r1");
+  assert.deepEqual(
+    reference.updates.find((u) => u.collection === "encounters").record.links.map((l) => l.id),
+    ["k5"],
+  );
+});
+
+test("deleting a quest doesn't also update the encounters it deletes", () => {
+  const quests = { ...withEncounters, quests: [...withEncounters.quests, { id: "q3", links: [] }] };
+  const plan = planDelete(quests, "npcs", "n1");
+
+  assert.ok(plan.updates.some((u) => u.collection === "encounters" && u.record.id === "e1"));
+  assert.ok(!planDelete(withEncounters, "quests", "q2").updates.some((u) => u.collection === "encounters"));
+});
+
+const ENTRY = "JournalEntry.QdI6Ix83ypmPq4lc";
+const PAGE = "JournalEntry.QdI6Ix83ypmPq4lc.JournalEntryPage.WVPcqI82sGV2YrXq";
+const PACK_ENTRY = "Compendium.world.lore.JournalEntry.WVPcqI82sGV2YrXq";
+const PACK_PAGE = "Compendium.my-module.lore.JournalEntry.WVPcqI82sGV2YrXq.JournalEntryPage.QdI6Ix83ypmPq4lc";
+
+test("adds journal entries and pages, from the world or a compendium, as a quest's handouts", () => {
+  let handouts = [];
+  for (const [uuid, name] of [
+    [ENTRY, "The map"],
+    [PAGE, " A letter "],
+    [PACK_ENTRY, "Lore"],
+    [PACK_PAGE, ""],
+  ]) {
+    const result = addHandout(handouts, uuid, name);
+    assert.ok(!result.error, uuid);
+    handouts = result.handouts;
+  }
+
+  assert.deepEqual(handouts, [
+    { uuid: ENTRY, name: "The map" },
+    { uuid: PAGE, name: "A letter" },
+    { uuid: PACK_ENTRY, name: "Lore" },
+    { uuid: PACK_PAGE, name: "Handout" },
+  ]);
+  assert.deepEqual(addHandout(handouts, ENTRY, "Again").handouts, handouts, "once each");
+  assert.equal(addHandout([], ENTRY, "x".repeat(200)).handouts[0].name.length, 120);
+  assert.deepEqual(removeHandout(handouts, PAGE).map((h) => h.uuid), [ENTRY, PACK_ENTRY, PACK_PAGE]);
+  assert.ok(isHandoutUuid(PAGE));
+});
+
+test("a quest's handouts are journal entries or pages, up to 20", () => {
+  for (const uuid of ["Scene.QdI6Ix83ypmPq4lc", "Actor.QdI6Ix83ypmPq4lc", "JournalEntry.short", `${ENTRY}.JournalEntryPage.bad`, "", null]) {
+    assert.match(addHandout([], uuid, "x").error, /journal entry or page/, String(uuid));
+  }
+  const full = Array.from({ length: MAX_HANDOUTS }, (_, i) => ({ uuid: `JournalEntry.${String(i).padStart(16, "a")}`, name: "H" }));
+  assert.equal(MAX_HANDOUTS, 20);
+  assert.equal(addHandout(full, ENTRY, "One more").error, "Up to 20 handouts a quest.");
+});
+
+test("handouts are sent with a quest", () => {
+  assert.ok(EDITABLE.quests.includes("handouts"));
+  const quest = { id: "q1", name: "Q", handouts: [] };
+  assert.deepEqual(changedAttributes("quests", quest, { ...quest, handouts: [{ uuid: ENTRY, name: "The map" }] }), {
+    handouts: [{ uuid: ENTRY, name: "The map" }],
+  });
+});
+
+const TABLE = "RollTable.QdI6Ix83ypmPq4lc";
+const PACK_TABLE = "Compendium.dnd5e.tables24.RollTable.WVPcqI82sGV2YrXq";
+
+test("adds roll tables to a place, from the world or a compendium, once each and up to 10", () => {
+  const first = addRollTable([], TABLE, "Marsh encounters");
+  const second = addRollTable(first.rollTables, PACK_TABLE, "");
+
+  assert.deepEqual(second.rollTables, [
+    { uuid: TABLE, name: "Marsh encounters" },
+    { uuid: PACK_TABLE, name: "Roll table" },
+  ]);
+  assert.deepEqual(addRollTable(second.rollTables, TABLE, "Again").rollTables, second.rollTables);
+  assert.equal(addRollTable([], TABLE, "y".repeat(130)).rollTables[0].name.length, 120);
+  assert.deepEqual(removeRollTable(second.rollTables, TABLE), [{ uuid: PACK_TABLE, name: "Roll table" }]);
+  for (const uuid of ["Item.QdI6Ix83ypmPq4lc", "RollTable.nope", `${TABLE}.TableResult.QdI6Ix83ypmPq4lc`, undefined]) {
+    assert.match(addRollTable([], uuid, "x").error, /Drop a roll table/, String(uuid));
+  }
+  const full = Array.from({ length: MAX_ROLL_TABLES }, (_, i) => ({ uuid: `RollTable.${String(i).padStart(16, "b")}`, name: "T" }));
+  assert.equal(addRollTable(full, TABLE, "One more").error, "Up to 10 roll tables a place.");
+  assert.ok(EDITABLE.locations.includes("rollTables"));
+});
+
+test("names an encounter's maps limit", () => {
+  const full = Array.from({ length: 20 }, (_, i) => ({ uuid: `Scene.${String(i).padStart(16, "c")}`, name: "M" }));
+
+  assert.equal(addScene(full, "Scene.QdI6Ix83ypmPq4lc", "One more", "encounter").error, "Up to 20 maps an encounter.");
+  assert.equal(addScene(full, "Scene.QdI6Ix83ypmPq4lc", "One more", "quest").error, "Up to 20 maps a quest.");
+});
+
+test("linking the same records again leaves the links as they were, so nothing is sent", () => {
+  const quest = {
+    id: "q9",
+    links: [
+      { id: "k1", linkableType: "CampaignNpc", linkableId: "n2", name: "Thorne", position: 0 },
+      { id: "k2", linkableType: "CampaignReference", linkableId: "r1", name: "Ghoul", position: 1 },
+      { id: "k3", linkableType: "CampaignNpc", linkableId: "n1", name: "Kalvar", position: 2 },
+    ],
+  };
+
+  assert.equal(setLinks(quest, "npcs", ["n1", "n2"], store.npcs, ids()), quest);
+  assert.deepEqual(changedAttributes("quests", quest, setLinks(quest, "npcs", ["n1", "n2"], store.npcs, ids())), {});
+  assert.deepEqual(setLinks(quest, "npcs", ["n1"], store.npcs, ids()).links.map((l) => l.linkableId), ["r1", "n1"]);
 });

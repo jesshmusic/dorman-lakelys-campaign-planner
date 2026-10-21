@@ -24,22 +24,28 @@ export const SETTINGS = {
   useSecrets: "useSecrets",
   useThreeClueRule: "useThreeClueRule",
   useGettingStarted: "useGettingStarted",
+  // The homebrew monster sources whose index goes to Dungeon Master Guru: "world-actors.<world id>" and Actor
+  // compendium ids (see homebrew.mjs). World scope, GM only.
+  homebrewSources: "homebrewSources",
 };
 
 // Fired after every pull or push so open windows can re-render
 export const SYNCED_HOOK = `${MODULE_ID}.synced`;
 
-// One journal entry per section of the campaign, one page per record
+// One journal entry per section of the campaign, one page per record, in
+// the Journal sidebar's order. Encounters came later: it sorts after Quests
+// in campaigns made before it, too.
 export const SECTIONS = [
-  { collection: "campaign", name: "Overview" },
-  { collection: "sessions", name: "Sessions" },
-  { collection: "npcs", name: "Cast" },
-  { collection: "fronts", name: "Threats" },
-  { collection: "quests", name: "Quests" },
-  { collection: "secrets", name: "Secrets and Clues" },
-  { collection: "locations", name: "Places" },
-  { collection: "factions", name: "Factions" },
-  { collection: "references", name: "Book References" },
+  { collection: "campaign", name: "Overview", sort: 1000 },
+  { collection: "sessions", name: "Sessions", sort: 2000 },
+  { collection: "npcs", name: "Cast", sort: 3000 },
+  { collection: "fronts", name: "Threats", sort: 4000 },
+  { collection: "quests", name: "Quests", sort: 5000 },
+  { collection: "encounters", name: "Encounters", sort: 5500 },
+  { collection: "secrets", name: "Secrets and Clues", sort: 6000 },
+  { collection: "locations", name: "Places", sort: 7000 },
+  { collection: "factions", name: "Factions", sort: 8000 },
+  { collection: "references", name: "Book References", sort: 9000 },
 ];
 
 // Tombstone record types from the server
@@ -49,6 +55,7 @@ export const TYPE_COLLECTIONS = {
   CampaignFaction: "factions",
   CampaignFront: "fronts",
   CampaignQuest: "quests",
+  CampaignEncounter: "encounters",
   CampaignSecret: "secrets",
   CampaignSession: "sessions",
   CampaignReference: "references",
@@ -61,6 +68,7 @@ export const PUSH_TYPES = {
   factions: "faction",
   fronts: "front",
   quests: "quest",
+  encounters: "encounter",
   secrets: "secret",
   sessions: "session",
   locations: "location",

@@ -88,3 +88,12 @@ test("the version stays the same through play", () => {
     version,
   );
 });
+
+test("includes the maps of encounters", () => {
+  const uuids = campaignSceneUuids({
+    quests: [{ foundryScenes: [{ uuid: MAP }] }],
+    encounters: [{ foundryScenes: [{ uuid: PASS }, { uuid: MAP }] }, {}],
+  });
+
+  assert.deepEqual(uuids, [MAP, PASS]);
+});

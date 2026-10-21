@@ -42,8 +42,8 @@ export const contentLinkUuids = (html) =>
 
 /**
  * The world documents a campaign uses, by type: the maps of its places,
- * sessions and quests; its NPCs' actors; the actors, items and roll tables
- * its book references point to; and anything its journal pages link to.
+ * sessions, quests and encounters; its NPCs' actors; the actors, items and roll tables
+ * its book references point to; its places' random encounter tables; and anything its journal pages link to.
  * Compendium entries are left out: they stay links.
  * @param {Record<string, object[]>} lists the campaign's records by collection
  * @param {{ texts?: string[] }} options texts: the journal pages' HTML
@@ -58,8 +58,24 @@ export function adventureUuids(lists, { texts = [] } = {}) {
   campaignSceneUuids(lists).forEach(add);
   (lists.npcs ?? []).forEach((npc) => add(npc.foundryActorUuid));
   (lists.references ?? []).forEach((reference) => add(reference.foundryUuid));
+  (lists.locations ?? []).forEach((location) => (location.rollTables ?? []).forEach((table) => add(table?.uuid)));
   texts.flatMap(contentLinkUuids).forEach(add);
   return Object.fromEntries(Object.entries(found).map(([documentName, uuids]) => [documentName, [...uuids]]));
+}
+
+// A world journal entry, or a page in one: "JournalEntry.<id>" or "JournalEntry.<id>.JournalEntryPage.<id>"
+const WORLD_JOURNAL = /^JournalEntry\.([A-Za-z0-9]{16})(\.JournalEntryPage\.[A-Za-z0-9]{16})?$/;
+
+/**
+ * The world journal entries the campaign's quests use as handouts (for a
+ * page, the entry it's in), once each, so the adventure takes them along.
+ * Compendium journals stay links.
+ * @param {{ quests?: object[] }} lists
+ * @returns {string[]} JournalEntry ids
+ */
+export function handoutEntryIds({ quests = [] } = {}) {
+  const ids = quests.flatMap((quest) => (quest.handouts ?? []).map((handout) => WORLD_JOURNAL.exec(handout?.uuid ?? "")?.[1]));
+  return [...new Set(ids.filter(Boolean))];
 }
 
 /**
@@ -122,6 +138,7 @@ const REFERENCES = {
   npcs: { factionId: "factions", statBlockReferenceId: "references" },
   fronts: { npcId: "npcs", factionId: "factions" },
   quests: { parentId: "quests", giverNpcId: "npcs", locationId: "locations" },
+  encounters: { questId: "quests" },
   locations: { parentId: "locations" },
   secrets: { revealedSessionId: "sessions" },
 };

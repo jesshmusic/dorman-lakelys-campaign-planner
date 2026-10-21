@@ -81,3 +81,54 @@ test("counts the records to send", () => {
   assert.equal(recordCount(store), 6 + 3 + 1);
   assert.equal(recordCount({}), 0);
 });
+
+test("sends a quest's encounters with the quest's id, so Dungeon Master Guru can point them at the new quest", () => {
+  const { campaign, store } = local();
+  const quest = store.quests[0];
+  store.encounters = [
+    {
+      id: "enc0000000000001",
+      uuid: "enc0000000000001",
+      syncVersion: 0,
+      questId: quest.id,
+      name: "Ambush",
+      kind: "combat",
+      position: 0,
+      foundryScenes: [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Bridge" }],
+      links: [{ id: "k1", uuid: "k1", linkableType: "CampaignReference", linkableId: "ref0000000000001", quantity: 4 }],
+      rewardCurrency: { gp: 30 },
+      rewardXp: 200,
+    },
+  ];
+
+  const payload = importPayload({ campaign, store, world });
+
+  assert.ok(SENT_COLLECTIONS.indexOf("encounters") > SENT_COLLECTIONS.indexOf("quests"));
+  assert.deepEqual(payload.records.encounters, [
+    {
+      id: "enc0000000000001",
+      questId: quest.id,
+      name: "Ambush",
+      kind: "combat",
+      position: 0,
+      foundryScenes: [{ uuid: "Scene.QdI6Ix83ypmPq4lc", name: "Bridge" }],
+      links: [{ id: "k1", uuid: "k1", linkableType: "CampaignReference", linkableId: "ref0000000000001", quantity: 4 }],
+      rewardCurrency: { gp: 30 },
+      rewardXp: 200,
+    },
+  ]);
+  assert.equal(recordCount(store), 6 + 3 + 1 + 1);
+  assert.deepEqual(importPayload({ campaign, store: { ...store, encounters: undefined }, world }).records.encounters, []);
+});
+
+test("sends a quest's handouts and a place's roll tables as they are", () => {
+  const { campaign, store } = local();
+  store.quests[0] = { ...store.quests[0], handouts: [{ uuid: "JournalEntry.QdI6Ix83ypmPq4lc", name: "Letter" }] };
+  store.locations = [
+    { id: "loc0000000000001", uuid: "loc0000000000001", syncVersion: 0, name: "The Marsh", rollTables: [{ uuid: "RollTable.QdI6Ix83ypmPq4lc", name: "Marsh encounters" }] },
+  ];
+  const payload = importPayload({ campaign, store, world });
+
+  assert.deepEqual(payload.records.quests[0].handouts, [{ uuid: "JournalEntry.QdI6Ix83ypmPq4lc", name: "Letter" }]);
+  assert.deepEqual(payload.records.locations[0].rollTables, [{ uuid: "RollTable.QdI6Ix83ypmPq4lc", name: "Marsh encounters" }]);
+});

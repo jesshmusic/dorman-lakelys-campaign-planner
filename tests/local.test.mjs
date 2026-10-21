@@ -159,6 +159,7 @@ test("gives each record a unique id that is also its uuid", () => {
 
 test("has an Add form for each kind of record", () => {
   assert.deepEqual(Object.keys(ADD_FORMS).sort(), [
+    "encounters",
     "factions",
     "fronts",
     "locations",
@@ -193,8 +194,8 @@ test("adds records from the forms", () => {
   assert.equal(newRecord("quests", { name: "Find the crypt", kind: "nonsense" }, { id }).kind, "side");
   const quest = newRecord("quests", { name: "Find the crypt" }, { id });
   assert.deepEqual(
-    [quest.foundryScenes, quest.links, quest.rewardCurrency, quest.rewardXp, quest.milestone],
-    [[], [], {}, null, false],
+    [quest.foundryScenes, quest.links, quest.rewardCurrency, quest.rewardXp, quest.milestone, quest.handouts],
+    [[], [], {}, null, false, []],
   );
   assert.equal(newRecord("npcs", { name: "Kalvar", role: "bbeg" }, { id }).role, "bbeg");
   assert.equal(newRecord("npcs", { name: "Kalvar", role: "dragon" }, { id }).role, "neutral");
@@ -203,6 +204,52 @@ test("adds records from the forms", () => {
     "Dark",
   ]);
   assert.equal(newRecord("factions", { name: "The Watch" }, { id }).name, "The Watch");
+});
+
+test("adds an encounter to a quest, after its other encounters", () => {
+  const existing = [
+    { id: "e1", questId: "q1", position: 0 },
+    { id: "e2", questId: "q1", position: 3 },
+    { id: "e3", questId: "q2", position: 7 },
+  ];
+  const encounter = newRecord(
+    "encounters",
+    { questId: "q1", name: " Ambush at the bridge ", kind: "trap", description: "Goblins in the reeds" },
+    { id: ids(), existing },
+  );
+
+  assert.deepEqual(
+    (({ questId, name, kind, description, notes, position, foundryScenes, links, rewardCurrency, rewardXp, syncVersion }) => ({
+      questId,
+      name,
+      kind,
+      description,
+      notes,
+      position,
+      foundryScenes,
+      links,
+      rewardCurrency,
+      rewardXp,
+      syncVersion,
+    }))(encounter),
+    {
+      questId: "q1",
+      name: "Ambush at the bridge",
+      kind: "trap",
+      description: "Goblins in the reeds",
+      notes: null,
+      position: 4,
+      foundryScenes: [],
+      links: [],
+      rewardCurrency: {},
+      rewardXp: null,
+      syncVersion: 0,
+    },
+  );
+  assert.equal(encounter.id, encounter.uuid);
+  assert.equal(newRecord("encounters", { questId: "q9", name: "Talk", kind: "dance" }, { id: ids(), existing }).kind, "combat");
+  assert.equal(newRecord("encounters", { questId: "q9", name: "Talk" }, { id: ids(), existing }).position, 0);
+  assert.deepEqual(newRecord("encounters", { questId: "q1" }, { id: ids() }), { error: "Name is required." });
 });
 
 test("numbers a new session after the last one", () => {
@@ -290,6 +337,10 @@ test("lets the Dashboard and planner set Foundry-only fields", () => {
       .treasureCurrency,
     { gp: 5 },
   );
+  const handouts = [{ uuid: "JournalEntry.QdI6Ix83ypmPq4lc", name: "Letter" }];
+  assert.deepEqual(applyLocalChange("quests", { name: "Q" }, { handouts }, { now }).handouts, handouts);
+  const encounter = applyLocalChange("encounters", { name: "E" }, { rewardXp: 50, name: "No" }, { now });
+  assert.deepEqual([encounter.rewardXp, encounter.name], [50, "E"]);
 });
 
 test("makes an NPC from an actor", () => {

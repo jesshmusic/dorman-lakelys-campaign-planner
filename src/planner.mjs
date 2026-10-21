@@ -20,6 +20,12 @@ const MAX_QUANTITY = 9999;
 export const COINS = ["pp", "gp", "ep", "sp", "cp"];
 // Foundry ids, as Dungeon Master Guru checks them
 const SCENE_UUID = /^Scene\.[A-Za-z0-9]{16}$/;
+// A journal entry or page, in this world or a compendium
+const HANDOUT_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?JournalEntry\.[A-Za-z0-9]{16}(\.JournalEntryPage\.[A-Za-z0-9]{16})?$/;
+export const MAX_HANDOUTS = 20;
+// A roll table, in this world or a compendium
+const TABLE_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?RollTable\.[A-Za-z0-9]{16}$/;
+export const MAX_ROLL_TABLES = 10;
 const ACTOR_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?Actor\.[A-Za-z0-9]{16}$/;
 const LIMITS = { stakes: 10, features: 20, scenes: 20, portents: 10 };
 // Foundry's token dispositions (CONST.TOKEN_DISPOSITIONS)
@@ -39,7 +45,8 @@ export function roleFromDisposition(disposition) {
 }
 
 // The link type for each collection, as Dungeon Master Guru names them. Sessions
-// link to any of them; quests to NPCs and references (monsters and reward items).
+// link to any of them; quests to NPCs and references (reward items); encounters
+// to NPCs and references (monsters and reward items).
 export const LINK_TYPES = {
   secrets: "CampaignSecret",
   locations: "CampaignLocation",
@@ -48,6 +55,10 @@ export const LINK_TYPES = {
   fronts: "CampaignFront",
   references: "CampaignReference",
 };
+
+// The records that have links: sessions, quests, and quests' encounters
+// (monsters with how many, NPCs and reward items)
+export const LINK_OWNERS = ["sessions", "quests", "encounters"];
 
 const BOOK_CODES = {
   "Player's Handbook": "phb",
@@ -358,15 +369,52 @@ export function actorChange(uuid, name) {
 }
 
 /**
- * A session's or quest's maps with one added (once), or { error }.
- * @param {string} noun what the maps are for, for the error: "session" or "quest"
+ * A session's, quest's or encounter's maps with one added (once), or { error }.
+ * @param {string} noun what the maps are for, for the error: "session", "quest" or "encounter"
  */
 export function addScene(scenes, uuid, name, noun = "session") {
   if (!SCENE_UUID.test(uuid ?? "")) return { error: "That isn't a scene from this world." };
   if ((scenes ?? []).some((scene) => scene.uuid === uuid)) return { scenes: scenes ?? [] };
-  if ((scenes ?? []).length >= MAX_SCENES) return { error: `Up to ${MAX_SCENES} maps a ${noun}.` };
+  if ((scenes ?? []).length >= MAX_SCENES) return { error: `Up to ${MAX_SCENES} maps ${/^[aeiou]/.test(noun) ? "an" : "a"} ${noun}.` };
   return { scenes: [...(scenes ?? []), { uuid, name: String(name ?? "Map").slice(0, MAX_NAME) }] };
 }
+
+/**
+ * A quest's handouts with a journal entry or page added at the end (once), or { error }.
+ * @param {{ uuid: string, name: string }[]} handouts
+ * @param {string} uuid e.g. "JournalEntry.QdI6Ix83ypmPq4lc.JournalEntryPage.WVPcqI82sGV2YrXq"
+ */
+export function addHandout(handouts, uuid, name) {
+  const list = handouts ?? [];
+  if (!HANDOUT_UUID.test(uuid ?? "")) return { error: "Drop a journal entry or page here, from the Journal sidebar or a compendium." };
+  if (list.some((handout) => handout.uuid === uuid)) return { handouts: list };
+  if (list.length >= MAX_HANDOUTS) return { error: `Up to ${MAX_HANDOUTS} handouts a quest.` };
+  const label = String(name ?? "").trim() || "Handout";
+  return { handouts: [...list, { uuid, name: label.slice(0, MAX_NAME) }] };
+}
+
+/** A quest's handouts without one */
+export const removeHandout = (handouts, uuid) => (handouts ?? []).filter((handout) => handout.uuid !== uuid);
+
+/** True for a journal entry or page uuid a quest can use as a handout */
+export const isHandoutUuid = (uuid) => HANDOUT_UUID.test(uuid ?? "");
+
+/**
+ * A place's random encounter tables with a roll table added at the end (once), or { error }.
+ * @param {{ uuid: string, name: string }[]} tables
+ * @param {string} uuid e.g. "RollTable.QdI6Ix83ypmPq4lc" or a compendium table's
+ */
+export function addRollTable(tables, uuid, name) {
+  const list = tables ?? [];
+  if (!TABLE_UUID.test(uuid ?? "")) return { error: "Drop a roll table here, from the sidebar or a compendium." };
+  if (list.some((table) => table.uuid === uuid)) return { rollTables: list };
+  if (list.length >= MAX_ROLL_TABLES) return { error: `Up to ${MAX_ROLL_TABLES} roll tables a place.` };
+  const label = String(name ?? "").trim() || "Roll table";
+  return { rollTables: [...list, { uuid, name: label.slice(0, MAX_NAME) }] };
+}
+
+/** A place's roll tables without one */
+export const removeRollTable = (tables, uuid) => (tables ?? []).filter((table) => table.uuid !== uuid);
 
 /** Coins from form values (coin_pp, coin_gp, ...): { gp: 150 }, or { error } */
 export function coinsFrom(values) {
@@ -381,7 +429,7 @@ export function coinsFrom(values) {
   return { coins };
 }
 
-/** A session or quest with one link's quantity set (1 or blank clears it), or { error } */
+/** A session, quest or encounter with one link's quantity set (1 or blank clears it), or { error } */
 export function setLinkQuantity(record, linkId, value) {
   const quantity = whole(value);
   if (Number.isNaN(quantity) || (quantity !== null && (quantity < 1 || quantity > MAX_QUANTITY))) {
@@ -484,8 +532,8 @@ function linkDetail(collection, record) {
 const linkName = (collection, record) => (collection === "secrets" ? record.text : record.name);
 
 /**
- * A session or quest with its links of one kind set to these records,
- * keeping the links it already had to them.
+ * A session, quest or encounter with its links of one kind set to these
+ * records, keeping the links it already had to them.
  * @param {object} owner the session or quest
  * @param {string} collection e.g. "secrets"
  * @param {string[]} ids the records to link, in order
@@ -495,6 +543,11 @@ const linkName = (collection, record) => (collection === "secrets" ? record.text
 export function setLinks(owner, collection, ids, records, id) {
   const type = LINK_TYPES[collection];
   const byId = new Map(records.map((record) => [record.id, record]));
+  // The same records as before: the links stay as they are, in their order,
+  // so saving doesn't send a change that isn't one
+  const now = (owner.links ?? []).filter((link) => link.linkableType === type).map((link) => link.linkableId);
+  const next = [...new Set(ids.filter((linkableId) => byId.has(linkableId)))];
+  if (next.length === now.length && next.every((linkableId) => now.includes(linkableId))) return owner;
   const keep = (owner.links ?? []).filter((link) => link.linkableType !== type);
   const existing = new Map(
     (owner.links ?? []).filter((link) => link.linkableType === type).map((link) => [link.linkableId, link]),
@@ -557,10 +610,12 @@ export function referenceFromDocument(document, id) {
 
 /**
  * What deleting a record means for the rest of the campaign: the pages to
- * remove, and the records that pointed at it, without the pointer.
+ * remove (a quest's encounters go with it), and the records that pointed at
+ * it, without the pointer.
  * @returns {{ remove: { collection: string, id: string }[], updates: { collection: string, record: object }[] }}
  */
 export function planDelete(store, collection, id) {
+  const remove = [{ collection, id }];
   const updates = [];
   const clear = (target, fields) => {
     for (const record of store[target] ?? []) {
@@ -584,17 +639,21 @@ export function planDelete(store, collection, id) {
     clear("locations", ["parentId"]);
   } else if (collection === "quests") {
     clear("quests", ["parentId"]);
+    for (const encounter of store.encounters ?? []) {
+      if (String(encounter.questId) === String(id)) remove.push({ collection: "encounters", id: encounter.id });
+    }
   } else if (collection === "sessions") {
     clear("secrets", ["revealedSessionId"]);
   } else if (collection === "references") {
     clear("npcs", ["statBlockReferenceId"]);
   }
-  // Sessions and quests drop their links to it
+  // Sessions, quests and encounters drop their links to it
+  const removed = (owners, owner) => remove.some((r) => r.collection === owners && r.id === owner.id);
   const type = LINK_TYPES[collection];
   if (type) {
-    for (const owners of ["sessions", "quests"]) {
+    for (const owners of LINK_OWNERS) {
       for (const owner of store[owners] ?? []) {
-        if (owners === collection && owner.id === id) continue;
+        if (removed(owners, owner)) continue;
         const links = (owner.links ?? []).filter((link) => !(link.linkableType === type && link.linkableId === id));
         if (links.length !== (owner.links ?? []).length) {
           const already = updates.find((u) => u.collection === owners && u.record.id === owner.id);
@@ -604,7 +663,7 @@ export function planDelete(store, collection, id) {
       }
     }
   }
-  return { remove: [{ collection, id }], updates };
+  return { remove, updates };
 }
 
 /** The Story tab's line about threats, for the techniques this world uses */

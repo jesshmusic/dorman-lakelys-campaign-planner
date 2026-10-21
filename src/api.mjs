@@ -122,9 +122,24 @@ export class DmGuruApi {
     return this.#request("GET", "/v1/foundry/compendium");
   }
 
-  /** Replaces one pack's index: { pack, count, skipped } */
-  sendCompendiumPack(pack, version, entries) {
-    return this.#request("POST", "/v1/foundry/compendium", { pack, version, entries });
+  /**
+   * Replaces one pack's index: { pack, count, skipped }. A homebrew pack
+   * (this world's own monsters) is sent with `homebrew: true` and its name as
+   * `label`; with no entries, Dungeon Master Guru drops it.
+   * @param {{ homebrew?: boolean, label?: string }} [extra]
+   */
+  sendCompendiumPack(pack, version, entries, { homebrew = false, label } = {}) {
+    return this.#request("POST", "/v1/foundry/compendium", {
+      pack,
+      version,
+      entries,
+      ...(homebrew ? { homebrew: true, label: label ?? pack } : {}),
+    });
+  }
+
+  /** One of the DM's Dungeon Master Guru monsters, to import as an actor: { id, name, actor } (dnd5e actor data) */
+  monster(id) {
+    return this.#request("GET", `/v1/foundry/monsters/${encodeURIComponent(id)}`);
   }
 
   async #request(method, path, body) {

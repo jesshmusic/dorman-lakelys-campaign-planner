@@ -8,6 +8,19 @@ import { applyLocalChange, buildLocalCampaign, newRecord } from "./local.mjs";
 import { planDelete, referenceFromDocument } from "./planner.mjs";
 import { THUMBNAIL, campaignSceneUuids, hasThumbnail, sceneVersion } from "./scenes.mjs";
 import { importPayload } from "./send.mjs";
+import { encounterSort, planQuestEncounters, questSort } from "./encounters.mjs";
+import { SRD_TABLES, systemTables } from "./difficulty.mjs";
+import {
+  MONSTER_FOLDER,
+  chosenSources,
+  droppedSources,
+  homebrewOptions,
+  homebrewPack,
+  importedActorUuid,
+  monsterActorData,
+  worldActorEntries,
+  worldActorsSource,
+} from "./homebrew.mjs";
 import { normalizeTruths } from "./setup.mjs";
 import { changedAttributes, createAttributes, describeFields, syncValue, uuidV4 } from "./editing.mjs";
 import { pendingCount, pendingUuids, pushPayload, queueCreate, queueDelete, queueUpdate, withRealIds } from "./outbox.mjs";
@@ -17,6 +30,7 @@ import {
   adventureData,
   adventureUuids,
   foldersFor,
+  handoutEntryIds,
   isPlayersCharacter,
   localFolderName,
   localJournal,
@@ -131,6 +145,7 @@ export class CampaignSync {
   #sentScenes = null;
   #sendingScenes = null;
   #scenesAgain = false;
+  #converting = null;
 
   get linked() {
     const campaign = game.settings.get(MODULE_ID, SETTINGS.campaign);
@@ -443,16 +458,48 @@ export class CampaignSync {
     const record = readable(collection, saving);
     const store = this.records();
     store[collection].set(String(record.id), record);
-    const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === collection);
-    if (entry) await this.#writePages(entry, collection, [record], new Set(), this.#renderContext(store));
+    const context = this.#renderContext(store);
+    await this.#writeTo(collection, [record], context);
+    for (const [target, related] of this.#related(collection, record, store)) await this.#writeTo(target, related, context);
     Hooks.callAll(SYNCED_HOOK);
     return true;
   }
 
+  // Writes records' pages in their section's journal entry. A campaign made
+  // before a section existed (Encounters) gets its entry now.
+  async #writeTo(collection, records, context) {
+    if (!records.length) return;
+    let entry = this.#entriesInFolder().find((e) => flag(e, "collection") === collection);
+    if (!entry && this.folder) entry = (await this.#ensureEntries(this.linked?.name ?? "Campaign"))[collection];
+    if (entry) await this.#writePages(entry, collection, records, new Set(), context);
+  }
+
+  // The other pages that show something of this record: a quest's page lists
+  // its encounters, and an encounter's page names its quest (and sorts by it)
+  #related(collection, record, store) {
+    if (collection === "encounters") {
+      const quest = store.quests.get(String(record.questId));
+      return quest ? [["quests", [quest]]] : [];
+    }
+    if (collection === "quests") {
+      return [["encounters", [...store.encounters.values()].filter((encounter) => String(encounter.questId) === String(record.id))]];
+    }
+    return [];
+  }
+
+  // After encounters are deleted, their quests' pages stop listing them
+  async #afterRemoving(removed) {
+    const store = this.records();
+    const quests = new Set(removed.filter(({ collection }) => collection === "encounters").map(({ record }) => String(record.questId)));
+    const pages = [...quests].map((id) => store.quests.get(id)).filter(Boolean);
+    if (pages.length) await this.#writeTo("quests", pages, this.#renderContext(store));
+  }
+
   /**
    * Sends the index of this world's SRD and core book compendiums to Dungeon
-   * Master Guru, so planner searches can link to their entries. Only packs
-   * whose package changed since the last send, unless `force`.
+   * Master Guru, so planner searches can link to their entries, and of the
+   * homebrew sources the GM chose (see homebrew.mjs). Only packs that changed
+   * since the last send, unless `force`.
    * @returns {Promise<{ packs: number, entries: number }>}
    */
   async sendCompendiumIndex({ force = false } = {}) {
@@ -478,7 +525,116 @@ export class CampaignSync {
       sent.packs += 1;
       sent.entries += result.count;
     }
+    const homebrew = await this.#sendHomebrew(api, { send: this.homebrewSources, saved, force });
+    return { packs: sent.packs + homebrew.packs, entries: sent.entries + homebrew.entries };
+  }
+
+  /** The homebrew sources the GM can choose: World actors, and the Actor compendiums that aren't the books' */
+  homebrewOptions() {
+    return homebrewOptions(
+      game.packs.contents.map((pack) => ({ id: pack.collection, label: pack.title, documentName: pack.documentName })),
+      { id: game.world.id, title: game.world.title },
+    );
+  }
+
+  /** The homebrew sources whose index goes to Dungeon Master Guru (a world setting) */
+  get homebrewSources() {
+    return chosenSources(game.settings.get(MODULE_ID, SETTINGS.homebrewSources));
+  }
+
+  /**
+   * Chooses the homebrew sources and, when connected, sends what changed: a
+   * newly ticked one with its monsters, and an unticked one with none, so
+   * Dungeon Master Guru drops it.
+   * @param {string[]} ids
+   * @returns {Promise<{ packs: number, entries: number }|null>} null when not connected
+   */
+  async setHomebrewSources(ids) {
+    const before = this.homebrewSources;
+    const after = chosenSources(ids);
+    await game.settings.set(MODULE_ID, SETTINGS.homebrewSources, after);
+    if (!this.token) return null;
+    const added = after.filter((id) => !before.includes(id));
+    return this.#sendHomebrew(this.api(), { send: added, drop: droppedSources(before, after), force: true });
+  }
+
+  // Sends homebrew packs: each in `send` with its monsters (unless Dungeon
+  // Master Guru has that version already), and each in `drop` with none
+  async #sendHomebrew(api, { send = [], drop = [], saved = {}, force = false }) {
+    const options = this.homebrewOptions();
+    const source = (id) => ({ id, label: options.find((option) => option.id === id)?.label ?? id });
+    const sent = { packs: 0, entries: 0 };
+    for (const id of send) {
+      const entries = await this.#homebrewEntries(id);
+      // Gone from this world for now (its module switched off, say): left as it is there
+      if (!entries) continue;
+      const pack = homebrewPack(source(id), entries);
+      if (!force && saved?.[id]?.version === pack.version) continue;
+      const result = await api.sendCompendiumPack(pack.pack, pack.version, pack.entries, { homebrew: true, label: pack.label });
+      sent.packs += 1;
+      sent.entries += result?.count ?? entries.length;
+    }
+    for (const id of drop) {
+      const pack = homebrewPack(source(id), []);
+      await api.sendCompendiumPack(pack.pack, pack.version, [], { homebrew: true, label: pack.label });
+    }
     return sent;
+  }
+
+  // A homebrew source's monsters as index entries, or null when it isn't in this world
+  async #homebrewEntries(id) {
+    // This world's actors; another world's (in a copied world, say) aren't here
+    const world = worldActorsSource({ id: game.world.id, title: game.world.title });
+    if (id === world.id) return worldActorEntries(game.actors.contents, id);
+    const pack = game.packs.get(id);
+    if (!pack || pack.documentName !== "Actor") return null;
+    const index = await pack.getIndex({ fields: INDEX_FIELDS });
+    return index.contents.map((entry) => entryFromIndex(id, "Actor", entry)).filter(Boolean);
+  }
+
+  /** Finds compendium entries by name, in the packs the campaign uses: (kind, name) => uuid or null */
+  compendiumUuid() {
+    return this.#compendiumLookup(this.records());
+  }
+
+  /** The world actor imported for one of Dungeon Master Guru's monsters, or null */
+  monsterActorUuid(monsterId) {
+    return importedActorUuid(game.actors?.contents ?? [], monsterId);
+  }
+
+  /** True when a Dungeon Master Guru monster can be imported here: a GM, connected, with a synced campaign */
+  get canImportMonsters() {
+    return Boolean(game.user.isGM && this.token && this.linked && !this.isLocal);
+  }
+
+  /**
+   * Imports one of Dungeon Master Guru's monsters as an actor in the "Dungeon
+   * Master Guru" folder. From then on, links to that monster point at it.
+   * Throws a DmGuruApiError when it can't be fetched.
+   */
+  async importMonster(monsterId) {
+    const existing = this.monsterActorUuid(monsterId);
+    if (existing) return fromUuidSync(existing);
+    const monster = await this.api().monster(monsterId);
+    const folder = await this.#monsterFolder();
+    const actor = await Actor.implementation.create(monsterActorData({ ...monster, id: monster.id ?? monsterId }, folder?.id ?? null));
+    // The journal pages link to it now
+    await this.rewritePages();
+    Hooks.callAll(SYNCED_HOOK);
+    return actor;
+  }
+
+  async #monsterFolder() {
+    return (
+      game.folders.find((f) => f.type === "Actor" && f.getFlag(MODULE_ID, "monsters")) ??
+      game.folders.find((f) => f.type === "Actor" && f.name === MONSTER_FOLDER) ??
+      Folder.create({ name: MONSTER_FOLDER, type: "Actor", flags: { [MODULE_ID]: { monsters: true } } })
+    );
+  }
+
+  /** XP by CR and the 2024 budgets: the game system's own when it has them (dnd5e does), or the SRD's */
+  get xpTables() {
+    return systemTables(globalThis.CONFIG?.DND5E) ?? SRD_TABLES;
   }
 
   /**
@@ -537,7 +693,12 @@ export class CampaignSync {
     }
     const store = this.records();
     const used = new Set(
-      campaignSceneUuids({ locations: [...store.locations.values()], sessions: [...store.sessions.values()], quests: [...store.quests.values()] }),
+      campaignSceneUuids({
+        locations: [...store.locations.values()],
+        sessions: [...store.sessions.values()],
+        quests: [...store.quests.values()],
+        encounters: [...store.encounters.values()],
+      }),
     );
     const scenes = game.scenes.contents.filter((scene) => hasThumbnail(scene._source));
     const toSend = scenes
@@ -669,16 +830,20 @@ export class CampaignSync {
     if (!store[collection]?.get(String(id))) return;
     const { remove, updates } = planDelete(this.recordLists(), collection, id);
     let outbox = this.outbox;
+    const removed = [];
     for (const { collection: target, id: targetId } of remove) {
       const record = store[target]?.get(String(targetId));
       if (!record) continue;
       const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === target);
       const page = entry?.pages.find((p) => flag(p, "uuid") === record.uuid);
       if (page) await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
+      // A quest's encounters are deleted too; deleting what's already gone there is fine
       outbox = queueDelete(outbox, { collection: target, type: PUSH_TYPES[target], uuid: record.uuid });
+      removed.push({ collection: target, record });
     }
     // Dungeon Master Guru clears these pointers itself when the delete arrives
     for (const update of updates) await this.#saveRecord(update.collection, update.record);
+    await this.#afterRemoving(removed);
     await this.#queue(outbox);
   }
 
@@ -714,14 +879,42 @@ export class CampaignSync {
   async deleteLocal(collection, id) {
     if (!this.isLocal) throw new Error("Edit this campaign on Dungeon Master Guru; it syncs here.");
     const { remove, updates } = planDelete(this.recordLists(), collection, id);
+    const removed = [];
     for (const { collection: target, id: targetId } of remove) {
       const record = this.records()[target]?.get(String(targetId));
       const entry = this.#entriesInFolder().find((e) => flag(e, "collection") === target);
       const page = record && entry?.pages.find((p) => flag(p, "uuid") === record.uuid);
       if (page) await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
+      if (record) removed.push({ collection: target, record });
     }
     for (const update of updates) await this.#saveRecord(update.collection, update.record);
+    await this.#afterRemoving(removed);
     Hooks.callAll(SYNCED_HOOK);
+  }
+
+  /**
+   * Moves the monsters quests had before encounters into an encounter each
+   * ("Encounter", combat, first), in a campaign that lives in this world.
+   * Only the active GM does it, so two GMs don't both; it finds nothing to do
+   * once it's done. A synced campaign's quests move on Dungeon Master Guru,
+   * and come with the next Sync. Returns how many quests changed.
+   */
+  convertQuestMonsters() {
+    if (!this.isLocal || !game.user.isActiveGM || !this.folder) return Promise.resolve(0);
+    this.#converting ??= this.#convertQuestMonsters().finally(() => {
+      this.#converting = null;
+    });
+    return this.#converting;
+  }
+
+  async #convertQuestMonsters() {
+    const { quests, encounters } = planQuestEncounters(this.recordLists(), { id: () => foundry.utils.randomID(16) });
+    // Each encounter first, then its quest without the monsters: if this stops
+    // partway, the next time finishes it without losing them or doubling up
+    for (const encounter of encounters) await this.#saveRecord("encounters", encounter);
+    for (const quest of quests) await this.#saveRecord("quests", quest);
+    if (quests.length) console.log(`Dorman Lakely's Campaign Planner | Moved the monsters of ${quests.length} quests into encounters`);
+    return quests.length;
   }
 
   /**
@@ -765,6 +958,8 @@ export class CampaignSync {
     await game.settings.set(MODULE_ID, SETTINGS.campaign, { uuid: campaign.uuid, name: campaign.name, local: true });
     // Its pages may have been written (or imported) with other techniques switched on
     await this.rewritePages();
+    // Made (or exported) before encounters: its quests' monsters move into one
+    await this.convertQuestMonsters();
     Hooks.callAll(SYNCED_HOOK);
   }
 
@@ -776,6 +971,8 @@ export class CampaignSync {
    */
   async sendToDmGuru() {
     if (!this.isLocal) throw new Error("This campaign is already on Dungeon Master Guru.");
+    // Quests go with their monsters in encounters, as Dungeon Master Guru keeps them
+    await this.convertQuestMonsters();
     const store = this.recordLists();
     const campaign = store.campaign[0];
     const world = { id: game.world.id, title: game.world.title };
@@ -827,6 +1024,12 @@ export class CampaignSync {
     const worldFolders = game.folders.contents.map((f) => ({ _id: f.id, folder: f._source.folder ?? null }));
     const journalFolders = [folder.id, ...subfolderIds(folder.id, worldFolders)];
     const entries = game.journal.filter((entry) => journalFolders.includes(entry._source.folder));
+    // Handouts from elsewhere in the Journal go along, so the quests' links to them still work
+    const handouts = handoutEntryIds(lists)
+      .filter((id) => !entries.some((entry) => entry.id === id))
+      .map((id) => game.journal.get(id))
+      .filter(Boolean);
+    entries.push(...handouts);
     const texts = entries.flatMap((entry) => entry.pages.contents.map((page) => page.text?.content ?? ""));
     const wanted = adventureUuids(lists, { texts });
 
@@ -846,7 +1049,11 @@ export class CampaignSync {
         else documents[documentName].push(document);
       }
     }
-    const used = [...journalFolders, ...Object.values(documents).flat().map((document) => document._source.folder)];
+    const used = [
+      ...journalFolders,
+      ...handouts.map((entry) => entry._source.folder),
+      ...Object.values(documents).flat().map((document) => document._source.folder),
+    ];
     return {
       campaign,
       folder,
@@ -973,9 +1180,13 @@ export class CampaignSync {
       techniques: currentTechniques(),
       baseUrl: this.baseUrl,
       compendiumUuid: this.#compendiumLookup(store),
+      monsterActorUuid: (id) => this.monsterActorUuid(id),
       actorName: (uuid) => fromUuidSync(uuid)?.name ?? null,
       recordOf: (collection, id) => store[collection]?.get(String(id)) ?? null,
       references: [...store.references.values()],
+      encounters: [...store.encounters.values()],
+      campaign: [...store.campaign.values()][0] ?? null,
+      xpTables: this.xpTables,
       nameOf: (collection, id) => {
         if (id === null || id === undefined) return null;
         const record = store[collection]?.get(String(id));
@@ -1001,13 +1212,13 @@ export class CampaignSync {
     }
     const existing = this.#entriesInFolder();
     const entries = {};
-    for (const [index, { collection, name }] of SECTIONS.entries()) {
+    for (const { collection, name, sort } of SECTIONS) {
       entries[collection] =
         existing.find((entry) => flag(entry, "collection") === collection) ??
         (await JournalEntry.create({
           name,
           folder: folder.id,
-          sort: (index + 1) * 1000,
+          sort,
           flags: { [MODULE_ID]: { collection } },
         }));
     }
@@ -1026,9 +1237,11 @@ export class CampaignSync {
         "text.content": content,
         [`flags.${MODULE_ID}`]: { uuid: record.uuid, collection, syncVersion: record.syncVersion, record },
       };
-      // Sessions in play order and main quests by act; other pages keep their creation order
+      // Sessions in play order, main quests by act, and encounters by quest;
+      // other pages keep their creation order
       if (collection === "sessions") data.sort = record.number * 1000;
-      if (collection === "quests") data.sort = (record.kind === "main" ? 0 : 100000) + (record.act ?? 99) * 1000 + (record.position ?? 0);
+      if (collection === "quests") data.sort = questSort(record);
+      if (collection === "encounters") data.sort = encounterSort(record, context.recordOf?.("quests", record.questId));
       const page = pages.get(record.uuid);
       if (!page) {
         creates.push(

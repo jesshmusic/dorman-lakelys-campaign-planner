@@ -11,15 +11,15 @@ const THUMBNAIL_FORMAT = 1;
 const SCENE_UUID = /^Scene\.[A-Za-z0-9]{16}$/;
 
 /**
- * The scenes a campaign uses: each place's map, and each session's and
- * quest's maps, once each.
- * @param {{ locations?: object[], sessions?: object[], quests?: object[] }} records
+ * The scenes a campaign uses: each place's map, and each session's, quest's
+ * and encounter's maps, once each.
+ * @param {{ locations?: object[], sessions?: object[], quests?: object[], encounters?: object[] }} records
  * @returns {string[]} scene UUIDs
  */
-export function campaignSceneUuids({ locations = [], sessions = [], quests = [] }) {
+export function campaignSceneUuids({ locations = [], sessions = [], quests = [], encounters = [] }) {
   const uuids = [
     ...locations.map((location) => location.foundrySceneUuid),
-    ...[...sessions, ...quests].flatMap((owner) => (owner.foundryScenes ?? []).map((scene) => scene.uuid)),
+    ...[...sessions, ...quests, ...encounters].flatMap((owner) => (owner.foundryScenes ?? []).map((scene) => scene.uuid)),
   ];
   return [...new Set(uuids.filter((uuid) => SCENE_UUID.test(uuid ?? "")))];
 }
@@ -57,8 +57,8 @@ export function sceneVersion(source) {
   return `${THUMBNAIL_FORMAT}-${hash(fingerprint)}`;
 }
 
-// A fast 53-bit string hash (cyrb53), as hex
-function hash(text) {
+/** A fast 53-bit string hash (cyrb53), as hex */
+export function hash(text) {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i += 1) {

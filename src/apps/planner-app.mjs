@@ -1,17 +1,34 @@
-import { clockSvg, creditHtml, currencyText, escapeHtml, truthsHtml } from "../render.mjs";
+import { ENCOUNTER_KIND_LABELS, clockSvg, creditHtml, currencyText, escapeHtml, truthsHtml } from "../render.mjs";
 import { changeTruthRows, readTruthRows, truthsFieldHtml } from "../truths-editor.mjs";
 import { normalizeTruths } from "../setup.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
-import { NPC_ROLES, newRecord } from "../local.mjs";
+import { ENCOUNTER_KINDS, NPC_ROLES, newRecord } from "../local.mjs";
 import { prepSteps } from "../techniques.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { sendCampaign } from "./send-campaign.mjs";
 import { exportAdventure } from "./export-adventure.mjs";
 import { syncButton, syncStatus, syncWithFeedback } from "./sync-button.mjs";
+import { contentLink, importMonster, monsterHtml, rollTable, rollTablesHtml, showHandout } from "./shared.mjs";
+import { difficultyText, encounterDifficulty } from "../difficulty.mjs";
+import {
+  applyEncounter,
+  encounterValues,
+  encountersOf,
+  itemLinks,
+  legacyEncounter,
+  monsterLinks,
+  moveEncounter,
+  withReference,
+  withoutLink,
+} from "../encounters.mjs";
 import {
   COINS,
   actorChange,
+  addHandout,
+  addRollTable,
   addScene,
+  removeHandout,
+  removeRollTable,
   sceneChange,
   setLinkQuantity,
   QUEST_STATUSES,
@@ -64,10 +81,6 @@ const PREP_STEPS = {
 
 // Where the brief's fields come from, credited under them
 const BRIEF_CREDITS = { pitch: ["pitch"], truths: ["truths"] };
-
-// A Foundry content link: click to open, drag onto a scene or sheet
-const contentLink = (uuid, name, icon) =>
-  `<a class="content-link" draggable="true" data-uuid="${escapeHtml(uuid)}" data-link><i class="fas fa-${icon}"></i>${escapeHtml(name)}</a>`;
 
 // A form field; `extra` is markup that's already safe, shown under its hint.
 // Truths are a list editor, its value the rows.
@@ -132,6 +145,16 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       saveQuest: PlannerApp.#onSaveQuest,
       removeQuestLink: PlannerApp.#onRemoveQuestLink,
       removeQuestScene: PlannerApp.#onRemoveQuestScene,
+      addEncounter: PlannerApp.#onAddEncounter,
+      removeEncounter: PlannerApp.#onRemoveEncounter,
+      moveEncounter: PlannerApp.#onMoveEncounter,
+      removeEncounterLink: PlannerApp.#onRemoveEncounterLink,
+      removeEncounterScene: PlannerApp.#onRemoveEncounterScene,
+      removeHandout: PlannerApp.#onRemoveHandout,
+      showHandout: PlannerApp.#onShowHandout,
+      removeRollTable: PlannerApp.#onRemoveRollTable,
+      rollTable: PlannerApp.#onRollTable,
+      importMonster: PlannerApp.#onImportMonster,
       saveSession: PlannerApp.#onSaveSession,
       addSession: PlannerApp.#onAddSession,
       removeLink: PlannerApp.#onRemoveLink,
@@ -464,7 +487,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       const quests = sorted.filter((quest) => (quest.kind ?? "main") === kind);
       return `<section class="dlcp-lane"><h2>${title}</h2>${quests.length ? `<ul class="dlcp-cards">${quests.map(card).join("")}</ul>` : this.#empty(`No ${title.toLowerCase()} yet.`)}</section>`;
     };
-    return `<p class="dlcp-muted">Main and side quests. Plan each one's maps, NPCs, monsters and reward.</p>
+    return `<p class="dlcp-muted">Main and side quests. Plan each one's maps, NPCs, encounters, handouts and reward.</p>
       <div class="dlcp-lanes">${lane("main", "Main quests")}${lane("side", "Side quests")}</div>
       <div class="dlcp-buttons">${this.#addButton("quests")}</div>`;
   }
@@ -475,7 +498,13 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const npcs = (quest.links ?? [])
       .filter((link) => link.linkableType === "CampaignNpc")
       .map((link) => escapeHtml(store.npcs.find((npc) => npc.id === link.linkableId)?.name ?? link.name));
-    const monsters = this.#linkNames(store, quest, ["monster"], "Monster");
+    const encounters = [
+      legacyEncounter(quest, store.references) && "Encounter",
+      ...encountersOf(store.encounters, quest.id).map((encounter) => encounter.name),
+    ]
+      .filter(Boolean)
+      .map(escapeHtml);
+    const handouts = (quest.handouts ?? []).map((handout) => contentLink(handout.uuid, handout.name, "book-open"));
     const reward = [
       currencyText(quest.rewardCurrency) && escapeHtml(currencyText(quest.rewardCurrency)),
       ...this.#linkNames(store, quest, TREASURE, "Item"),
@@ -486,7 +515,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return [
       ["Maps", maps],
       ["NPCs", npcs],
-      ["Monsters", monsters],
+      ["Encounters", encounters],
+      ["Handouts", handouts],
       ["Reward", reward],
     ]
       .filter(([, parts]) => parts.length)
@@ -510,9 +540,132 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     });
   }
 
-  // A quest's plan: its maps, NPCs, monsters and reward. In this world it's all
-  // edited here; for a Dungeon Master Guru campaign, the maps, coins, XP and
-  // milestone are, and the rest is planned on the website.
+  // A monster or item link's name: a link to its compendium entry or actor
+  // when there is one, and for a Dungeon Master Guru monster with none, a
+  // button to import it
+  #linkLabel(store, link, lookup) {
+    if (link.linkableType === "Monster") return monsterHtml(this.sync, { id: link.linkableId, name: link.name }, lookup);
+    if (link.linkableType === "Item") return escapeHtml(link.name);
+    const reference = store.references.find((r) => r.id === link.linkableId);
+    if (!reference) return escapeHtml(link.name);
+    return reference.foundryUuid
+      ? contentLink(reference.foundryUuid, reference.name, reference.category === "monster" ? "user" : "suitcase")
+      : escapeHtml(reference.name);
+  }
+
+  // What's after a link's name: a monster's CR, a book entry's citation
+  #linkDetail(store, link) {
+    const reference = link.linkableType === "CampaignReference" ? store.references.find((r) => r.id === link.linkableId) : null;
+    const detail = reference
+      ? [reference.challengeRating && `CR ${reference.challengeRating}`, reference.citation].filter(Boolean).join(" · ")
+      : link.detail;
+    return detail ? ` <span class="dlcp-muted">${escapeHtml(detail)}</span>` : "";
+  }
+
+  // An encounter's monsters or items, each with how many and a remove button
+  #encounterLinkRows(store, encounter, links, { lookup, noun }) {
+    if (!links.length) return "";
+    const id = encounter.id;
+    return `<ul class="dlcp-list">${links
+      .map(
+        (link) => `<li><span class="dlcp-grow">${this.#linkLabel(store, link, lookup)}${this.#linkDetail(store, link)}</span>
+          <input class="dlcp-quantity" type="number" min="1" max="9999" name="enc.${escapeHtml(id)}.qty_${escapeHtml(link.id)}" value="${escapeHtml(link.quantity ?? 1)}" aria-label="How many ${escapeHtml(link.name)}" data-tooltip="How many">
+          <button type="button" class="dlcp-link-button" data-action="removeEncounterLink" data-encounter="${escapeHtml(id)}" data-link-id="${escapeHtml(link.id)}" aria-label="Remove ${escapeHtml(link.name)} from the ${noun}">remove</button></li>`,
+      )
+      .join("")}</ul>`;
+  }
+
+  // How hard a combat encounter is for the party, by the 2024 rules
+  #difficulty(store, encounter, quest) {
+    const difficulty = encounterDifficulty(encounter, {
+      references: store.references,
+      campaign: store.campaign[0],
+      quest,
+      tables: this.sync.xpTables,
+    });
+    return difficulty ? `<p class="dlcp-difficulty"><strong>Difficulty:</strong> ${escapeHtml(difficultyText(difficulty))}</p>` : "";
+  }
+
+  // One encounter's card in the quest plan: everything in it is saved with the quest
+  #encounterCard(store, encounter, { quest, index, count, lookup }) {
+    const id = escapeHtml(encounter.id);
+    const name = (field) => `enc.${id}.${field}`;
+    const npcLinks = new Set(
+      (encounter.links ?? []).filter((link) => link.linkableType === "CampaignNpc").map((link) => link.linkableId),
+    );
+    const npcs = store.npcs.length
+      ? `<div class="dlcp-checks">${store.npcs
+          .map(
+            (npc) => `<label class="dlcp-check"><input type="checkbox" data-encounter-npc="${id}" value="${escapeHtml(npc.id)}" ${npcLinks.has(npc.id) ? "checked" : ""}> ${escapeHtml(npc.name)}</label>`,
+          )
+          .join("")}</div>`
+      : this.#empty("No NPCs in the campaign yet. Add them on the Cast tab.");
+    const maps = `${
+      (encounter.foundryScenes ?? []).length
+        ? `<ul class="dlcp-list">${encounter.foundryScenes
+            .map(
+              (scene) => `<li><span class="dlcp-grow">${contentLink(scene.uuid, scene.name, "map")}</span>
+                <button type="button" class="dlcp-link-button" data-action="removeEncounterScene" data-encounter="${id}" data-scene="${escapeHtml(scene.uuid)}" aria-label="Remove ${escapeHtml(scene.name)}">remove</button></li>`,
+            )
+            .join("")}</ul>`
+        : ""
+    }<div class="dlcp-drop dlcp-drop--small" data-kind="encounterScene" data-uuid="${escapeHtml(encounter.uuid)}"><i class="fas fa-map"></i> Drag scenes here for this encounter's maps.</div>`;
+    const kinds = ENCOUNTER_KINDS.map(
+      (kind) => `<option value="${kind}" ${encounter.kind === kind ? "selected" : ""}>${ENCOUNTER_KIND_LABELS[kind]}</option>`,
+    ).join("");
+    const button = (action, icon, label, extra = "") =>
+      `<button type="button" class="dlcp-icon-button" data-action="${action}" data-id="${id}" ${extra} aria-label="${label}" data-tooltip="${label}"><i class="fas fa-${icon}"></i></button>`;
+    return `<section class="dlcp-card dlcp-encounter" data-encounter-card="${id}">
+      <header class="dlcp-card-header">
+        <input type="text" class="dlcp-grow" name="${name("name")}" value="${escapeHtml(encounter.name)}" aria-label="Encounter name" maxlength="120">
+        <select name="${name("kind")}" aria-label="Type of encounter">${kinds}</select>
+        <span class="dlcp-record-buttons">
+          ${button("moveEncounter", "arrow-up", "Move up", `data-delta="-1" ${index === 0 ? "disabled" : ""}`)}
+          ${button("moveEncounter", "arrow-down", "Move down", `data-delta="1" ${index === count - 1 ? "disabled" : ""}`)}
+          <button type="button" class="dlcp-icon-button" data-action="openPage" data-collection="encounters" data-uuid="${escapeHtml(encounter.uuid)}" aria-label="Open the journal page" data-tooltip="Open the journal page"><i class="fas fa-book-open"></i></button>
+          ${button("removeEncounter", "trash", "Remove")}
+        </span>
+      </header>
+      <textarea name="${name("description")}" rows="2" aria-label="What happens" placeholder="What happens: the situation, what the monsters or NPCs want…">${escapeHtml(encounter.description ?? "")}</textarea>
+      ${this.#difficulty(store, encounter, quest)}
+      <h4>Monsters</h4>
+      ${this.#encounterLinkRows(store, encounter, monsterLinks(encounter, store.references), { lookup, noun: "encounter" })}
+      <div class="dlcp-drop dlcp-drop--small" data-kind="encounterMonster" data-uuid="${escapeHtml(encounter.uuid)}"><i class="fas fa-dragon"></i> Drag monsters here from a compendium or the Actors directory, then set how many.</div>
+      <h4>NPCs</h4>
+      ${npcs}
+      <h4>Maps</h4>
+      ${maps}
+      <h4>Reward</h4>
+      <div class="dlcp-coins">${COINS.map(
+        (coin) => `<label>${coin}<input type="number" min="0" name="${name(`coin_${coin}`)}" value="${escapeHtml(encounter.rewardCurrency?.[coin] ?? "")}" aria-label="${coin}"></label>`,
+      ).join("")}</div>
+      <div class="form-group"><label for="dlcp-encounter-xp-${id}">XP</label><input id="dlcp-encounter-xp-${id}" name="${name("rewardXp")}" type="number" min="0" value="${escapeHtml(encounter.rewardXp ?? "")}"></div>
+      ${this.#encounterLinkRows(store, encounter, itemLinks(encounter, store.references), { lookup, noun: "reward" })}
+      <div class="dlcp-drop dlcp-drop--small" data-kind="encounterTreasure" data-uuid="${escapeHtml(encounter.uuid)}"><i class="fas fa-gem"></i> Drag items or roll tables here for this encounter's reward.</div>
+      <details ${encounter.notes ? "open" : ""}><summary>Notes</summary>
+        <textarea name="${name("notes")}" rows="2" aria-label="Notes">${escapeHtml(encounter.notes ?? "")}</textarea></details>
+    </section>`;
+  }
+
+  // An encounter shown but not changed here: monsters a quest had before
+  // encounters, or a campaign that can't be changed in this browser
+  #encounterSummary(store, encounter, { quest, lookup, legacy = false }) {
+    const monsters = monsterLinks(encounter, store.references).map(
+      (link) => `<li>${this.#linkLabel(store, link, lookup)}${link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : ""}${this.#linkDetail(store, link)}</li>`,
+    );
+    const title = legacy ? "Encounter" : `${ENCOUNTER_KIND_LABELS[encounter.kind] ?? "Other"}: ${encounter.name}`;
+    return `<section class="dlcp-card dlcp-encounter">
+      <header class="dlcp-card-header"><h4>${escapeHtml(title)}</h4></header>
+      ${legacy ? `<p class="dlcp-muted">The monsters this quest had before encounters. They move into an encounter of their own${this.sync.isLocal ? "" : " when Dungeon Master Guru moves them and you Sync"}.</p>` : ""}
+      ${encounter.description ? `<p>${escapeHtml(encounter.description)}</p>` : ""}
+      ${legacy ? "" : this.#difficulty(store, encounter, quest)}
+      ${monsters.length ? `<ul>${monsters.join("")}</ul>` : ""}
+    </section>`;
+  }
+
+  // A quest's plan: its maps, NPCs, encounters, handouts and reward. In this
+  // world it's all edited here; for a Dungeon Master Guru campaign too, unless
+  // this browser can't change it.
   #renderQuestPlan(store) {
     const quest = store.quests.find((q) => q.id === this.#questId);
     if (!quest) {
@@ -531,6 +684,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       nameOf("locations", quest.locationId) && `At ${nameOf("locations", quest.locationId)}`,
       nameOf("quests", quest.parentId) && `Part of ${nameOf("quests", quest.parentId)}`,
     ].filter(Boolean);
+    const lookup = this.sync.compendiumUuid();
 
     const maps = `${
       (quest.foundryScenes ?? []).length
@@ -547,10 +701,31 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       ? this.#checklist(quest, "npcs", store.npcs, "NPCs")
       : this.#readOnlyList((quest.links ?? []).filter((l) => l.linkableType === "CampaignNpc").map((l) => escapeHtml(l.name)), "No NPCs picked on Dungeon Master Guru.");
 
-    const monsters = editable
-      ? `${this.#referenceRows(quest, store, ["monster"], { remove: "removeQuestLink" })}
-         <div class="dlcp-drop" data-kind="questMonster"><i class="fas fa-dragon"></i> Drag monsters here from a compendium or the Actors directory.</div>`
-      : this.#readOnlyList(this.#linkNames(store, quest, ["monster"], "Monster"), "No monsters picked on Dungeon Master Guru.");
+    const list = encountersOf(store.encounters, quest.id);
+    const legacy = legacyEncounter(quest, store.references);
+    const encounters = `
+      ${legacy ? this.#encounterSummary(store, legacy, { quest, lookup, legacy: true }) : ""}
+      ${list
+        .map((encounter, index) =>
+          editable
+            ? this.#encounterCard(store, encounter, { quest, index, count: list.length, lookup })
+            : this.#encounterSummary(store, encounter, { quest, lookup }),
+        )
+        .join("")}
+      ${list.length || legacy ? "" : this.#empty("No encounters yet.")}
+      ${editable ? `<div class="dlcp-buttons"><button type="button" class="dlcp-add" data-action="addEncounter"><i class="fas fa-plus"></i> Add an encounter</button></div>` : ""}`;
+
+    const handouts = `${
+      (quest.handouts ?? []).length
+        ? `<ul class="dlcp-list">${quest.handouts
+            .map(
+              (handout) => `<li><span class="dlcp-grow">${contentLink(handout.uuid, handout.name, "book-open")}</span>
+                <button type="button" data-action="showHandout" data-uuid="${escapeHtml(handout.uuid)}" data-tooltip="Choose which players see it"><i class="fas fa-eye"></i> Show to players</button>
+                <button type="button" class="dlcp-link-button" data-action="removeHandout" data-uuid="${escapeHtml(handout.uuid)}" aria-label="Remove ${escapeHtml(handout.name)}">remove</button></li>`,
+            )
+            .join("")}</ul>`
+        : ""
+    }<div class="dlcp-drop" data-kind="questHandout"><i class="fas fa-book-open"></i> Drag journal entries or pages here from the Journal sidebar or a compendium.</div>`;
 
     const items = editable
       ? `${this.#referenceRows(quest, store, TREASURE, { quantities: true, remove: "removeQuestLink" })}
@@ -580,11 +755,12 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           </select></header>
         <p class="dlcp-muted">${escapeHtml(facts.join(" · "))}</p>
         ${quest.description ? `<p>${escapeHtml(quest.description)}</p>` : ""}
-        ${editable ? "" : `<p class="dlcp-notice">This quest is planned on Dungeon Master Guru. Add its maps, coins and XP here; they sync.</p>`}
+        ${editable ? "" : `<p class="dlcp-notice">This quest is planned on Dungeon Master Guru. Add its maps, handouts, coins and XP here; they sync.</p>`}
         ${part("Maps", "The scenes the quest plays out on. Click one to view it.", maps)}
         ${part("NPCs involved", "Who helps, hinders or turns up along the way, beyond the quest giver.", npcs)}
-        ${part("Monsters", "Creatures the party could face. Drag one from here onto a map to place a token.", monsters)}
-        ${part("Reward", "What the party gets for finishing it.", reward)}
+        ${part("Encounters", "The fights, talks, traps and puzzles along the way, in order. Each has its own monsters (with how many), NPCs, maps and reward. Drag a monster from here onto a map to place a token.", encounters)}
+        ${part("Handouts", "Letters, maps and notes for the players: journal entries or pages, to show them when the time comes.", handouts)}
+        ${part("Reward", "What the party gets for finishing the quest.", reward)}
         <div class="dlcp-buttons dlcp-sticky">
           <button type="button" data-action="saveQuest"><i class="fas fa-save"></i> Save the quest</button>
           ${editable ? `<button type="button" data-action="edit" data-collection="quests" data-id="${escapeHtml(quest.id)}"><i class="fas fa-pen"></i> Edit details</button>` : ""}
@@ -629,10 +805,26 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       : "";
   }
 
+  // A session's monsters picked from Dungeon Master Guru's own: a link to the
+  // compendium entry or imported actor, or a button to import it
+  #srdMonsterRows(owner) {
+    const links = (owner.links ?? []).filter((link) => link.linkableType === "Monster");
+    if (!links.length) return "";
+    const lookup = this.sync.compendiumUuid();
+    return `<ul class="dlcp-list">${links
+      .map(
+        (link) => `<li><span class="dlcp-grow">${monsterHtml(this.sync, { id: link.linkableId, name: link.name }, lookup)}${link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : ""}
+          ${link.detail ? ` <span class="dlcp-muted">${escapeHtml(link.detail)}</span>` : ""}</span>
+          <button type="button" class="dlcp-link-button" data-action="removeLink" data-link-id="${escapeHtml(link.id)}" aria-label="Remove ${escapeHtml(link.name)}">remove</button></li>`,
+      )
+      .join("")}</ul>`;
+  }
+
   // Cast ----------------------------------------------------------------------
 
   #renderCast(store) {
     const factionName = (id) => store.factions.find((f) => f.id === id)?.name;
+    const lookup = this.sync.compendiumUuid();
     const npcs = [...store.npcs].sort(
       (a, b) => NPC_ROLES.indexOf(a.role) - NPC_ROLES.indexOf(b.role) || a.name.localeCompare(b.name),
     );
@@ -645,6 +837,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           ${npc.motive ? `<p><strong>Wants:</strong> ${escapeHtml(npc.motive)}</p>` : ""}
           ${npc.secret ? `<p><strong>Secret:</strong> ${escapeHtml(npc.secret)}</p>` : ""}
           ${npc.voice ? `<p><strong>Voice:</strong> ${escapeHtml(npc.voice)}</p>` : ""}
+          ${npc.monster ? `<p class="dlcp-foundry"><strong>Dungeon Master Guru stat block:</strong> ${monsterHtml(this.sync, npc.monster, lookup)}${npc.monster.challengeRating ? ` <span class="dlcp-muted">CR ${escapeHtml(npc.monster.challengeRating)}</span>` : ""}</p>` : ""}
           <p class="dlcp-foundry">
             ${
               npc.foundryActorUuid
@@ -692,12 +885,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
               }
               <span class="dlcp-drop dlcp-drop--small" data-kind="scene" data-uuid="${escapeHtml(location.uuid)}"><i class="fas fa-map"></i> ${location.foundrySceneUuid ? "Drop another scene to replace it" : "Drop a scene from the Scenes directory"}</span>
             </p>
+            ${(location.rollTables ?? []).length ? `<p><strong>Random encounters:</strong></p>${rollTablesHtml(location, { remove: this.#editable })}` : ""}
+            ${this.#editable ? `<p class="dlcp-foundry"><span class="dlcp-drop dlcp-drop--small" data-kind="placeTable" data-uuid="${escapeHtml(location.uuid)}"><i class="fas fa-table-list"></i> Drop roll tables for random encounters here</span></p>` : ""}
           </div>${tree(location.id)}</li>`,
         )
         .join("")}</ul>`;
     };
     const places = tree(null);
-    return `<p class="dlcp-muted">Fantastic locations, each with a few evocative features. Put places inside others, like a tavern in a town.</p>
+    return `<p class="dlcp-muted">Fantastic locations, each with a few evocative features. Put places inside others, like a tavern in a town.
+        Drop roll tables on a place for its random encounters, and click Roll at the table: only GMs see what comes up.</p>
       ${places || this.#empty("No places yet.")}
       <div class="dlcp-buttons">${this.#addButton("locations")}</div>`;
   }
@@ -818,7 +1014,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         ${step("npcs", checklist("npcs", store.npcs, "NPCs"))}
         ${step(
           "monsters",
-          `${references(["monster"])}<div class="dlcp-drop" data-kind="monster"><i class="fas fa-dragon"></i> Drag monsters here from a compendium or the Actors directory.</div>`,
+          `${this.#srdMonsterRows(session)}${references(["monster"])}<div class="dlcp-drop" data-kind="monster"><i class="fas fa-dragon"></i> Drag monsters here from a compendium or the Actors directory.</div>`,
         )}
         ${step(
           "treasure",
@@ -1023,57 +1219,170 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     return this.#withQuantities(form, updated);
   }
 
-  // Saves a quest's plan. For a Dungeon Master Guru campaign, only what syncs
-  // from Foundry: its maps, coins, XP and milestone.
-  async #saveQuest(quest, record) {
-    if (this.#editable) return this.#save("quests", record);
-    const { foundryScenes, rewardCurrency, rewardXp, milestone } = record;
+  // Reads the whole quest plan: the quest, and each of its encounters' cards
+  // (the ones shown; any others stay as they are). Encounters in `skip` are
+  // left out. Returns { record, encounters } or { error }.
+  #questPlanFromForm(quest, { skip = [] } = {}) {
+    const current = this.#questFromForm(quest);
+    if (current.error) return current;
+    const form = this.element.querySelector('[data-form="quest"]');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const store = this.sync.recordLists();
+    const encounters = [];
+    for (const encounter of encountersOf(store.encounters, quest.id)) {
+      if (skip.includes(encounter.id)) continue;
+      const id = CSS.escape(encounter.id);
+      if (!form.querySelector(`[data-encounter-card="${id}"]`)) {
+        encounters.push(encounter);
+        continue;
+      }
+      const npcIds = [...form.querySelectorAll(`[data-encounter-npc="${id}"]:checked`)].map((box) => box.value);
+      const result = applyEncounter(encounter, encounterValues(values, encounter.id), {
+        npcIds,
+        npcs: store.npcs,
+        id: () => foundry.utils.randomID(16),
+      });
+      if (result.error) return result;
+      encounters.push(result.record);
+    }
+    return { record: current.record, encounters };
+  }
+
+  // Saves a quest's plan: each encounter that changed (or is new), then the
+  // quest. For a campaign this browser can't change, only what syncs from
+  // Foundry: the quest's maps, handouts, coins, XP and milestone.
+  async #saveQuestPlan(quest, { record, encounters = [] }) {
+    if (this.#editable) {
+      const before = new Map(this.sync.recordLists().encounters.map((encounter) => [encounter.id, encounter]));
+      for (const encounter of encounters) {
+        const original = before.get(encounter.id);
+        if (original && JSON.stringify(original) === JSON.stringify(encounter)) continue;
+        if (!(await this.#save("encounters", encounter))) return false;
+      }
+      return this.#save("quests", record);
+    }
+    const { foundryScenes, rewardCurrency, rewardXp, milestone, handouts } = record;
     try {
-      return await this.sync.update("quests", quest, { foundryScenes, rewardCurrency, rewardXp, milestone });
+      return await this.sync.update("quests", quest, { foundryScenes, rewardCurrency, rewardXp, milestone, handouts: handouts ?? [] });
     } catch (error) {
       ui.notifications.error(`Couldn't save: ${error.message}`);
       return false;
     }
   }
 
-  // Adds a map to the open quest, keeping anything typed in its plan
-  async #addQuestScene(scene) {
+  /**
+   * Changes the open quest's plan, keeping anything typed in it: reads the
+   * form, lets `change` alter it ({ record, encounters }, or { error }), and
+   * saves what changed. Returns the saved quest, or false.
+   */
+  async #changeQuestPlan(change = (plan) => plan, { skip = [] } = {}) {
     const quest = this.#record("quests", this.#questId);
-    if (!quest) return;
-    const result = addScene(quest.foundryScenes, scene.uuid, scene.name, "quest");
-    if (result.error) return ui.notifications.warn(result.error);
-    return this.#saveQuestScenes(quest, result.scenes);
-  }
-
-  async #saveQuestScenes(quest, scenes) {
-    const current = this.#questFromForm(quest);
-    if (current.error) return ui.notifications.warn(current.error);
-    return this.#saveQuest(quest, { ...current.record, foundryScenes: scenes });
-  }
-
-  // A monster or item dropped on a quest's plan becomes a linked book reference
-  async #addQuestReference(document) {
-    const quest = this.#record("quests", this.#questId);
-    const current = quest && this.#questFromForm(quest);
-    if (!current || current.error) {
-      if (current?.error) ui.notifications.warn(current.error);
-      return;
+    if (!quest) return false;
+    const plan = this.#questPlanFromForm(quest, { skip });
+    if (plan.error) {
+      ui.notifications.warn(plan.error);
+      return false;
     }
-    const reference = await this.sync.referenceFor(document);
-    const references = this.sync.recordLists().references;
-    const ids = [...new Set([...linkedIds(current.record, "references"), reference.id])];
-    await this.#save("quests", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
+    const changed = await change(plan);
+    if (!changed || changed.error) {
+      if (changed?.error) ui.notifications.warn(changed.error);
+      return false;
+    }
+    return this.#saveQuestPlan(quest, changed);
   }
 
-  // A monster, item or table dropped on session prep becomes a linked book reference
+  // Changes one encounter in the open quest's plan
+  #changeEncounter(key, change, by = "id") {
+    return this.#changeQuestPlan(async (plan) => {
+      const encounter = plan.encounters.find((e) => e[by] === key);
+      if (!encounter) return null;
+      const updated = await change(encounter);
+      if (!updated || updated.error) return updated;
+      return { ...plan, encounters: plan.encounters.map((e) => (e.id === encounter.id ? updated : e)) };
+    });
+  }
+
+  // Adds a map to the open quest, keeping anything typed in its plan
+  #addQuestScene(scene) {
+    return this.#changeQuestPlan((plan) => {
+      const result = addScene(plan.record.foundryScenes, scene.uuid, scene.name, "quest");
+      return result.error ? result : { ...plan, record: { ...plan.record, foundryScenes: result.scenes } };
+    });
+  }
+
+  // A journal entry or page dropped on the quest's Handouts
+  #addHandout(document) {
+    return this.#changeQuestPlan((plan) => {
+      const result = addHandout(plan.record.handouts, document.uuid, document.name);
+      return result.error ? result : { ...plan, record: { ...plan.record, handouts: result.handouts } };
+    });
+  }
+
+  // An item or table dropped on a quest's reward becomes a linked book reference
+  #addQuestReference(document) {
+    return this.#changeQuestPlan(async (plan) => {
+      const reference = await this.sync.referenceFor(document);
+      const references = this.sync.recordLists().references;
+      return { ...plan, record: withReference(plan.record, reference.id, references, () => foundry.utils.randomID(16)) };
+    });
+  }
+
+  // A monster, item or table dropped on an encounter: linked as a book reference
+  #addEncounterReference(encounterUuid, document) {
+    return this.#changeEncounter(
+      encounterUuid,
+      async (encounter) => {
+        const reference = await this.sync.referenceFor(document);
+        const references = this.sync.recordLists().references;
+        return withReference(encounter, reference.id, references, () => foundry.utils.randomID(16));
+      },
+      "uuid",
+    );
+  }
+
+  // A scene dropped on an encounter becomes one of its maps
+  #addEncounterScene(encounterUuid, scene) {
+    return this.#changeEncounter(
+      encounterUuid,
+      (encounter) => {
+        const result = addScene(encounter.foundryScenes, scene.uuid, scene.name, "encounter");
+        return result.error ? result : { ...encounter, foundryScenes: result.scenes };
+      },
+      "uuid",
+    );
+  }
+
+  // A roll table dropped on a place: one of its random encounter tables
+  #addRollTable(locationUuid, table) {
+    const location = this.#record("locations", locationUuid, "uuid");
+    if (!location) return;
+    const result = addRollTable(location.rollTables, table.uuid, table.name);
+    if (result.error) return ui.notifications.warn(result.error);
+    return this.#change("locations", location.uuid, { rollTables: result.rollTables });
+  }
+
+  // Something dropped on the planner: a scene for a map, an actor for an NPC,
+  // a monster, item or table for a session, quest or encounter (a linked book
+  // reference), a journal for a quest's handouts, or a roll table for a place
   async #onDrop(event, kind, recordUuid) {
     event.preventDefault();
     event.stopPropagation();
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     const document = data?.uuid ? await fromUuid(data.uuid) : null;
-    if (["scene", "sessionScene", "questScene"].includes(kind) && document?.documentName !== "Scene") {
+    if (["scene", "sessionScene", "questScene", "encounterScene"].includes(kind) && document?.documentName !== "Scene") {
       return ui.notifications.warn("Drop a scene here, from the Scenes directory.");
     }
+    if (kind === "questHandout") {
+      if (!["JournalEntry", "JournalEntryPage"].includes(document?.documentName)) {
+        return ui.notifications.warn("Drop a journal entry or page here, from the Journal sidebar or a compendium.");
+      }
+      return this.#addHandout(document);
+    }
+    if (kind === "placeTable") {
+      if (document?.documentName !== "RollTable") return ui.notifications.warn("Drop a roll table here, from the sidebar or a compendium.");
+      return this.#addRollTable(recordUuid, document);
+    }
+    if (kind === "encounterScene") return this.#addEncounterScene(recordUuid, document);
     if (["actor", "newNpc"].includes(kind) && document?.documentName !== "Actor") {
       return ui.notifications.warn("Drop an actor here, from the Actors directory or a compendium.");
     }
@@ -1094,7 +1403,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     }
     if (kind === "sessionScene") return this.#addSessionScene(document);
     if (kind === "questScene") return this.#addQuestScene(document);
-    const monster = kind === "monster" || kind === "questMonster";
+    const monster = kind === "monster" || kind === "encounterMonster";
     const wanted = monster ? ["Actor"] : ["Item", "RollTable"];
     if (!document || !wanted.includes(document.documentName)) {
       ui.notifications.warn(monster ? "Drop an actor here." : "Drop an item or a roll table here.");
@@ -1108,7 +1417,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
       system: document.system,
       pack: document.pack ?? null,
     };
-    if (kind === "questMonster" || kind === "questTreasure") return this.#addQuestReference(dropped);
+    if (kind === "questTreasure") return this.#addQuestReference(dropped);
+    if (kind === "encounterMonster" || kind === "encounterTreasure") return this.#addEncounterReference(recordUuid, dropped);
     const session = this.#record("sessions", this.#sessionId);
     const current = session && this.#sessionFromForm(session);
     if (!current || current.error) {
@@ -1146,7 +1456,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const name = record.name ?? record.displayTitle ?? record.text;
     const confirmed = await foundry.applications.api.DialogV2.confirm({
       window: { title: "Delete" },
-      content: `<p>Delete <strong>${escapeHtml(name)}</strong> and its journal page? Anything that points to it is cleared.</p>`,
+      content: `<p>Delete <strong>${escapeHtml(name)}</strong> and its journal page?${collection === "quests" ? " Its encounters go too." : ""} Anything that points to it is cleared.</p>`,
     });
     if (!confirmed) return;
     try {
@@ -1248,6 +1558,8 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const session = this.#record("sessions", this.#sessionId);
     const current = session && this.#sessionFromForm(session);
     if (!current || current.error) return;
+    // A Dungeon Master Guru monster goes by its link; a book reference by the reference
+    if (target.dataset.linkId) return this.#save("sessions", withoutLink(current.record, target.dataset.linkId));
     const references = this.sync.recordLists().references;
     const ids = linkedIds(current.record, "references").filter((id) => id !== target.dataset.id);
     await this.#save("sessions", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
@@ -1263,28 +1575,96 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     this.render();
   }
 
+  // Saves the quest and its encounters
   static async #onSaveQuest() {
     const quest = this.#record("quests", this.#questId);
-    if (!quest) return;
-    const result = this.#questFromForm(quest);
-    if (result.error) return ui.notifications.warn(result.error);
-    if (await this.#saveQuest(quest, result.record)) ui.notifications.info(`Saved ${quest.name}.`);
+    if (quest && (await this.#changeQuestPlan())) ui.notifications.info(`Saved ${quest.name}.`);
   }
 
-  static async #onRemoveQuestLink(_event, target) {
-    const quest = this.#record("quests", this.#questId);
-    const current = quest && this.#questFromForm(quest);
-    if (!current || current.error) return;
-    const references = this.sync.recordLists().references;
-    const ids = linkedIds(current.record, "references").filter((id) => id !== target.dataset.id);
-    await this.#save("quests", setLinks(current.record, "references", ids, references, () => foundry.utils.randomID(16)));
+  static #onRemoveQuestLink(_event, target) {
+    return this.#changeQuestPlan((plan) => {
+      const references = this.sync.recordLists().references;
+      const ids = linkedIds(plan.record, "references").filter((id) => id !== target.dataset.id);
+      return { ...plan, record: setLinks(plan.record, "references", ids, references, () => foundry.utils.randomID(16)) };
+    });
   }
 
   static #onRemoveQuestScene(_event, target) {
-    const quest = this.#record("quests", this.#questId);
-    if (!quest) return;
-    const scenes = (quest.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene);
-    return this.#saveQuestScenes(quest, scenes);
+    return this.#changeQuestPlan((plan) => ({
+      ...plan,
+      record: { ...plan.record, foundryScenes: (plan.record.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene) },
+    }));
+  }
+
+  // A new encounter at the end of the quest's, saved with what's typed in the others
+  static #onAddEncounter() {
+    return this.#changeQuestPlan((plan) => {
+      const encounter = newRecord(
+        "encounters",
+        { questId: plan.record.id, name: `Encounter ${plan.encounters.length + 1}`, kind: "combat" },
+        { id: () => foundry.utils.randomID(16), existing: plan.encounters },
+      );
+      return encounter.error ? encounter : { ...plan, encounters: [...plan.encounters, encounter] };
+    });
+  }
+
+  static async #onRemoveEncounter(_event, target) {
+    const encounter = this.#record("encounters", target.dataset.id);
+    if (!encounter) return;
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Remove the encounter" },
+      content: `<p>Remove <strong>${escapeHtml(encounter.name)}</strong> and its journal page?</p>`,
+    });
+    if (!confirmed) return;
+    // What's typed in the quest and its other encounters is kept
+    const saved = await this.#changeQuestPlan((plan) => plan, { skip: [encounter.id] });
+    if (!saved) return;
+    try {
+      await this.sync.deleteRecord("encounters", encounter.id);
+    } catch (error) {
+      ui.notifications.error(`Couldn't remove it: ${error.message}`);
+    }
+  }
+
+  static #onMoveEncounter(_event, target) {
+    const delta = Number(target.dataset.delta);
+    return this.#changeQuestPlan((plan) => ({ ...plan, encounters: moveEncounter(plan.encounters, target.dataset.id, delta) }));
+  }
+
+  static #onRemoveEncounterLink(_event, target) {
+    return this.#changeEncounter(target.dataset.encounter, (encounter) => withoutLink(encounter, target.dataset.linkId));
+  }
+
+  static #onRemoveEncounterScene(_event, target) {
+    return this.#changeEncounter(target.dataset.encounter, (encounter) => ({
+      ...encounter,
+      foundryScenes: (encounter.foundryScenes ?? []).filter((scene) => scene.uuid !== target.dataset.scene),
+    }));
+  }
+
+  static #onRemoveHandout(_event, target) {
+    return this.#changeQuestPlan((plan) => ({
+      ...plan,
+      record: { ...plan.record, handouts: removeHandout(plan.record.handouts, target.dataset.uuid) },
+    }));
+  }
+
+  static #onShowHandout(_event, target) {
+    return showHandout(target.dataset.uuid);
+  }
+
+  static #onRemoveRollTable(_event, target) {
+    const location = this.#record("locations", target.dataset.location, "uuid");
+    if (!location) return;
+    return this.#change("locations", location.uuid, { rollTables: removeRollTable(location.rollTables, target.dataset.uuid) });
+  }
+
+  static #onRollTable(_event, target) {
+    return rollTable(target.dataset.uuid);
+  }
+
+  static #onImportMonster(_event, target) {
+    return importMonster(this.sync, target.dataset.monsterId, target);
   }
 
   static #onClearScene(_event, target) {
