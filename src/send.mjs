@@ -6,8 +6,19 @@ import { normalizeTruths } from "./setup.mjs";
 
 // What gets sent, in the same shapes Dungeon Master Guru sends back. Each
 // record keeps its id, so Dungeon Master Guru can keep the references between
-// them (an NPC's faction, a session's linked secrets) and return the new ids.
-export const SENT_COLLECTIONS = ["factions", "references", "locations", "npcs", "fronts", "quests", "sessions", "secrets"];
+// them (an NPC's faction, a session's linked secrets, an encounter's quest)
+// and return the new ids.
+export const SENT_COLLECTIONS = [
+  "factions",
+  "references",
+  "locations",
+  "npcs",
+  "fronts",
+  "quests",
+  "encounters",
+  "sessions",
+  "secrets",
+];
 
 // Kept only in Foundry
 const LOCAL_ONLY = ["uuid", "syncVersion", "local", "template", "partyActorUuids", "displayTitle", "citation"];

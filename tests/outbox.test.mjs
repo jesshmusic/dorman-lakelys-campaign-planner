@@ -100,3 +100,35 @@ test("each kind of change is sent in the push endpoint's shape", () => {
   );
   assert.deepEqual(pushPayload({ op: "delete", collection: "npcs", type: "npc", uuid: "u" }), { op: "delete", type: "npc", uuid: "u" });
 });
+
+test("an encounter made in Foundry for a quest made in Foundry points at the quest's real id once it's sent", () => {
+  let outbox = queueCreate([], { collection: "quests", type: "quest", uuid: "q-temp", attributes: { name: "Clear the crypt" } });
+  outbox = queueCreate(outbox, {
+    collection: "encounters",
+    type: "encounter",
+    uuid: "e-temp",
+    attributes: { name: "Ambush", questId: "q-temp", links: [{ linkableType: "CampaignNpc", linkableId: "n-temp", quantity: null }] },
+  });
+
+  const real = withRealIds(outbox[1], { "q-temp": "41", "n-temp": "31" });
+
+  assert.equal(real.attributes.questId, "41");
+  assert.deepEqual(real.attributes.links.map((link) => link.linkableId), ["31"]);
+  assert.equal(withRealIds(outbox[1], {}).attributes.questId, "q-temp", "until then it keeps the stand-in");
+  assert.deepEqual(pushPayload(real), { op: "create", type: "encounter", uuid: "e-temp", attributes: real.attributes });
+});
+
+test("moving an encounter to another quest sends the quest's real id, before and after", () => {
+  const change = {
+    op: "update",
+    collection: "encounters",
+    type: "encounter",
+    uuid: "e-1",
+    baseVersion: 2,
+    base: { questId: "q-temp" },
+    attributes: { questId: "q-temp2" },
+  };
+  const real = withRealIds(change, { "q-temp": "7", "q-temp2": "8" });
+
+  assert.deepEqual([real.base.questId, real.attributes.questId], ["7", "8"]);
+});

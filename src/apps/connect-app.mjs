@@ -180,15 +180,54 @@ export class ConnectApp extends foundry.applications.api.ApplicationV2 {
   // Compendium index: lets planner searches on Dungeon Master Guru link to these compendiums
   #renderIndex() {
     const result = this.#indexResult;
+    const chosen = new Set(this.sync.homebrewSources);
+    const homebrew = this.sync
+      .homebrewOptions()
+      .map(
+        (option) => `<label class="dlcp-check"><input type="checkbox" data-homebrew value="${escapeHtml(option.id)}" ${chosen.has(option.id) ? "checked" : ""} ${this.#busy ? "disabled" : ""}>
+          ${escapeHtml(option.label)}${option.id === "world.actors" ? ` <span class="dlcp-muted">(this world's NPC actors)</span>` : ""}</label>`,
+      )
+      .join("");
     return `
       <h3>Compendiums</h3>
       <p class="hint">Sends the names, CRs and IDs (never stat blocks) of your SRD and 2024 core book compendiums,
         so monsters and items picked on Dungeon Master Guru become links you can drag onto a scene. Sent automatically
         when a book module updates.</p>
+      <fieldset class="dlcp-homebrew">
+        <legend>Homebrew monsters</legend>
+        <p class="hint">Tick your own monsters to pick them on Dungeon Master Guru too: this world's NPC actors, or an
+          Actor compendium of yours. Only their names, CRs and IDs are sent, never their stat blocks. Untick one and
+          Dungeon Master Guru forgets it.</p>
+        <div class="dlcp-checks">${homebrew}</div>
+      </fieldset>
       ${result ? `<p class="dlcp-notice">Sent ${result.entries.toLocaleString()} entries from ${result.packs} compendiums.</p>` : ""}
       <div class="dlcp-buttons">
         <button type="button" data-action="sendIndex" ${this.#busy ? "disabled" : ""}><i class="fas fa-book"></i> Send compendium index</button>
       </div>`;
+  }
+
+  async _onRender(context, options) {
+    await super._onRender?.(context, options);
+    for (const box of this.element.querySelectorAll("[data-homebrew]")) {
+      box.addEventListener("change", () => this.#onHomebrewChange());
+    }
+  }
+
+  // A homebrew source was ticked or unticked: save the choice and send what changed
+  async #onHomebrewChange() {
+    const ids = [...this.element.querySelectorAll("[data-homebrew]:checked")].map((box) => box.value);
+    this.#busy = true;
+    this.#error = null;
+    await this.render();
+    try {
+      const result = await this.sync.setHomebrewSources(ids);
+      this.#indexResult = result?.packs ? result : null;
+    } catch (error) {
+      this.#error = `Couldn't send the homebrew monsters: ${error.message}`;
+    } finally {
+      this.#busy = false;
+      this.render();
+    }
   }
 
   // A campaign planned in this world can go to Dungeon Master Guru

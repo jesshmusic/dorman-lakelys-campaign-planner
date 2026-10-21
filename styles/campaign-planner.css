@@ -740,6 +740,70 @@
   width: auto;
 }
 
+/* A quest's encounters and handouts, and a place's random encounter tables */
+
+.dlcp-encounter {
+  margin-top: 0.5rem;
+}
+
+.dlcp-encounter > .dlcp-card-header input[type="text"] {
+  font-weight: bold;
+}
+
+.dlcp-encounter > .dlcp-card-header select {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-encounter textarea {
+  min-height: 2.5rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.dlcp-encounter h4 {
+  font-size: 0.95rem;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.dlcp-encounter details {
+  margin-top: 0.4rem;
+}
+
+.dlcp-difficulty {
+  font-size: 0.9rem;
+}
+
+.dlcp-encounters > li.dlcp-encounter {
+  display: block;
+  margin: 0.25rem 0;
+}
+
+.dlcp-encounters h4 {
+  margin: 0.2rem 0;
+}
+
+.dlcp-tables li,
+.dlcp-handouts li {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.dlcp-tables button,
+.dlcp-handouts button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.dlcp-import {
+  white-space: nowrap;
+}
+
+.dlcp-homebrew {
+  margin: 0.5rem 0;
+}
+
 /* Welcome and what's-new messages in chat */
 
 .dlcp-announcement {

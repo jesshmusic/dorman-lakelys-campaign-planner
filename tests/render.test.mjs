@@ -310,7 +310,7 @@ test("shows a session's maps, coins and item quantities", () => {
   assert.match(html, /\{Ruby\} ×3/);
 });
 
-test("renders a quest's maps, NPCs, monsters and reward", () => {
+test("renders a quest's maps, NPCs, monsters from before encounters, and reward", () => {
   const quest = {
     name: "Clear the crypt",
     kind: "side",
@@ -340,7 +340,9 @@ test("renders a quest's maps, NPCs, monsters and reward", () => {
   assert.match(html, /<strong>Quest giver:<\/strong> Kalvar the Hollow/);
   assert.match(html, /<h3>Maps<\/h3><p>@UUID\[Scene\.QdI6Ix83ypmPq4lc\]\{The Crypt\}<\/p>/);
   assert.match(html, /<h3>NPCs<\/h3><ul><li>Kalvar the Hollow \(BBEG\)<\/li><\/ul>/);
-  assert.match(html, /<h3>Monsters<\/h3><ul><li>@UUID\[Compendium\.dnd5e\.monsters\.Actor\.ghoul0000000000\]\{Ghoul\} \(CR 1\)<\/li><li>Cult Fanatic \(Monster Manual p\. 92\)<\/li><\/ul>/);
+  // Monsters it has from before encounters show as one encounter, not a section of their own
+  assert.ok(!html.includes("<h3>Monsters</h3>"));
+  assert.match(html, /<h3>Encounters<\/h3><h4>Encounter<\/h4><p><strong>Monsters:<\/strong><\/p><ul><li>@UUID\[Compendium\.dnd5e\.monsters\.Actor\.ghoul0000000000\]\{Ghoul\} \(CR 1\)<\/li><li>Cult Fanatic \(Monster Manual p\. 92\)<\/li><\/ul>/);
   assert.match(html, /<h3>Reward<\/h3><p>The temple&#39;s favour<\/p>/);
   assert.match(html, /<strong>Coins:<\/strong> 250 gp, 40 sp/);
   assert.match(html, /<strong>XP:<\/strong> 900/);
@@ -352,7 +354,95 @@ test("renders a quest's maps, NPCs, monsters and reward", () => {
 test("leaves out a quest's empty sections", () => {
   const html = renderRecord("quests", { name: "Find the crypt", kind: "main", status: "available" }, context);
 
-  for (const heading of ["Maps", "NPCs", "Monsters", "Reward"]) assert.ok(!html.includes(`<h3>${heading}</h3>`), heading);
+  for (const heading of ["Maps", "NPCs", "Monsters", "Encounters", "Handouts", "Reward"]) {
+    assert.ok(!html.includes(`<h3>${heading}</h3>`), heading);
+  }
+});
+
+const GOBLIN = "Compendium.dnd5e.monsters.Actor.goblin0000000000";
+const encounter = {
+  id: "e1",
+  questId: "q1",
+  name: "Ambush at the bridge",
+  kind: "combat",
+  position: 0,
+  description: "Goblins wait in the reeds.",
+  notes: "They flee at half strength.",
+  foundryScenes: [{ uuid: "Scene.WVPcqI82sGV2YrXq", name: "The Bridge" }],
+  rewardCurrency: { gp: 30 },
+  rewardXp: 200,
+  links: [
+    { linkableType: "Monster", linkableId: "m1", name: "Goblin", detail: "CR 1/4", quantity: 4 },
+    { linkableType: "CampaignReference", linkableId: "9", name: "Cult Fanatic", quantity: 2 },
+    { linkableType: "CampaignNpc", linkableId: "7", name: "Kalvar the Hollow", detail: "BBEG" },
+    { linkableType: "CampaignReference", linkableId: "10", name: "Bag of Holding" },
+  ],
+};
+const withEncounters = {
+  ...context,
+  names: undefined,
+  nameOf: (collection, id) => (collection === "quests" && id === "q1" ? "Clear the crypt" : context.nameOf(collection, id)),
+  compendiumUuid: (kind, name) => (kind === "monster" && name === "Goblin" ? GOBLIN : null),
+  encounters: [
+    { ...encounter, id: "e2", name: "The riddle door", kind: "puzzle", position: 1, links: [], foundryScenes: [], rewardCurrency: {}, rewardXp: null, description: null },
+    encounter,
+    { ...encounter, id: "e3", questId: "other", name: "Elsewhere" },
+  ],
+};
+
+test("lists a quest's encounters in order, each with its monsters and counts, maps and reward", () => {
+  const quest = { id: "q1", name: "Clear the crypt", kind: "main", status: "active", links: [] };
+  const html = renderRecord("quests", quest, withEncounters);
+
+  assert.match(html, /<h3>Encounters<\/h3><h4>Combat: Ambush at the bridge<\/h4>.*<h4>Puzzle: The riddle door<\/h4>/);
+  assert.ok(!html.includes("Elsewhere"));
+  assert.ok(!html.includes("<h4>Encounter</h4>"), "no monsters from before encounters");
+  assert.match(html, /<p><strong>Monsters:<\/strong><\/p><ul><li>@UUID\[Compendium\.dnd5e\.monsters\.Actor\.goblin0000000000\]\{Goblin\} ×4 \(CR 1\/4\)<\/li><li>Cult Fanatic \(Monster Manual p\. 92\) ×2<\/li><\/ul>/);
+  assert.match(html, /<p><strong>NPCs:<\/strong><\/p><ul><li>Kalvar the Hollow \(BBEG\)<\/li><\/ul>/);
+  assert.match(html, /<p><strong>Maps:<\/strong> @UUID\[Scene\.WVPcqI82sGV2YrXq\]\{The Bridge\}<\/p>/);
+  assert.match(html, /<p><strong>Reward:<\/strong> 30 gp, 200 XP<\/p><ul><li>@UUID\[Compendium\.dnd-dungeon-masters-guide\.equipment\.Item\.abc123\]\{Bag of Holding\}<\/li><\/ul>/);
+});
+
+test("an encounter's own page shows its type, quest and the same detail", () => {
+  const html = renderRecord("encounters", encounter, withEncounters);
+
+  assert.match(html, /<strong>Type:<\/strong> Combat/);
+  assert.match(html, /<strong>Quest:<\/strong> Clear the crypt/);
+  assert.match(html, /<p>Goblins wait in the reeds\.<\/p>/);
+  assert.match(html, /<h3>Monsters<\/h3><ul><li>@UUID\[Compendium\.dnd5e\.monsters\.Actor\.goblin0000000000\]\{Goblin\} ×4/);
+  assert.match(html, /<h3>NPCs<\/h3><ul><li>Kalvar the Hollow/);
+  assert.match(html, /<h3>Maps<\/h3><p>@UUID\[Scene\.WVPcqI82sGV2YrXq\]\{The Bridge\}<\/p>/);
+  assert.match(html, /<h3>Reward<\/h3><p>30 gp, 200 XP<\/p><ul><li>@UUID/);
+  assert.match(html, /<h3>Notes<\/h3><p>They flee at half strength\.<\/p>/);
+  const bare = renderRecord("encounters", { name: "Talk", kind: "nonsense", links: [] }, withEncounters);
+  assert.match(bare, /<strong>Type:<\/strong> Other/);
+  for (const heading of ["Monsters", "NPCs", "Maps", "Reward", "Notes"]) assert.ok(!bare.includes(`<h3>${heading}</h3>`), heading);
+});
+
+test("a Dungeon Master Guru monster with no compendium entry links to the actor imported for it", () => {
+  const imported = { ...withEncounters, compendiumUuid: () => null, monsterActorUuid: (id) => (id === "m1" ? "Actor.goblinImported001" : null) };
+  const html = renderRecord("encounters", encounter, imported);
+
+  assert.match(html, /@UUID\[Actor\.goblinImported001\]\{Goblin\} ×4/);
+  const npc = renderRecord("npcs", { name: "Grik", role: "villain", monster: { id: "m1", name: "Goblin", slug: "goblin", challengeRating: "1/4" } }, imported);
+  assert.match(npc, /@UUID\[Actor\.goblinImported001\]\{Goblin\} \(CR 1\/4\)/);
+});
+
+test("lists a quest's handouts as links", () => {
+  const quest = {
+    id: "q1",
+    name: "Clear the crypt",
+    kind: "main",
+    handouts: [
+      { uuid: "JournalEntry.QdI6Ix83ypmPq4lc", name: "The map <torn>" },
+      { uuid: "Compendium.world.lore.JournalEntry.WVPcqI82sGV2YrXq.JournalEntryPage.abcdefABCDEF1234", name: "A letter" },
+      { uuid: "JournalEntry.bad]{x}", name: "Broken" },
+    ],
+  };
+  const html = renderRecord("quests", quest, context);
+
+  assert.match(html, /<h3>Handouts<\/h3><ul><li>@UUID\[JournalEntry\.QdI6Ix83ypmPq4lc\]\{The map &lt;torn&gt;\}<\/li><li>@UUID\[Compendium\.world\.lore\.JournalEntry\.WVPcqI82sGV2YrXq\.JournalEntryPage\.abcdefABCDEF1234\]\{A letter\}<\/li><\/ul>/);
+  assert.ok(!html.includes("Broken"));
 });
 
 const without = (...keys) => ({ ...ALL_ON, ...Object.fromEntries(keys.map((key) => [key, false])) });
@@ -450,4 +540,35 @@ test("credits nothing for a technique that's switched off", () => {
   assert.equal(creditHtml(["truths"], without("truths")), "");
   assert.doesNotMatch(creditHtml(["threats", "clocks"], without("clocks")), /Progress clocks/);
   assert.equal(creditHtml([]), "");
+});
+
+test("lists a place's random encounter tables as links", () => {
+  const html = renderRecord(
+    "locations",
+    { name: "The Marsh", rollTables: [{ uuid: "RollTable.QdI6Ix83ypmPq4lc", name: "Marsh encounters" }] },
+    context,
+  );
+
+  assert.match(html, /<h3>Random encounters<\/h3><ul><li>@UUID\[RollTable\.QdI6Ix83ypmPq4lc\]\{Marsh encounters\}<\/li><\/ul>/);
+  assert.ok(!renderRecord("locations", { name: "Bare" }, context).includes("Random encounters"));
+});
+
+test("shows a combat encounter's difficulty for the party, on its page and the quest's", () => {
+  const references = [{ id: "g", name: "Goblin Warrior", category: "monster", challengeRating: "1/4", citation: "SRD 5.2" }];
+  const fight = { id: "e9", questId: "q9", name: "Goblins", kind: "combat", links: [{ linkableType: "CampaignReference", linkableId: "g", name: "Goblin Warrior", quantity: 12 }] };
+  const quest = { id: "q9", name: "Clear the warren", kind: "main", levelMin: 2, links: [] };
+  const withParty = {
+    ...context,
+    references,
+    encounters: [fight],
+    campaign: { partySize: 4, startLevel: 1 },
+    recordOf: (collection, id) => (collection === "quests" && id === "q9" ? quest : null),
+  };
+  const line =
+    "<p><strong>Difficulty:</strong> Moderate: 600 XP (budget for 4 level-2 characters: Low 400 · Moderate 600 · High 800).</p>";
+
+  // At the quest's lowest level: 12 goblin warriors at 50 XP each
+  assert.ok(renderRecord("encounters", fight, withParty).includes(line));
+  assert.ok(renderRecord("quests", quest, withParty).includes(line));
+  assert.ok(!renderRecord("encounters", { ...fight, kind: "social" }, withParty).includes("Difficulty"));
 });

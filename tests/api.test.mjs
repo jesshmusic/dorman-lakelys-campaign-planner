@@ -213,3 +213,35 @@ test("polls for the token, with the reason it isn't ready as the error code", as
   assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/link/token");
   assert.deepEqual(JSON.parse(calls[0].init.body), { deviceCode: "d" });
 });
+
+test("sends a homebrew pack's index with its name", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { pack: "world.actors", count: 1, skipped: 0 } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+  const entries = [{ uuid: "Actor.aa0000000000000", name: "Ash Wraith", category: "monster", challengeRating: "1/2", detail: null }];
+
+  await api.sendCompendiumPack("world.actors", "homebrew-abc+2", entries, { homebrew: true, label: "World actors" });
+
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    pack: "world.actors",
+    version: "homebrew-abc+2",
+    entries,
+    homebrew: true,
+    label: "World actors",
+  });
+});
+
+test("fetches one of the DM's monsters to import", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: { id: "99", name: "Owlbear Queen", actor: { name: "Owlbear Queen", type: "npc" } } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  assert.equal((await api.monster("99")).name, "Owlbear Queen");
+  assert.equal(calls[0].url, "https://dungeonmaster.guru/v1/foundry/monsters/99");
+  assert.equal(calls[0].init.method, "GET");
+});
+
+test("a monster that's gone is a 404 error", async () => {
+  const { fetchImpl } = fakeFetch([{ status: 404, body: { errors: ["Not found"] } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  await assert.rejects(api.monster("1"), (error) => error instanceof DmGuruApiError && error.status === 404);
+});

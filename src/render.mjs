@@ -2,6 +2,7 @@
 // globals, so it can be tested in Node. Every value from the server is escaped.
 
 import { normalizeTruths } from "./setup.mjs";
+import { SRD_TABLES, difficultyText, encounterDifficulty } from "./difficulty.mjs";
 import { ALL_ON, creditsFor, prepSteps } from "./techniques.mjs";
 
 export function escapeHtml(value) {
@@ -46,6 +47,16 @@ export const NPC_ROLES = {
 };
 
 const QUEST_STATUSES = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
+
+// What sort of challenge an encounter is
+export const ENCOUNTER_KIND_LABELS = {
+  combat: "Combat",
+  social: "Social",
+  exploration: "Exploration",
+  puzzle: "Puzzle",
+  trap: "Trap",
+  other: "Other",
+};
 const SESSION_STATUSES = { planned: "Planned", prepped: "Prepped", played: "Played" };
 
 /**
@@ -86,12 +97,13 @@ const MONSTER_CATEGORIES = ["monster"];
 const TREASURE_CATEGORIES = ["magic_item", "equipment", "table", "spell", "other"];
 
 /**
- * Lists a session's or quest's links: a book entry links to its compendium
- * entry (with how many), a place shows its map, an NPC their actor, and
- * Dungeon Master Guru's SRD monsters and items link to the compendium entry
- * of the same name.
+ * Lists a session's, quest's or encounter's links: a book entry links to its
+ * compendium entry (with how many), a place shows its map, an NPC their
+ * actor, and Dungeon Master Guru's SRD monsters and items link to the
+ * compendium entry of the same name (or a monster to the actor imported for
+ * it, when there's none).
  */
-function linkLists(owner, { references = [], compendiumUuid, recordOf }) {
+function linkLists(owner, { references = [], compendiumUuid, recordOf, monsterActorUuid }) {
   const withDetail = (html, detail) => (detail ? `${html} (${escapeHtml(detail)})` : html);
   const line = (link) => {
     if (link.linkableType === "CampaignReference") {
@@ -109,7 +121,8 @@ function linkLists(owner, { references = [], compendiumUuid, recordOf }) {
       return `${withDetail(escapeHtml(link.name), link.detail)}${extra ? ` · ${extra}` : ""}`;
     }
     const kind = { Monster: "monster", Item: "item" }[link.linkableType];
-    const uuid = kind && compendiumUuid?.(kind, link.name);
+    const uuid =
+      (kind && compendiumUuid?.(kind, link.name)) || (kind === "monster" ? monsterActorUuid?.(link.linkableId) : null);
     const quantity = link.quantity > 1 ? ` ×${escapeHtml(link.quantity)}` : "";
     return withDetail(`${compendiumLink(uuid, link.name) ?? escapeHtml(link.name)}${quantity}`, link.detail);
   };
@@ -131,12 +144,80 @@ const mapLinks = (scenes) =>
     .filter(Boolean)
     .join(", ");
 
+// A list with a label above it, or nothing when it's empty
+const labelled = (label, html) => (html ? `<p><strong>${escapeHtml(label)}:</strong></p>${html}` : "");
+
+// An encounter's reward in a line (coins and XP), then its items. Under a
+// "Reward:" label, unless it has a heading of its own.
+function encounterReward(encounter, links, { label = true } = {}) {
+  const line = escapeHtml(
+    [currencyText(encounter.rewardCurrency), encounter.rewardXp ? `${encounter.rewardXp} XP` : ""].filter(Boolean).join(", "),
+  );
+  const items = links.treasure();
+  if (!line && !items) return "";
+  if (!label) return `${line ? `<p>${line}</p>` : ""}${items}`;
+  return `<p><strong>Reward:</strong>${line ? ` ${line}` : ""}</p>${items}`;
+}
+
+// How hard a combat encounter is for the party, by the 2024 rules
+function difficultyFact(encounter, context, quest) {
+  const difficulty = encounterDifficulty(encounter, {
+    references: context.references,
+    campaign: context.campaign,
+    quest: quest ?? context.recordOf?.("quests", encounter.questId),
+    tables: context.xpTables ?? SRD_TABLES,
+  });
+  return fact("Difficulty", difficultyText(difficulty));
+}
+
+// What an encounter needs and gives, as the quest page lists it under the encounter's name
+function encounterDetail(encounter, context, quest) {
+  const links = linkLists(encounter, context);
+  return [
+    para(encounter.description),
+    difficultyFact(encounter, context, quest),
+    labelled("Monsters", links.monsters()),
+    labelled("NPCs", links.of("CampaignNpc")),
+    linkFact("Maps", mapLinks(encounter.foundryScenes)),
+    encounterReward(encounter, links),
+  ].join("");
+}
+
+const kindLabel = (kind) => ENCOUNTER_KIND_LABELS[kind] ?? ENCOUNTER_KIND_LABELS.other;
+
+/**
+ * A quest's encounters for its page, in order, each under its type and name.
+ * Monsters the quest has from before encounters show first, as one encounter.
+ */
+function questEncounters(quest, context) {
+  const encounters = (context.encounters ?? [])
+    .filter((encounter) => String(encounter.questId) === String(quest.id))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const legacy = linkLists(quest, context).monsters();
+  return [
+    legacy ? `<h4>Encounter</h4>${labelled("Monsters", legacy)}` : "",
+    ...encounters.map(
+      (encounter) =>
+        `<h4>${escapeHtml(kindLabel(encounter.kind))}: ${escapeHtml(encounter.name)}</h4>${encounterDetail(encounter, context, quest)}`,
+    ),
+  ].join("");
+}
+
+// A quest's handouts or a place's roll tables as a list of links: click one to open it
+const handoutLinks = (documents) => {
+  const links = (documents ?? []).map((document) => compendiumLink(document.uuid, document.name)).filter(Boolean);
+  return links.length ? `<ul>${links.map((link) => `<li>${link}</li>`).join("")}</ul>` : "";
+};
+
 /**
  * Renders a record as journal page HTML.
  * @param {string} collection e.g. "npcs"
  * @param {object} record the record JSON from the API
- * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[], compendiumUuid?: (kind: "monster"|"item", name: string) => string|null, techniques?: object }} context
- *   techniques: the ones this world uses (see techniques.mjs); a page leaves out the ones switched off. All, if not given.
+ * @param {{ baseUrl: string, nameOf: (collection: string, id: string|null) => string|null, references: object[], encounters?: object[], compendiumUuid?: (kind: "monster"|"item", name: string) => string|null, monsterActorUuid?: (monsterId: string) => string|null, techniques?: object }} context
+ *   campaign: the campaign record, for its party (an encounter's difficulty); xpTables: XP by CR and the
+ *   budgets (see difficulty.mjs; the SRD's if not given); encounters: every encounter, for the quest pages; monsterActorUuid: the actor imported for a Dungeon Master Guru
+ *   monster, if any; techniques: the ones this world uses (see techniques.mjs); a page leaves out the ones switched
+ *   off. All, if not given.
  */
 export function renderRecord(collection, record, context) {
   const renderer = RENDERERS[collection];
@@ -183,12 +264,14 @@ const RENDERERS = {
       section("Setting notes", para(c.settingNotes)),
     ].join(""),
 
-  npcs: (npc, { baseUrl, nameOf, compendiumUuid }) => {
+  npcs: (npc, { baseUrl, nameOf, compendiumUuid, monsterActorUuid }) => {
     const statBlocks = [];
     const actorLink = compendiumLink(npc.foundryActorUuid, npc.foundryActorName ?? npc.name);
     if (actorLink) statBlocks.push(actorLink);
     if (npc.statBlockReference) statBlocks.push(referenceLink(npc.statBlockReference));
-    const monsterLink = npc.monster && compendiumLink(compendiumUuid?.("monster", npc.monster.name), npc.monster.name);
+    const monsterLink =
+      npc.monster &&
+      compendiumLink(compendiumUuid?.("monster", npc.monster.name) || monsterActorUuid?.(npc.monster.id), npc.monster.name);
     if (monsterLink) {
       statBlocks.push(`${monsterLink} (CR ${escapeHtml(npc.monster.challengeRating)})`);
     } else if (npc.monster) {
@@ -218,6 +301,7 @@ const RENDERERS = {
       linkFact("Map", compendiumLink(location.foundrySceneUuid, location.foundrySceneName ?? "Map")),
       para(location.description),
       section("Fantastic features", list(location.features)),
+      section("Random encounters", handoutLinks(location.rollTables)),
       section("Notes", para(location.notes)),
     ].join(""),
 
@@ -263,7 +347,8 @@ const RENDERERS = {
       para(quest.description),
       section("Maps", maps ? `<p>${maps}</p>` : ""),
       section("NPCs", links.of("CampaignNpc")),
-      section("Monsters", links.monsters()),
+      section("Encounters", questEncounters(quest, context)),
+      section("Handouts", handoutLinks(quest.handouts)),
       section(
         "Reward",
         para(quest.reward) +
@@ -273,6 +358,21 @@ const RENDERERS = {
           links.treasure(),
       ),
       section("Notes", para(quest.notes)),
+    ].join("");
+  },
+
+  encounters: (encounter, context) => {
+    const links = linkLists(encounter, context);
+    return [
+      fact("Type", kindLabel(encounter.kind)),
+      fact("Quest", context.nameOf("quests", encounter.questId)),
+      para(encounter.description),
+      difficultyFact(encounter, context),
+      section("Monsters", links.monsters()),
+      section("NPCs", links.of("CampaignNpc")),
+      section("Maps", mapLinks(encounter.foundryScenes) ? `<p>${mapLinks(encounter.foundryScenes)}</p>` : ""),
+      section("Reward", encounterReward(encounter, links, { label: false })),
+      section("Notes", para(encounter.notes)),
     ].join("");
   },
 

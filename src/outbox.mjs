@@ -13,7 +13,7 @@
 
 // Fields that hold another record's id. A record made in Foundry has a
 // stand-in id (its uuid) until Dungeon Master Guru gives it a real one.
-export const ID_FIELDS = ["parentId", "factionId", "npcId", "giverNpcId", "locationId", "statBlockReferenceId"];
+export const ID_FIELDS = ["parentId", "factionId", "npcId", "giverNpcId", "locationId", "statBlockReferenceId", "questId"];
 
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 

@@ -22,6 +22,8 @@ const MODES = { three_act: "arc", sandbox: "sandbox", five_room: "oneshot", blan
 
 export const NPC_ROLES = ["bbeg", "villain", "lieutenant", "ally", "patron", "neutral"];
 export const QUEST_KINDS = ["main", "side"];
+// What sort of challenge an encounter is, as Dungeon Master Guru names them
+export const ENCOUNTER_KINDS = ["combat", "social", "exploration", "puzzle", "trap", "other"];
 
 const blankToNull = (value) => {
   const text = String(value ?? "").trim();
@@ -86,13 +88,30 @@ const BLANKS = {
     parentId: null,
     giverNpcId: null,
     locationId: null,
-    // What the quest needs and gives: its maps ({ uuid, name }[]), links to its
-    // NPCs, monsters and reward items, its reward coins, and XP or a milestone
+    // What the quest needs and gives: its maps ({ uuid, name }[]), links to the
+    // NPCs involved and its reward items, its reward coins, and XP or a
+    // milestone. Its monsters are in its encounters.
     foundryScenes: [],
     links: [],
     rewardCurrency: {},
     rewardXp: null,
     milestone: false,
+    // Journal entries or pages to show the players: { uuid, name }[]
+    handouts: [],
+  }),
+  // One part of a quest: a fight, a talk, a trap. Its links are its monsters
+  // (quantity: how many), NPCs and reward items; its maps and reward are its own.
+  encounters: (r) => ({
+    questId: r.questId ?? null,
+    name: r.name,
+    kind: r.kind ?? "combat",
+    description: r.description ?? null,
+    notes: null,
+    position: r.position ?? 0,
+    foundryScenes: [],
+    links: r.links ?? [],
+    rewardCurrency: {},
+    rewardXp: null,
   }),
   secrets: (r) => ({
     text: r.text,
@@ -128,6 +147,8 @@ const BLANKS = {
     // The Foundry scene that maps this place
     foundrySceneUuid: null,
     foundrySceneName: null,
+    // Roll tables for random encounters here: { uuid, name }[]
+    rollTables: [],
   }),
   factions: (r) => ({ name: r.name, description: r.description ?? null, goal: r.goal ?? null, notes: null }),
 };
@@ -296,6 +317,14 @@ export const ADD_FORMS = {
       { name: "description", label: "Who they are", type: "textarea" },
     ],
   },
+  encounters: {
+    title: "Add an encounter",
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "kind", label: "Type", type: "select", options: ENCOUNTER_KINDS.map((kind) => [kind, kind[0].toUpperCase() + kind.slice(1)]) },
+      { name: "description", label: "What happens", type: "textarea" },
+    ],
+  },
   sessions: {
     title: "Add a session",
     fields: [
@@ -379,6 +408,23 @@ export function newRecord(collection, values, { id, existing = [] }) {
       );
     case "factions":
       return record(collection, { name: text("name"), goal: text("goal"), description: text("description") }, id);
+    case "encounters": {
+      // values.questId: the quest it's part of; it goes after the quest's other encounters
+      const questId = blankToNull(values.questId);
+      const siblings = existing.filter((encounter) => encounter.questId === questId);
+      return record(
+        collection,
+        {
+          questId,
+          name: text("name"),
+          kind: ENCOUNTER_KINDS.includes(values.kind) ? values.kind : "combat",
+          description: text("description"),
+          position: siblings.reduce((last, encounter) => Math.max(last, (encounter.position ?? 0) + 1), 0),
+          links: Array.isArray(values.links) ? values.links : [],
+        },
+        id,
+      );
+    }
     case "sessions": {
       const number = existing.reduce((highest, session) => Math.max(highest, session.number ?? 0), 0) + 1;
       return record(collection, { number, title: text("title"), level: numberOrNull(values.level) }, id);
@@ -409,9 +455,10 @@ export function applyLocalChange(collection, record, attributes, { now }) {
   }
   const allowed = {
     fronts: ["clockFilled", "portents"],
-    quests: ["status", "foundryScenes", "rewardCurrency", "rewardXp", "milestone"],
+    quests: ["status", "foundryScenes", "rewardCurrency", "rewardXp", "milestone", "handouts"],
+    encounters: ["foundryScenes", "rewardCurrency", "rewardXp"],
     sessions: ["log", "recap", "status", "foundryScenes", "treasureCurrency"],
-    locations: ["foundrySceneUuid", "foundrySceneName"],
+    locations: ["foundrySceneUuid", "foundrySceneName", "rollTables"],
     npcs: ["foundryActorUuid", "foundryActorName"],
   }[collection];
   if (!allowed) return record;

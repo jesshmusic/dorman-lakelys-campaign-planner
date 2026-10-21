@@ -131,6 +131,15 @@ Hooks.once("init", () => {
     onChange: () => dashboard?.rendered && dashboard.render(),
   });
 
+  // The homebrew monster sources whose index goes to Dungeon Master Guru, picked in the Connect window
+  game.settings.register(MODULE_ID, SETTINGS.homebrewSources, {
+    name: "Homebrew monsters to send to Dungeon Master Guru",
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [],
+  });
+
   // Use the six truths, threat clocks, grim portents, ...: each on unless a GM switches it off
   registerTechniqueSettings(() => techniquesChanged());
 
@@ -248,6 +257,9 @@ Hooks.once("ready", () => {
 
   // The welcome message on first install, and what's new after an update
   announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));
+
+  // A campaign in this world from before encounters: its quests' monsters move into one (the active GM, once)
+  sync.convertQuestMonsters().catch((error) => console.warn(`${MODULE_TITLE} | Could not move the quests' monsters into encounters`, error));
 
   // Campaigns sync only when the GM clicks Sync: nothing pulls or pushes on a timer
   sendCompendiumIndex();
