@@ -3,6 +3,7 @@ import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
 import { addForm } from "../local.mjs";
 import { LIST_FIELDS } from "../planner.mjs";
 import { listFieldHtml } from "../list-editor.mjs";
+import { levelSelectHtml, optionsHtml } from "../levels.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { LINKS } from "../welcome.mjs";
 import { giveReward } from "./give-reward.mjs";
@@ -550,10 +551,8 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       const hint = f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : "";
       let control;
       if (f.type === "textarea") control = `<textarea id="${id}" name="${f.name}" rows="3"></textarea>`;
-      else if (f.type === "select")
-        control = `<select id="${id}" name="${f.name}">${f.options
-          .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
-          .join("")}</select>`;
+      else if (f.type === "select") control = `<select id="${id}" name="${f.name}">${optionsHtml(f.options, f.value)}</select>`;
+      else if (f.type === "level") control = levelSelectHtml({ id, name: f.name, value: f.value, blank: f.blank });
       else
         control = `<input id="${id}" name="${f.name}" type="${f.type === "number" ? "number" : "text"}"
           value="${escapeHtml(f.value ?? "")}" ${f.min ? `min="${f.min}" max="${f.max}"` : ""}>`;

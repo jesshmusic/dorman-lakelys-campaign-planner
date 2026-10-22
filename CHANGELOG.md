@@ -5,6 +5,10 @@
 ## [1.3.0] - 2026-10-22
 
 - **Lists instead of one per line:** a threat's grim portents and stakes, a place's features and a session's potential scenes are now lists built a row at a time, like truths: a box for each, buttons to move or remove it, and Add.
+- **Level dropdowns:** every level is now picked from 1 to 20: the campaign's starting and target level (in the brief and the setup guide), a session's party level, and a quest's levels.
+- **A quest's levels:** a quest's edit form has its lowest and highest level, as on Dungeon Master Guru. Its journal page shows them, and its encounters' difficulty uses the lowest.
+- **The campaign's status and type:** the brief has the campaign's status (planning, active, completed or archived) and type (story arc, sandbox or one-shot), and Sync sends them.
+- **An NPC's stat block:** an NPC's edit form can pick its stat block from the campaign's monster book references, as on Dungeon Master Guru.
 
 ## [1.2.0] - 2026-10-21
 

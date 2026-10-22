@@ -20,6 +20,7 @@ export const EDITABLE = {
     "plannedSessions",
     "cadence",
     "status",
+    "mode",
   ],
   factions: ["name", "goal", "description", "notes"],
   locations: ["name", "description", "features", "notes", "parentId", "foundrySceneUuid", "foundrySceneName", "rollTables"],
@@ -99,12 +100,14 @@ export const linksForSync = (links) =>
   }));
 
 /**
- * A field's value as the sync sends it: links in their short form, and a
+ * A field's value as the sync sends it: links in their short form, a
  * campaign's truths as [{ name, description }], even ones an older version
- * kept as text
+ * kept as text, and an NPC's stat block by its reference's id
  */
 export function syncValue(field, record) {
   if (field === "links") return linksForSync(record[field]);
+  // A pulled NPC has its stat block's reference, not the id
+  if (field === "statBlockReferenceId" && !(field in record)) return record.statBlockReference?.id ?? null;
   if (field === "truths" && record.truths !== null && record.truths !== undefined) return normalizeTruths(record.truths);
   return record[field] ?? null;
 }
@@ -170,6 +173,9 @@ export const FIELD_LABELS = {
   parentId: "what it's part of",
   npcId: "who's behind it",
   statBlockReferenceId: "the stat block",
+  mode: "the campaign type",
+  levelMin: "the lowest level",
+  levelMax: "the highest level",
   questId: "the quest it's in",
   handouts: "the handouts",
   rollTables: "the random encounter tables",

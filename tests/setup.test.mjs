@@ -363,3 +363,16 @@ test("credits the ideas behind the sandbox and one-shot templates", () => {
   assert.deepEqual(creditsFor([TEMPLATE_IDEAS.five_room]).map((s) => s.title), ["5 Room Dungeons"]);
   assert.deepEqual(creditsFor([TEMPLATE_IDEAS.sandbox]).map((s) => s.title), ["Don't Prep Plots"]);
 });
+
+test("the guide's levels are dropdowns of 1 to 20, sent as numbers", () => {
+  assert.deepEqual(
+    [FIELDS.start_level, FIELDS.target_level].map((f) => [f.type, f.min, f.max, f.blank]),
+    [
+      ["level", 1, 20, "Not set"],
+      ["level", 1, 20, "Not set"],
+    ],
+  );
+  const draft = { ...defaultDraft(), values: { name: "Zombie Siege", start_level: "3", target_level: "" } };
+  const { campaign } = toPayload(draft, { world: { id: "w", title: "W" }, requestId: "r" });
+  assert.deepEqual([campaign.start_level, campaign.target_level], [3, null]);
+});

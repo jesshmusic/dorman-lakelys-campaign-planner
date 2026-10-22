@@ -329,7 +329,7 @@ export const ADD_FORMS = {
     title: "Add a session",
     fields: [
       { name: "title", label: "Title", type: "text", hint: "Optional, e.g. The Siege of Hommlet" },
-      { name: "level", label: "Party level", type: "number", min: 1, max: 20 },
+      { name: "level", label: "Party level", type: "level", min: 1, max: 20, blank: "Not set" },
     ],
   },
 };
