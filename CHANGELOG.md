@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-22
+
+- **Sync fix:** a quest made in Foundry that linked to book references sent in an earlier Sync could never sync, and neither could its encounters. Sync now knows the real ids of everything already sent, sends each record before anything that points at it, and when one can't be sent, holds back what needs it and says which record it's waiting for.
+- **Campaigns are repaired:** when the module updates, the GM's client brings each campaign in the world up to date. Records and changes waiting for Sync point at real ids, pointers at records made in Foundry and since deleted are dropped, and book references made from an actor take the actor's current name. Campaigns from older adventure exports are brought up to date too.
+- **Book references follow their actor:** renaming an actor renames its book references. A synced campaign's renames wait for Sync.
+- **Update notice:** when Dungeon Master Guru needs a newer version of the module, Sync stops and says to update, keeping every change for after.
+
 ## [1.3.0] - 2026-10-22
 
 - **Lists instead of one per line:** a threat's grim portents and stakes, a place's features and a session's potential scenes are now lists built a row at a time, like truths: a box for each, buttons to move or remove it, and Add.

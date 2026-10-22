@@ -23,7 +23,20 @@ import {
 } from "./homebrew.mjs";
 import { normalizeTruths } from "./setup.mjs";
 import { changedAttributes, createAttributes, describeFields, syncValue, uuidV4 } from "./editing.mjs";
-import { pendingCount, pendingUuids, pushPayload, queueCreate, queueDelete, queueUpdate, withRealIds } from "./outbox.mjs";
+import {
+  pendingCount,
+  pendingUuids,
+  pointAtRealIds,
+  pointsAt,
+  pushPayload,
+  queueCreate,
+  queueDelete,
+  queueUpdate,
+  realIds,
+  sendOrder,
+  withRealIds,
+} from "./outbox.mjs";
+import { migrateFolder, newFolderFlags } from "./migrate-world.mjs";
 import {
   ADVENTURE_PACK,
   CAMPAIGN_FLAG,
@@ -354,31 +367,48 @@ export class CampaignSync {
   }
 
   async #syncNow() {
-    const queued = this.outbox;
-    const ids = {};
+    // Data from an older version of the module is brought up to date first
+    if ((await migrateFolder(this.folder)).length) await this.rewritePages();
+    // Each record goes before what points at it: a quest after its book references
+    const queued = sendOrder(this.outbox);
+    // The real ids of records made here and sent before; the rest get theirs as they're sent
+    const ids = realIds(Object.values(this.records()).flatMap((records) => [...records.values()]));
+    // Records made here that weren't sent this time: what points at them waits for them
+    const unsent = new Set();
     const kept = [];
     const failed = [];
     let sent = 0;
     let unreachable = null;
+    const keep = (change, failure) => {
+      failed.push(failure);
+      kept.push(change);
+      if (change.op === "create") unsent.add(change.uuid);
+    };
     for (const [index, original] of queued.entries()) {
       const change = withRealIds(original, ids);
-      try {
-        const outcome = await this.#send(change);
-        if (outcome.ok) {
-          sent += 1;
-          if (outcome.id !== undefined) ids[change.uuid] = String(outcome.id);
-        } else {
-          failed.push({ name: outcome.name ?? change.uuid, reason: outcome.reason });
-          kept.push(change);
+      const needs = pointsAt(change).find((id) => unsent.has(id));
+      if (needs) {
+        keep(change, { name: this.#nameOf(change.uuid), reason: `It needs ${this.#nameOf(needs)}, which didn't sync.` });
+      } else {
+        try {
+          const outcome = await this.#send(change);
+          if (outcome.ok) {
+            sent += 1;
+            if (outcome.id !== undefined) {
+              ids[change.uuid] = String(outcome.id);
+              await this.#pointAtRealId(change.uuid, String(outcome.id));
+            }
+          } else {
+            keep(change, { name: outcome.name ?? this.#nameOf(change.uuid), reason: outcome.reason });
+          }
+        } catch (error) {
+          if (cantReach(error)) {
+            unreachable = whyNot(error);
+            kept.push(change, ...queued.slice(index + 1).map((rest) => withRealIds(rest, ids)));
+            break;
+          }
+          keep(change, { name: this.#nameOf(change.uuid), reason: error.message });
         }
-      } catch (error) {
-        if (cantReach(error)) {
-          unreachable = whyNot(error);
-          kept.push(change, ...queued.slice(index + 1).map((rest) => withRealIds(rest, ids)));
-          break;
-        }
-        failed.push({ name: change.uuid, reason: error.message });
-        kept.push(change);
       }
       // Save progress as it goes, so nothing is sent twice if this stops partway
       await this.#setOutbox([...kept, ...queued.slice(index + 1).map((rest) => withRealIds(rest, ids))]);
@@ -394,6 +424,33 @@ export class CampaignSync {
     this.lastSyncProblem = unreachable ? { at: Date.now(), message: unreachable } : null;
     Hooks.callAll(SYNCED_HOOK);
     return { sent, failed, unreachable };
+  }
+
+  // A record's name, by its id or uuid, for a message: "the quest Find the crypt"
+  #nameOf(id) {
+    for (const [collection, records] of Object.entries(this.records())) {
+      for (const record of records.values()) {
+        if (record.uuid === id || String(record.id) === String(id)) return pageName(collection, record);
+      }
+    }
+    return "a record that's no longer here";
+  }
+
+  // Once a record made here has its real id, the records that point at it
+  // here point at that id too (the changes waiting for Sync get it as they're sent)
+  async #pointAtRealId(standIn, id) {
+    const store = this.records();
+    const changed = [];
+    for (const [collection, records] of Object.entries(store)) {
+      for (const record of records.values()) {
+        const pointed = pointAtRealIds(record, { [standIn]: id });
+        if (pointed === record) continue;
+        records.set(String(record.id), pointed);
+        changed.push([collection, pointed]);
+      }
+    }
+    const context = this.#renderContext(store);
+    for (const [collection, record] of changed) await this.#writeTo(collection, [record], context);
   }
 
   // Sends one queued change. Returns { ok, id? } or { ok: false, reason, name }; throws when it can't reach the server.
@@ -940,6 +997,24 @@ export class CampaignSync {
     return reference;
   }
 
+  /**
+   * A renamed actor's book references take its new name. A synced campaign's
+   * renames wait for Sync, like other changes made here.
+   */
+  async followActorName(actor) {
+    if (!game.user.isActiveGM || !this.linked || !this.folder || !actor?.uuid) return 0;
+    const name = String(actor.name ?? "").trim().slice(0, 120);
+    if (!name) return 0;
+    const references = [...this.records().references.values()].filter(
+      (reference) => reference.foundryUuid === actor.uuid && reference.name !== name,
+    );
+    for (const reference of references) {
+      if (this.isLocal) await this.saveLocal("references", { ...reference, name });
+      else await this.update("references", reference, { name });
+    }
+    return references.length;
+  }
+
   /** The campaigns that live in this world: [{ uuid, name }] */
   localCampaigns() {
     const campaigns = [];
@@ -1207,7 +1282,7 @@ export class CampaignSync {
       folder = await Folder.create({
         name: this.isLocal ? campaignName : `${campaignName} (DM Guru)`,
         type: "JournalEntry",
-        flags: { [MODULE_ID]: { campaignUuid: uuid } },
+        flags: { [MODULE_ID]: newFolderFlags(uuid) },
       });
     }
     const existing = this.#entriesInFolder();
@@ -1293,13 +1368,15 @@ export class CampaignSync {
   }
 }
 
-// Dungeon Master Guru can't be reached, or won't take this browser's token:
-// stop syncing and keep the changes for next time
-const cantReach = (error) => error?.status === 0 || error?.status === 401 || error?.status === 429 || error?.status >= 500;
+// Dungeon Master Guru can't be reached, won't take this browser's token, or
+// needs a newer version of the module: stop syncing and keep the changes for next time
+const cantReach = (error) =>
+  error?.status === 0 || error?.status === 401 || error?.status === 426 || error?.status === 429 || error?.status >= 500;
 
 // Why a sync stopped, to finish "Couldn't sync: Dungeon Master Guru …"
 function whyNot(error) {
   if (error.status === 401) return "didn't accept this browser's connection. Connect again";
+  if (error.status === 426) return "needs a newer version of this module. Update Dorman Lakely's Campaign Planner, then Sync";
   if (error.status === 429) return "is busy. Try again in a minute";
   if (error.status >= 500) return `had a problem (error ${error.status})`;
   return "couldn't be reached";

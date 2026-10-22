@@ -2,6 +2,15 @@
 
 export const DEFAULT_BASE_URL = "https://dungeonmaster.guru";
 
+// The shape of campaign data this version of the module sends and reads, as
+// Dungeon Master Guru numbers it. It's sent with every request to the
+// /v1/foundry endpoints. When Dungeon Master Guru changes a shape in a way
+// this version would get wrong, it stops taking this number and replies 426
+// (Upgrade Required), and the GM is asked to update the module. Raise it with
+// the module's matching change; versions before 1.3.1 sent none, which
+// Dungeon Master Guru reads as 1.
+export const SYNC_SCHEMA = 1;
+
 export class DmGuruApiError extends Error {
   /**
    * @param {string} message
@@ -19,6 +28,11 @@ export class DmGuruApiError extends Error {
 
   get unauthorized() {
     return this.status === 401;
+  }
+
+  /** Dungeon Master Guru needs a newer version of the module to sync */
+  get updateNeeded() {
+    return this.status === 426;
   }
 }
 
@@ -150,6 +164,7 @@ export class DmGuruApi {
         headers: {
           Accept: "application/json",
           ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+          ...(path.startsWith("/v1/foundry/") ? { "X-Planner-Schema": String(SYNC_SCHEMA) } : {}),
           ...(body ? { "Content-Type": "application/json" } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
