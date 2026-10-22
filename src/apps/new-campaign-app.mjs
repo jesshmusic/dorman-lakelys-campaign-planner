@@ -18,6 +18,7 @@ import {
   validateStep,
 } from "../setup.mjs";
 import { gettingStarted } from "../planner.mjs";
+import { levelSelectHtml } from "../levels.mjs";
 import { loadGuideWords } from "../guide-words.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 
@@ -221,7 +222,9 @@ export class NewCampaignApp extends foundry.applications.api.ApplicationV2 {
         const value = escapeHtml(this.#draft.values[name] ?? "");
         const placeholder = field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : "";
         const control =
-          field.type === "textarea" || field.type === "lines"
+          field.type === "level"
+            ? levelSelectHtml({ id, value: this.#draft.values[name], blank: field.blank, attributes: `data-field="${name}"` })
+            : field.type === "textarea" || field.type === "lines"
             ? `<textarea id="${id}" data-field="${name}" rows="${field.type === "lines" ? 6 : 3}" ${placeholder}>${value}</textarea>`
             : `<input id="${id}" data-field="${name}" type="${field.type === "number" ? "number" : "text"}" value="${value}"
                 ${field.min ? `min="${field.min}" max="${field.max}"` : ""} ${placeholder}>`;

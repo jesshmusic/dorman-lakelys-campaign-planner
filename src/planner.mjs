@@ -8,8 +8,21 @@ import { NPC_ROLES } from "./local.mjs";
 import { NPC_ROLES as ROLE_LABELS } from "./render.mjs";
 import { TRUTHS_HINT, linesOf, normalizeTruths, truthRows, truthsError } from "./setup.mjs";
 import { ALL_ON, visibleFields } from "./techniques.mjs";
+import { MAX_LEVEL, MIN_LEVEL } from "./levels.mjs";
 
 export const QUEST_STATUSES = ["available", "active", "completed", "failed"];
+// A campaign's status and type, as Dungeon Master Guru names them
+export const CAMPAIGN_STATUSES = [
+  ["planning", "Planning"],
+  ["active", "Active"],
+  ["completed", "Completed"],
+  ["archived", "Archived"],
+];
+export const CAMPAIGN_MODES = [
+  ["arc", "Story arc"],
+  ["sandbox", "Sandbox"],
+  ["oneshot", "One-shot"],
+];
 export const SESSION_STATUSES = ["planned", "prepped", "played"];
 export const THREE_CLUES = 3;
 const MAX_NAME = 120;
@@ -28,6 +41,14 @@ const TABLE_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?RollTable\.[A-Za-z0-9]{16}$/
 export const MAX_ROLL_TABLES = 10;
 const ACTOR_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?Actor\.[A-Za-z0-9]{16}$/;
 const LIMITS = { stakes: 10, features: 20, scenes: 20, portents: 10 };
+
+// The fields edited as a list, a row at a time: what one row is called, and how many there can be
+export const LIST_FIELDS = {
+  portents: { noun: "portent", max: LIMITS.portents, placeholder: "e.g. Villages go quiet along the river" },
+  stakes: { noun: "question", max: LIMITS.stakes, placeholder: "e.g. Will the bridge hold?" },
+  features: { noun: "feature", max: LIMITS.features, placeholder: "e.g. A rope bridge over the gorge" },
+  scenes: { noun: "scene", max: LIMITS.scenes, placeholder: "e.g. Ambush at the ford" },
+};
 // Foundry's token dispositions (CONST.TOKEN_DISPOSITIONS)
 const DISPOSITIONS = { secret: -2, hostile: -1, neutral: 0, friendly: 1 };
 
@@ -86,9 +107,14 @@ const whole = (value) => {
 };
 const pick = (records, id) => (id && records?.some((record) => record.id === id) ? id : null);
 
+// A character level, picked from a dropdown of 1 to 20 (see levels.mjs);
+// `blank` labels the choice for no level
+const LEVEL = { type: "level", min: MIN_LEVEL, max: MAX_LEVEL };
+
 /**
  * The edit form for each kind of record. `options` fields list choices; a
- * `records` field picks another record of the campaign.
+ * `records` field picks another record of the campaign, offering only the
+ * ones `only` accepts when it has one.
  */
 export const EDIT_FORMS = {
   fronts: {
@@ -98,8 +124,8 @@ export const EDIT_FORMS = {
       { name: "goal", label: "What it wants", type: "text" },
       { name: "doom", label: "What happens if no one stops it", type: "text" },
       { name: "description", label: "Description", type: "textarea" },
-      { name: "portents", label: "Grim portents", type: "lines", hint: "Signs it's getting closer, one per line." },
-      { name: "stakes", label: "Stakes", type: "lines", hint: "Questions you want answered in play, one per line." },
+      { name: "portents", label: "Grim portents", type: "lines", hint: "Signs it's getting closer, in order." },
+      { name: "stakes", label: "Stakes", type: "lines", hint: "Questions you want answered in play." },
       { name: "clockSegments", label: "Clock segments", type: "number", min: 2, max: 12 },
       { name: "clockFilled", label: "Segments filled", type: "number", min: 0, max: 12 },
       { name: "npcId", label: "Villain", type: "records", collection: "npcs", blank: "None" },
@@ -131,6 +157,8 @@ export const EDIT_FORMS = {
         ],
       },
       { name: "act", label: "Act", type: "number", min: 1, max: 20 },
+      { name: "levelMin", label: "Lowest level", ...LEVEL, blank: "Any" },
+      { name: "levelMax", label: "Highest level", ...LEVEL, blank: "Any" },
       { name: "description", label: "What it's about", type: "textarea" },
       { name: "giverNpcId", label: "Given by", type: "records", collection: "npcs", blank: "No one" },
       { name: "locationId", label: "Where", type: "records", collection: "locations", blank: "Anywhere" },
@@ -155,6 +183,15 @@ export const EDIT_FORMS = {
       { name: "appearance", label: "Appearance", type: "text" },
       { name: "voice", label: "Voice and manner", type: "text" },
       { name: "factionId", label: "Faction", type: "records", collection: "factions", blank: "None" },
+      {
+        name: "statBlockReferenceId",
+        label: "Stat block",
+        type: "records",
+        collection: "references",
+        only: (reference) => reference.category === "monster",
+        blank: "None",
+        hint: "A monster from the campaign's book references.",
+      },
       { name: "notes", label: "Notes", type: "textarea" },
     ],
   },
@@ -163,7 +200,7 @@ export const EDIT_FORMS = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "description", label: "What it's like", type: "textarea" },
-      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing, one per line." },
+      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing." },
       { name: "parentId", label: "Inside", type: "records", collection: "locations", blank: "Nowhere (top level)" },
       { name: "notes", label: "Notes", type: "textarea" },
     ],
@@ -196,9 +233,11 @@ export const BRIEF_FIELDS = [
   { name: "name", label: "Campaign name", type: "text", required: true },
   { name: "tone", label: "Tone", type: "text" },
   { name: "settingName", label: "Setting", type: "text" },
+  { name: "status", label: "Status", type: "select", options: CAMPAIGN_STATUSES },
+  { name: "mode", label: "Type", type: "select", options: CAMPAIGN_MODES },
   { name: "partySize", label: "Players", type: "number", min: 1, max: 12 },
-  { name: "startLevel", label: "Starting level", type: "number", min: 1, max: 20 },
-  { name: "targetLevel", label: "Target level", type: "number", min: 1, max: 20 },
+  { name: "startLevel", label: "Starting level", ...LEVEL, blank: "Not set" },
+  { name: "targetLevel", label: "Target level", ...LEVEL, blank: "Not set" },
   { name: "plannedSessions", label: "Planned sessions", type: "number", min: 1, max: 100 },
   { name: "cadence", label: "How often you play", type: "text" },
   { name: "premise", label: "Premise", type: "textarea" },
@@ -228,6 +267,10 @@ export function formValues(fields, record) {
     fields.map((field) => {
       const value = record && field.name in record ? record[field.name] : field.default;
       if (field.type === "truths") return [field.name, truthRows(value)];
+      // A pulled NPC has its stat block's reference, not the id
+      if (field.name === "statBlockReferenceId" && record && !(field.name in record)) {
+        return [field.name, record.statBlockReference?.id ?? ""];
+      }
       if (field.name === "portents") return [field.name, (value ?? []).map((p) => p.text).join("\n")];
       if (Array.isArray(value)) return [field.name, value.join("\n")];
       return [field.name, value === null || value === undefined ? "" : String(value)];
@@ -244,7 +287,8 @@ function readFields(fields, values, store, current = {}) {
     const raw = values[field.name];
     if (field.required && !text(raw)) return { error: `${field.label} is required.` };
     switch (field.type) {
-      case "number": {
+      case "number":
+      case "level": {
         const number = whole(raw);
         if (Number.isNaN(number) || (number !== null && (number < field.min || number > field.max))) {
           return { error: `${field.label} must be a whole number from ${field.min} to ${field.max}.` };
@@ -323,6 +367,16 @@ export function applyEdit(collection, record, values, store = {}, techniques = A
   if (collection === "secrets" && changes.revelation && changes.revelation.length > MAX_NAME) {
     return { error: `What it points to can be at most ${MAX_NAME} characters.` };
   }
+  if (collection === "quests" && changes.levelMin && changes.levelMax && changes.levelMax < changes.levelMin) {
+    return { error: "The highest level can't be lower than the lowest." };
+  }
+  if (collection === "npcs" && "statBlockReferenceId" in changes) {
+    // What the NPC's page shows for its stat block
+    const reference = (store.references ?? []).find((r) => r.id === changes.statBlockReferenceId);
+    changes.statBlockReference = reference
+      ? { id: reference.id, name: reference.name, citation: reference.citation ?? null, foundryUuid: reference.foundryUuid ?? null }
+      : null;
+  }
   return { record: { ...record, ...changes } };
 }
 
@@ -339,7 +393,7 @@ function isWithin(records, id, ancestorId) {
 
 /** The campaign after its brief is saved, or { error }. With truths switched off, it keeps the ones it has. */
 export function applyBrief(campaign, values, techniques = ALL_ON) {
-  const read = readFields(briefFields(techniques), values);
+  const read = readFields(briefFields(techniques), values, {}, campaign);
   if (read.error) return read;
   const changes = read.values;
   if (changes.startLevel && changes.targetLevel && changes.targetLevel < changes.startLevel) {
@@ -645,7 +699,11 @@ export function planDelete(store, collection, id) {
   } else if (collection === "sessions") {
     clear("secrets", ["revealedSessionId"]);
   } else if (collection === "references") {
-    clear("npcs", ["statBlockReferenceId"]);
+    // A pulled NPC has its stat block's reference, not the id
+    for (const npc of store.npcs ?? []) {
+      if ((npc.statBlockReferenceId ?? npc.statBlockReference?.id) !== id) continue;
+      updates.push({ collection: "npcs", record: { ...npc, statBlockReferenceId: null, statBlockReference: null } });
+    }
   }
   // Sessions, quests and encounters drop their links to it
   const removed = (owners, owner) => remove.some((r) => r.collection === owners && r.id === owner.id);

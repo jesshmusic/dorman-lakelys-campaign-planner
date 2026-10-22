@@ -44,15 +44,16 @@ export const TEMPLATES = [
   },
 ];
 
-// Campaign fields, by their Dungeon Master Guru attribute names
+// Campaign fields, by their Dungeon Master Guru attribute names. Levels are
+// picked from a dropdown of 1 to 20; `blank` labels the choice for none.
 export const FIELDS = {
   name: { label: "Campaign name", type: "text", required: true },
   tone: { label: "Tone", type: "text", placeholder: "e.g. survival horror, swashbuckling" },
   premise: { label: "Premise", hint: "What is this campaign about?", type: "textarea" },
   pitch: { label: "Pitch for your players", hint: "A short, spoiler-free summary for session zero", type: "textarea" },
   party_size: { label: "Players", type: "number", min: 1, max: 12 },
-  start_level: { label: "Starting level", type: "number", min: 1, max: 20 },
-  target_level: { label: "Target level", type: "number", min: 1, max: 20 },
+  start_level: { label: "Starting level", type: "level", min: 1, max: 20, blank: "Not set" },
+  target_level: { label: "Target level", type: "level", min: 1, max: 20, blank: "Not set" },
   planned_sessions: {
     label: "Planned sessions",
     hint: "Story arcs get one session each (6 if blank)",
@@ -293,7 +294,7 @@ export function validateStep(stepId, values, techniques = ALL_ON) {
     for (const name of STEPS.find((step) => step.id === "table").fields) {
       const field = FIELDS[name];
       const value = text(values, name);
-      if (field.type !== "number" || value === "") continue;
+      if (!["number", "level"].includes(field.type) || value === "") continue;
       const number = Number(value);
       if (!Number.isInteger(number) || number < field.min || number > field.max) {
         return `${field.label} must be a whole number from ${field.min} to ${field.max}.`;
@@ -346,7 +347,7 @@ export function toPayload(draft, { world, characters = [], requestId }) {
       continue;
     }
     const value = text(draft.values, name);
-    if (field.type === "number") campaign[name] = value === "" ? null : Number(value);
+    if (field.type === "number" || field.type === "level") campaign[name] = value === "" ? null : Number(value);
     else campaign[name] = value === "" ? null : value;
   }
   campaign.excluded_compendium_packs = [...draft.excludedPacks];

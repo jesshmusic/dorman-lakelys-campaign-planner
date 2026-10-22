@@ -1,5 +1,7 @@
 import { ENCOUNTER_KIND_LABELS, clockSvg, creditHtml, currencyText, escapeHtml, truthsHtml } from "../render.mjs";
 import { changeTruthRows, readTruthRows, truthsFieldHtml } from "../truths-editor.mjs";
+import { listEditorHtml, listFieldHtml } from "../list-editor.mjs";
+import { levelOptions, levelSelectHtml, optionsHtml } from "../levels.mjs";
 import { normalizeTruths } from "../setup.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { ENCOUNTER_KINDS, NPC_ROLES, newRecord } from "../local.mjs";
@@ -22,7 +24,9 @@ import {
   withoutLink,
 } from "../encounters.mjs";
 import {
+  CAMPAIGN_MODES,
   COINS,
+  LIST_FIELDS,
   actorChange,
   addHandout,
   addRollTable,
@@ -59,7 +63,7 @@ const TABS = [
   { id: "sessions", label: "Sessions", icon: "fa-calendar-days" },
 ];
 
-const MODE_LABELS = { arc: "Story arc", sandbox: "Sandbox", oneshot: "One-shot" };
+const MODE_LABELS = Object.fromEntries(CAMPAIGN_MODES);
 const STATUS_LABELS = { available: "Available", active: "Active", completed: "Completed", failed: "Failed" };
 const SESSION_STATUS_LABELS = { planned: "Planned", prepped: "Prepped", played: "Played" };
 const NOUNS = { fronts: "threat", quests: "quest", npcs: "NPC", locations: "place", factions: "faction", secrets: "secret" };
@@ -71,7 +75,7 @@ const TREASURE = ["magic_item", "equipment", "table", "spell", "other"];
 const PREP_STEPS = {
   characters: ["Review the characters", "What does each character want? What hooks might pull them in this session?"],
   strongStart: ["Create a strong start", "Open with something happening that pulls the players straight into the game."],
-  scenes: ["Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away. One per line."],
+  scenes: ["Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away."],
   secrets: ["Define secrets and clues", "Pick around ten unrevealed secrets the party could discover. Don't decide how."],
   locations: ["Develop fantastic locations", "Places that might come up, each with a few evocative features."],
   npcs: ["Outline important NPCs", "Who is likely to show up?"],
@@ -83,14 +87,22 @@ const PREP_STEPS = {
 const BRIEF_CREDITS = { pitch: ["pitch"], truths: ["truths"] };
 
 // A form field; `extra` is markup that's already safe, shown under its hint.
-// Truths are a list editor, its value the rows.
+// Truths are a list editor, its value the rows. Levels are a dropdown of 1 to 20.
 const field = (f, value, extra = "") => {
   const id = `dlcp-planner-${f.name}`;
   if (f.type === "truths") return truthsFieldHtml({ label: f.label, hint: f.hint, rows: value, idPrefix: id, extra });
   const label = `<label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>`;
   const hint = `${f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : ""}${extra}`;
-  if (f.type === "textarea" || f.type === "lines") {
-    return `<div class="form-group stacked">${label}<textarea id="${id}" name="${f.name}" rows="${f.type === "lines" ? 4 : 3}">${escapeHtml(value)}</textarea>${hint}</div>`;
+  // A few short lines (portents, stakes, features): a list the GM builds a row at a time
+  if (f.type === "lines") {
+    return listFieldHtml({ name: f.name, label: f.label, hint: f.hint, value, idPrefix: id, extra, ...LIST_FIELDS[f.name] });
+  }
+  if (f.type === "textarea") {
+    return `<div class="form-group stacked">${label}<textarea id="${id}" name="${f.name}" rows="3">${escapeHtml(value)}</textarea>${hint}</div>`;
+  }
+  if (f.type === "select" || f.type === "level") {
+    const options = f.type === "level" ? levelOptions(f.blank) : f.options;
+    return `<div class="form-group">${label}<select id="${id}" name="${f.name}">${optionsHtml(options, value)}</select>${hint}</div>`;
   }
   return `<div class="form-group">${label}<input id="${id}" name="${f.name}" type="${f.type === "number" ? "number" : "text"}"
     value="${escapeHtml(value)}" ${f.min !== undefined ? `min="${f.min}" max="${f.max}"` : ""}>${hint}</div>`;
@@ -345,7 +357,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     const credit = (f) => (BRIEF_CREDITS[f.name] ? creditHtml(BRIEF_CREDITS[f.name], techniques) : "");
     const brief = this.#editable
       ? `<form class="dlcp-brief" data-form="brief">
-          <div class="dlcp-grid">${fields.filter((f) => f.type === "text" || f.type === "number")
+          <div class="dlcp-grid">${fields.filter((f) => ["text", "number", "level", "select"].includes(f.type))
             .map((f) => field(f, values[f.name]))
             .join("")}</div>
           ${fields.filter((f) => ["textarea", "lines", "truths"].includes(f.type))
@@ -999,7 +1011,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
         <div class="dlcp-grid">
           <div class="form-group"><label for="dlcp-session-title">Title</label><input id="dlcp-session-title" name="title" type="text" value="${escapeHtml(values.title ?? "")}" placeholder="Session ${escapeHtml(session.number)}"></div>
           <div class="form-group"><label for="dlcp-session-date">Date</label><input id="dlcp-session-date" name="scheduledOn" type="date" value="${escapeHtml(values.scheduledOn ?? "")}"></div>
-          <div class="form-group"><label for="dlcp-session-level">Party level</label><input id="dlcp-session-level" name="level" type="number" min="1" max="20" value="${escapeHtml(values.level ?? "")}"></div>
+          <div class="form-group"><label for="dlcp-session-level">Party level</label>${levelSelectHtml({ id: "dlcp-session-level", name: "level", value: values.level, blank: "Not set" })}</div>
           <div class="form-group"><label for="dlcp-session-status">Status</label><select id="dlcp-session-status" name="status">${Object.entries(SESSION_STATUS_LABELS).map(([value, label]) => `<option value="${value}" ${session.status === value ? "selected" : ""}>${label}</option>`).join("")}</select></div>
         </div>
         ${step(
@@ -1008,7 +1020,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           <textarea name="characterNotes" rows="3" aria-label="Character notes">${escapeHtml(values.characterNotes ?? "")}</textarea>`,
         )}
         ${step("strongStart", `<textarea name="strongStart" rows="3" aria-label="Strong start">${escapeHtml(values.strongStart ?? "")}</textarea>`, creditHtml(["strongStart"], techniques))}
-        ${step("scenes", `<textarea name="scenes" rows="4" aria-label="Potential scenes">${escapeHtml((values.scenes ?? []).join("\n"))}</textarea>`)}
+        ${step("scenes", listEditorHtml({ name: "scenes", value: values.scenes ?? [], idPrefix: "dlcp-prep", ...LIST_FIELDS.scenes }))}
         ${step("secrets", checklist("secrets", unrevealed, "secrets"))}
         ${step("locations", checklist("locations", store.locations, "places") + maps)}
         ${step("npcs", checklist("npcs", store.npcs, "NPCs"))}
@@ -1084,14 +1096,15 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
     for (;;) {
       const control = (f) => {
         if (f.type === "select" || f.type === "records") {
-          const options =
-            f.type === "select"
-              ? f.options
-              : [["", f.blank], ...store[f.collection].filter((r) => r.id !== record?.id).map((r) => [r.id, r.name])];
+          // Only the records the field offers, and the one it has now
+          const offered = (store[f.collection] ?? []).filter(
+            (r) => r.id !== record?.id && (!f.only || f.only(r) || r.id === values[f.name]),
+          );
+          const options = f.type === "select" ? f.options : [["", f.blank], ...offered.map((r) => [r.id, r.name])];
           return `<div class="form-group"><label for="dlcp-edit-${f.name}">${escapeHtml(f.label)}</label>
-            <select id="dlcp-edit-${f.name}" name="${f.name}">${options
-              .map(([value, label]) => `<option value="${escapeHtml(value)}" ${values[f.name] === value ? "selected" : ""}>${escapeHtml(label)}</option>`)
-              .join("")}</select></div>`;
+            <select id="dlcp-edit-${f.name}" name="${f.name}">${optionsHtml(options, values[f.name])}</select>${
+              f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : ""
+            }</div>`;
         }
         return field({ ...f, name: f.name }, values[f.name] ?? "").replaceAll("dlcp-planner-", "dlcp-edit-");
       };

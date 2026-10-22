@@ -122,3 +122,14 @@ test("fields are named in words when the GM is asked about a clash", () => {
   assert.equal(describeFields(["motive", "clockFilled"]), "what they want, the clock");
   assert.equal(describeFields(["settingNotes", "giverNpcId"]), "the setting notes, who gives it");
 });
+
+test("sends a pulled NPC's stat block by its reference's id", () => {
+  assert.equal(syncValue("statBlockReferenceId", { statBlockReference: { id: "r1", name: "Ghoul" } }), "r1");
+  assert.equal(syncValue("statBlockReferenceId", { statBlockReferenceId: null, statBlockReference: { id: "r1" } }), null);
+  assert.equal(syncValue("statBlockReferenceId", {}), null);
+});
+
+test("the campaign's type is sent with its brief", () => {
+  assert.deepEqual(changedAttributes("campaign", { name: "Z", mode: "arc" }, { name: "Z", mode: "sandbox" }), { mode: "sandbox" });
+  assert.equal(describeFields(["mode", "levelMin", "levelMax"]), "the campaign type, the lowest level, the highest level");
+});

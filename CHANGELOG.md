@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-22
+
+- **Lists instead of one per line:** a threat's grim portents and stakes, a place's features and a session's potential scenes are now lists built a row at a time, like truths: a box for each, buttons to move or remove it, and Add.
+- **Level dropdowns:** every level is now picked from 1 to 20: the campaign's starting and target level (in the brief and the setup guide), a session's party level, and a quest's levels.
+- **A quest's levels:** a quest's edit form has its lowest and highest level, as on Dungeon Master Guru. Its journal page shows them, and its encounters' difficulty uses the lowest.
+- **The campaign's status and type:** the brief has the campaign's status (planning, active, completed or archived) and type (story arc, sandbox or one-shot), and Sync sends them.
+- **An NPC's stat block:** an NPC's edit form can pick its stat block from the campaign's monster book references, as on Dungeon Master Guru.
+
 ## [1.2.0] - 2026-10-21
 
 - **Encounters:** a quest's plan is now its encounters, in order, instead of one list of monsters. Each is combat, social, exploration, puzzle, trap or other, with what happens, its monsters (with how many), the NPCs in it, its own maps and its own reward (items with how many, coins and XP). Add, move and remove them on the quest's plan; each has its own page in a new Encounters journal, and the quest's page lists them. A quest's monsters from before are moved into an encounter called "Encounter" (for a Dungeon Master Guru campaign, when the website moves them and you Sync).

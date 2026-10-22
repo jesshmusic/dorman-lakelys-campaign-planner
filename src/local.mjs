@@ -274,7 +274,7 @@ export const ADD_FORMS = {
         name: "portents",
         label: "Grim portents",
         type: "lines",
-        hint: "Signs that it's getting closer, one per line.",
+        hint: "Signs that it's getting closer, in order.",
       },
       { name: "clockSegments", label: "Clock segments", type: "number", min: 4, max: 12, value: "6" },
     ],
@@ -306,7 +306,7 @@ export const ADD_FORMS = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "description", label: "What it's like", type: "textarea" },
-      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing, one per line." },
+      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing." },
     ],
   },
   factions: {
@@ -329,7 +329,7 @@ export const ADD_FORMS = {
     title: "Add a session",
     fields: [
       { name: "title", label: "Title", type: "text", hint: "Optional, e.g. The Siege of Hommlet" },
-      { name: "level", label: "Party level", type: "number", min: 1, max: 20 },
+      { name: "level", label: "Party level", type: "level", min: 1, max: 20, blank: "Not set" },
     ],
   },
 };

@@ -764,3 +764,103 @@ test("linking the same records again leaves the links as they were, so nothing i
   assert.deepEqual(changedAttributes("quests", quest, setLinks(quest, "npcs", ["n1", "n2"], store.npcs, ids())), {});
   assert.deepEqual(setLinks(quest, "npcs", ["n1"], store.npcs, ids()).links.map((l) => l.linkableId), ["r1", "n1"]);
 });
+
+test("a quest's levels are dropdowns of 1 to 20, with Any for none", () => {
+  const levels = EDIT_FORMS.quests.fields.filter((f) => f.type === "level");
+
+  assert.deepEqual(
+    levels.map((f) => [f.name, f.min, f.max, f.blank]),
+    [
+      ["levelMin", 1, 20, "Any"],
+      ["levelMax", 1, 20, "Any"],
+    ],
+  );
+  assert.ok(levels.every((f) => EDITABLE.quests.includes(f.name)));
+});
+
+test("saves a quest's levels, lowest first", () => {
+  const quest = store.quests[0];
+
+  const { record } = applyEdit("quests", quest, { name: "Act I", levelMin: "3", levelMax: "5" }, store);
+  assert.deepEqual([record.levelMin, record.levelMax], [3, 5]);
+  assert.deepEqual(applyEdit("quests", quest, { name: "Act I", levelMin: "", levelMax: "" }, store).record.levelMin, null);
+  assert.deepEqual(applyEdit("quests", quest, { name: "Act I", levelMin: "6", levelMax: "4" }, store), {
+    error: "The highest level can't be lower than the lowest.",
+  });
+  assert.deepEqual(applyEdit("quests", quest, { name: "Act I", levelMin: "21" }, store), {
+    error: "Lowest level must be a whole number from 1 to 20.",
+  });
+});
+
+test("the brief's levels are dropdowns, and it has the campaign's status and type", () => {
+  const fields = Object.fromEntries(briefFields().map((f) => [f.name, f]));
+
+  assert.deepEqual([fields.startLevel.type, fields.targetLevel.type], ["level", "level"]);
+  assert.deepEqual(
+    fields.status.options.map(([value]) => value),
+    ["planning", "active", "completed", "archived"],
+  );
+  assert.deepEqual(
+    fields.mode.options.map(([value]) => value),
+    ["arc", "sandbox", "oneshot"],
+  );
+  assert.ok(["status", "mode", "startLevel", "targetLevel"].every((name) => EDITABLE.campaign.includes(name)));
+});
+
+test("saves the brief's status and type, keeping the ones it has for a choice that isn't allowed", () => {
+  const campaign = { name: "Zombie Siege", status: "active", mode: "sandbox", truths: [] };
+
+  const { record } = applyBrief(campaign, { name: "Zombie Siege", status: "completed", mode: "oneshot" });
+  assert.deepEqual([record.status, record.mode], ["completed", "oneshot"]);
+  const kept = applyBrief(campaign, { name: "Zombie Siege", status: "lost", mode: "" }).record;
+  assert.deepEqual([kept.status, kept.mode], ["active", "sandbox"]);
+});
+
+test("an NPC's stat block is picked from the campaign's monster references", () => {
+  const field = EDIT_FORMS.npcs.fields.find((f) => f.name === "statBlockReferenceId");
+
+  assert.deepEqual([field.type, field.collection, field.blank], ["records", "references", "None"]);
+  assert.equal(field.only({ category: "monster" }), true);
+  assert.equal(field.only({ category: "magic_item" }), false);
+});
+
+test("a pulled NPC's form shows the stat block it has", () => {
+  const npc = { id: "n1", name: "Kalvar", statBlockReference: { id: "r1", name: "Ghoul", citation: "SRD 5.2" } };
+
+  assert.equal(formValues(EDIT_FORMS.npcs.fields, npc).statBlockReferenceId, "r1");
+  assert.equal(formValues(EDIT_FORMS.npcs.fields, { id: "n2", name: "Thorne" }).statBlockReferenceId, "");
+});
+
+test("saving an NPC's stat block keeps what its page shows in step, and sends only the id", () => {
+  const references = [{ id: "r1", name: "Ghoul", category: "monster", citation: "SRD 5.2", foundryUuid: null }];
+  const npc = { id: "n1", name: "Kalvar", role: "bbeg", statBlockReference: null };
+
+  const { record } = applyEdit("npcs", npc, { name: "Kalvar", role: "bbeg", statBlockReferenceId: "r1" }, { references });
+  assert.equal(record.statBlockReferenceId, "r1");
+  assert.deepEqual(record.statBlockReference, { id: "r1", name: "Ghoul", citation: "SRD 5.2", foundryUuid: null });
+  assert.deepEqual(changedAttributes("npcs", npc, record), { statBlockReferenceId: "r1" });
+
+  const cleared = applyEdit("npcs", record, { name: "Kalvar", role: "bbeg", statBlockReferenceId: "" }, { references }).record;
+  assert.deepEqual([cleared.statBlockReferenceId, cleared.statBlockReference], [null, null]);
+  // A stat block that isn't in the campaign isn't kept
+  const unknown = applyEdit("npcs", npc, { name: "Kalvar", role: "bbeg", statBlockReferenceId: "r9" }, { references }).record;
+  assert.equal(unknown.statBlockReferenceId, null);
+});
+
+test("deleting a book reference clears the NPCs it's the stat block of, pulled ones too", () => {
+  const npcs = [
+    { id: "n1", name: "Kalvar", statBlockReferenceId: "r1", statBlockReference: { id: "r1", name: "Ghoul" } },
+    { id: "n2", name: "Thorne", statBlockReference: { id: "r1", name: "Ghoul" } },
+    { id: "n3", name: "Elmo", statBlockReference: { id: "r2", name: "Bandit" } },
+  ];
+
+  const plan = planDelete({ npcs, references: [{ id: "r1" }, { id: "r2" }] }, "references", "r1");
+  const cleared = plan.updates.filter((u) => u.collection === "npcs").map((u) => u.record);
+  assert.deepEqual(
+    cleared.map((npc) => [npc.id, npc.statBlockReferenceId, npc.statBlockReference]),
+    [
+      ["n1", null, null],
+      ["n2", null, null],
+    ],
+  );
+});

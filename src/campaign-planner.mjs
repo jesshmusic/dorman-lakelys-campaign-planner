@@ -7,6 +7,7 @@ import { openCampaignPicker } from "./apps/campaign-picker.mjs";
 import { PlannerApp } from "./apps/planner-app.mjs";
 import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
+import { watchListEditors } from "./list-editor.mjs";
 import { useRememberedGuideWords } from "./guide-words.mjs";
 import { registerTechniqueSettings } from "./technique-settings.mjs";
 import { MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
@@ -232,6 +233,9 @@ function watchScenes() {
 }
 
 // The buttons in the welcome and what's-new messages
+// The list editors' buttons (portents, stakes, features, scenes), wherever they're drawn
+watchListEditors(document);
+
 watchAnnouncements({
   help: () => openHelp(),
   newCampaign: () => openNewCampaign(),
