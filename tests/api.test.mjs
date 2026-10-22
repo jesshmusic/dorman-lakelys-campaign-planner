@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DmGuruApi, DmGuruApiError } from "../src/api.mjs";
+import { DmGuruApi, DmGuruApiError, SYNC_SCHEMA } from "../src/api.mjs";
 
 function fakeFetch(responses) {
   const calls = [];
@@ -244,4 +244,28 @@ test("a monster that's gone is a 404 error", async () => {
   const api = new DmGuruApi({ token: "t", fetchImpl });
 
   await assert.rejects(api.monster("1"), (error) => error instanceof DmGuruApiError && error.status === 404);
+});
+
+test("tells Dungeon Master Guru which shape of campaign data it speaks", async () => {
+  const { calls, fetchImpl } = fakeFetch([{ body: {} }, { body: { steps: [] } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  await api.changes("c", 0);
+  await api.setupGuide();
+
+  assert.equal(SYNC_SCHEMA, 1);
+  assert.equal(calls[0].init.headers["X-Planner-Schema"], "1");
+  assert.equal(calls[1].init.headers["X-Planner-Schema"], undefined, "only the /v1/foundry endpoints take it");
+});
+
+test("knows when Dungeon Master Guru needs a newer module", async () => {
+  const { fetchImpl } = fakeFetch([{ status: 426, body: { errors: ["Update the module"], code: "update_module" } }]);
+  const api = new DmGuruApi({ token: "t", fetchImpl });
+
+  await assert.rejects(api.changes("c", 0), (error) => {
+    assert.ok(error instanceof DmGuruApiError);
+    assert.equal(error.updateNeeded, true);
+    assert.equal(error.code, "update_module");
+    return true;
+  });
 });

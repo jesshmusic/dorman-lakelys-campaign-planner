@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 import {
   pendingCount,
   pendingUuids,
+  pointAtRealIds,
+  pointsAt,
   pushPayload,
   queueCreate,
   queueDelete,
   queueUpdate,
+  realIds,
+  sendOrder,
   withRealIds,
 } from "../src/outbox.mjs";
 
@@ -131,4 +135,75 @@ test("moving an encounter to another quest sends the quest's real id, before and
   const real = withRealIds(change, { "q-temp": "7", "q-temp2": "8" });
 
   assert.deepEqual([real.base.questId, real.attributes.questId], ["7", "8"]);
+});
+
+test("knows the real ids of records made here and already sent, from the records", () => {
+  const records = [
+    { id: "3", uuid: "ref-temp" },
+    { id: "q-temp", uuid: "q-temp" },
+    { id: 12, uuid: "server-uuid" },
+  ];
+
+  assert.deepEqual(realIds(records), { "ref-temp": "3", "server-uuid": "12" });
+});
+
+test("points a record at real ids, leaving it as it is when nothing changes", () => {
+  const quest = {
+    id: "q-temp",
+    uuid: "q-temp",
+    parentId: "q-parent",
+    links: [
+      { linkableType: "CampaignReference", linkableId: "ref-temp", quantity: 3 },
+      { linkableType: "Monster", linkableId: "55" },
+    ],
+  };
+  const ids = { "ref-temp": "3", "q-parent": "9" };
+
+  const pointed = pointAtRealIds(quest, ids);
+  assert.equal(pointed.parentId, "9");
+  assert.deepEqual(
+    pointed.links.map((link) => [link.linkableId, link.quantity]),
+    [
+      ["3", 3],
+      ["55", undefined],
+    ],
+  );
+  assert.equal(pointed.id, "q-temp", "its own id isn't a pointer");
+  assert.equal(pointAtRealIds(pointed, ids), pointed);
+
+  const npc = { id: "n1", statBlockReferenceId: "ref-temp", statBlockReference: { id: "ref-temp", name: "Ghoul" } };
+  assert.deepEqual(pointAtRealIds(npc, ids).statBlockReference, { id: "3", name: "Ghoul" });
+});
+
+test("lists what a change points at", () => {
+  const change = {
+    op: "create",
+    uuid: "e-temp",
+    attributes: { questId: "q-temp", npcId: null, links: [{ linkableId: "ref-temp" }], revealedSessionUuid: "s-uuid" },
+  };
+
+  assert.deepEqual(pointsAt(change), ["q-temp", "ref-temp", "s-uuid"]);
+  assert.deepEqual(pointsAt({ op: "delete", uuid: "x" }), []);
+});
+
+test("sends records made here before what points at them, keeping the rest in order", () => {
+  // The quest was made first, then the references dropped on it: its create came first
+  const quest = { op: "create", collection: "quests", uuid: "q-temp", attributes: { name: "Q", links: [{ linkableId: "r1" }, { linkableId: "r2" }] } };
+  const clock = { op: "update", collection: "fronts", uuid: "f-1", attributes: { clockFilled: 3 } };
+  const r1 = { op: "create", collection: "references", uuid: "r1", attributes: { name: "Zombie" } };
+  const encounter = { op: "create", collection: "encounters", uuid: "e-temp", attributes: { questId: "q-temp" } };
+  const r2 = { op: "create", collection: "references", uuid: "r2", attributes: { name: "Watch Zombie" } };
+
+  assert.deepEqual(
+    sendOrder([quest, clock, r1, encounter, r2]).map((change) => change.uuid),
+    ["f-1", "r1", "r2", "q-temp", "e-temp"],
+  );
+  assert.deepEqual(sendOrder([clock, r1]).map((change) => change.uuid), ["f-1", "r1"]);
+});
+
+test("records that point at each other go in the order they were queued", () => {
+  const a = { op: "create", uuid: "a", attributes: { parentId: "b" } };
+  const b = { op: "create", uuid: "b", attributes: { parentId: "a" } };
+
+  assert.deepEqual(sendOrder([a, b]).map((change) => change.uuid), ["a", "b"]);
 });

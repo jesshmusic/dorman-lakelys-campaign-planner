@@ -8,6 +8,7 @@ import { PlannerApp } from "./apps/planner-app.mjs";
 import { BugReportLink, DmGuruLink, PatreonLink } from "./apps/link-apps.mjs";
 import { announce, bugReportLink, openBugReport, watchAnnouncements } from "./announce.mjs";
 import { watchListEditors } from "./list-editor.mjs";
+import { migrateWorld } from "./migrate-world.mjs";
 import { useRememberedGuideWords } from "./guide-words.mjs";
 import { registerTechniqueSettings } from "./technique-settings.mjs";
 import { MODULE_ID, MODULE_TITLE, SETTINGS } from "./constants.mjs";
@@ -262,8 +263,19 @@ Hooks.once("ready", () => {
   // The welcome message on first install, and what's new after an update
   announce().catch((error) => console.warn(`${MODULE_TITLE} | Could not post the welcome message`, error));
 
-  // A campaign in this world from before encounters: its quests' monsters move into one (the active GM, once)
-  sync.convertQuestMonsters().catch((error) => console.warn(`${MODULE_TITLE} | Could not move the quests' monsters into encounters`, error));
+  // Campaigns kept by an older version of the module are brought up to date
+  // (see migrations.mjs), then a campaign from before encounters has its
+  // quests' monsters moved into one (the active GM, once)
+  migrateWorld()
+    .then((migrated) => migrated.includes(sync.folder?.id) && sync.rewritePages())
+    .then(() => sync.convertQuestMonsters())
+    .catch((error) => console.warn(`${MODULE_TITLE} | Could not bring this world's campaigns up to date`, error));
+
+  // A renamed actor's book references take its new name
+  Hooks.on("updateActor", (actor, changes) => {
+    if (!("name" in changes)) return;
+    sync.followActorName(actor).catch((error) => console.warn(`${MODULE_TITLE} | Could not rename "${actor.name}"'s book references`, error));
+  });
 
   // Campaigns sync only when the GM clicks Sync: nothing pulls or pushes on a timer
   sendCompendiumIndex();

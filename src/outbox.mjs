@@ -86,23 +86,86 @@ export function pendingUuids(outbox) {
 }
 
 /**
+ * The real ids of records made in Foundry that Dungeon Master Guru has
+ * already been sent. Such a record keeps its uuid, which was its stand-in id,
+ * and gets the id Dungeon Master Guru gave it. A record still waiting to be
+ * sent has its uuid as its id, so it isn't here.
+ * @param {Iterable<{ id: string|number, uuid: string }>} records
+ * @returns {Record<string, string>} stand-in id -> real id
+ */
+export function realIds(records) {
+  const ids = {};
+  for (const record of records) {
+    if (record?.uuid && record.id !== null && record.id !== undefined && String(record.id) !== record.uuid) {
+      ids[record.uuid] = String(record.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * A record (or a change's attributes) pointing at real ids instead of
+ * stand-in ones. The same object when nothing points at a stand-in.
+ * @param {Record<string, string>} ids stand-in id -> real id
+ */
+export function pointAtRealIds(attributes, ids) {
+  if (!attributes) return attributes;
+  const real = (id) => (id !== null && id !== undefined && ids[String(id)] !== undefined ? ids[String(id)] : id);
+  const changed = {};
+  for (const field of ID_FIELDS) {
+    if (field in attributes && real(attributes[field]) !== attributes[field]) changed[field] = real(attributes[field]);
+  }
+  const links = Array.isArray(attributes.links) ? attributes.links : null;
+  if (links?.some((link) => real(link.linkableId) !== link.linkableId)) {
+    changed.links = links.map((link) => ({ ...link, linkableId: String(real(link.linkableId)) }));
+  }
+  // What an NPC's page shows for its stat block
+  const statBlock = attributes.statBlockReference;
+  if (statBlock?.id !== undefined && real(statBlock.id) !== statBlock.id) {
+    changed.statBlockReference = { ...statBlock, id: real(statBlock.id) };
+  }
+  return Object.keys(changed).length ? { ...attributes, ...changed } : attributes;
+}
+
+/**
  * A queued change with stand-in ids replaced by the ids Dungeon Master Guru
  * gave those records when their creates were sent.
  * @param {Record<string, string>} ids stand-in id -> real id
  */
 export function withRealIds(change, ids) {
-  const real = (id) => (id !== null && id !== undefined && ids[String(id)] !== undefined ? ids[String(id)] : id);
-  const remap = (attributes = {}) => {
-    const out = { ...attributes };
-    for (const field of ID_FIELDS) if (field in out) out[field] = real(out[field]);
-    if (Array.isArray(out.links)) out.links = out.links.map((link) => ({ ...link, linkableId: String(real(link.linkableId)) }));
-    return out;
-  };
   return {
     ...change,
-    ...(change.attributes ? { attributes: remap(change.attributes) } : {}),
-    ...(change.base ? { base: remap(change.base) } : {}),
+    ...(change.attributes ? { attributes: pointAtRealIds(change.attributes, ids) } : {}),
+    ...(change.base ? { base: pointAtRealIds(change.base, ids) } : {}),
   };
+}
+
+/** The ids (and session uuids) of the other records a queued change points at */
+export function pointsAt(change) {
+  const attributes = change.attributes ?? {};
+  const ids = ID_FIELDS.filter((field) => attributes[field] !== null && attributes[field] !== undefined).map((field) =>
+    String(attributes[field]),
+  );
+  for (const link of Array.isArray(attributes.links) ? attributes.links : []) ids.push(String(link.linkableId));
+  if (attributes.revealedSessionUuid) ids.push(String(attributes.revealedSessionUuid));
+  return ids;
+}
+
+/**
+ * The queue in the order to send it: as queued, except that a change waits
+ * for the records made in Foundry that it points at. A quest goes after the
+ * book references it links to, and before its encounters.
+ */
+export function sendOrder(outbox) {
+  const waiting = [...outbox];
+  const ordered = [];
+  while (waiting.length) {
+    const creating = new Set(waiting.filter((change) => change.op === "create").map((change) => change.uuid));
+    const ready = waiting.findIndex((change) => pointsAt(change).every((id) => id === change.uuid || !creating.has(id)));
+    // Records that point at each other can't both wait: send the first as queued
+    ordered.push(...waiting.splice(ready === -1 ? 0 : ready, 1));
+  }
+  return ordered;
 }
 
 /** What to send to the push endpoint for a queued change */
