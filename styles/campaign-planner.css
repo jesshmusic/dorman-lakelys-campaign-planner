@@ -1023,3 +1023,67 @@
 .dlcp-reward-items select {
   width: 100%;
 }
+
+/* Lists built a row at a time: grim portents, stakes, features, potential scenes */
+
+.dlcp-list-field {
+  border: none;
+  margin: 0.5rem 0 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.dlcp-list-field legend {
+  padding: 0;
+}
+
+.dlcp-list-field .hint {
+  margin: 0 0 0.35rem;
+}
+
+.dlcp-list-editor {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.dlcp-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.dlcp-list-row {
+  align-items: center;
+  border-left: 3px solid var(--color-border-light-tertiary, #b5b3a4);
+  display: flex;
+  gap: 0.4rem;
+  padding-left: 0.4rem;
+}
+
+.dlcp-list-row:focus-within {
+  border-left-color: #972c1d;
+}
+
+.dlcp-list-number {
+  flex: 0 0 1.5rem;
+  font-weight: bold;
+  text-align: right;
+}
+
+.dlcp-list-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dlcp-list-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.15rem;
+}

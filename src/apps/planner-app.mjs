@@ -1,5 +1,6 @@
 import { ENCOUNTER_KIND_LABELS, clockSvg, creditHtml, currencyText, escapeHtml, truthsHtml } from "../render.mjs";
 import { changeTruthRows, readTruthRows, truthsFieldHtml } from "../truths-editor.mjs";
+import { listEditorHtml, listFieldHtml } from "../list-editor.mjs";
 import { normalizeTruths } from "../setup.mjs";
 import { MODULE_ID, SYNCED_HOOK } from "../constants.mjs";
 import { ENCOUNTER_KINDS, NPC_ROLES, newRecord } from "../local.mjs";
@@ -23,6 +24,7 @@ import {
 } from "../encounters.mjs";
 import {
   COINS,
+  LIST_FIELDS,
   actorChange,
   addHandout,
   addRollTable,
@@ -71,7 +73,7 @@ const TREASURE = ["magic_item", "equipment", "table", "spell", "other"];
 const PREP_STEPS = {
   characters: ["Review the characters", "What does each character want? What hooks might pull them in this session?"],
   strongStart: ["Create a strong start", "Open with something happening that pulls the players straight into the game."],
-  scenes: ["Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away. One per line."],
+  scenes: ["Outline potential scenes", "A short list of scenes that might happen. Be ready to throw them away."],
   secrets: ["Define secrets and clues", "Pick around ten unrevealed secrets the party could discover. Don't decide how."],
   locations: ["Develop fantastic locations", "Places that might come up, each with a few evocative features."],
   npcs: ["Outline important NPCs", "Who is likely to show up?"],
@@ -89,8 +91,12 @@ const field = (f, value, extra = "") => {
   if (f.type === "truths") return truthsFieldHtml({ label: f.label, hint: f.hint, rows: value, idPrefix: id, extra });
   const label = `<label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>`;
   const hint = `${f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : ""}${extra}`;
-  if (f.type === "textarea" || f.type === "lines") {
-    return `<div class="form-group stacked">${label}<textarea id="${id}" name="${f.name}" rows="${f.type === "lines" ? 4 : 3}">${escapeHtml(value)}</textarea>${hint}</div>`;
+  // A few short lines (portents, stakes, features): a list the GM builds a row at a time
+  if (f.type === "lines") {
+    return listFieldHtml({ name: f.name, label: f.label, hint: f.hint, value, idPrefix: id, extra, ...LIST_FIELDS[f.name] });
+  }
+  if (f.type === "textarea") {
+    return `<div class="form-group stacked">${label}<textarea id="${id}" name="${f.name}" rows="3">${escapeHtml(value)}</textarea>${hint}</div>`;
   }
   return `<div class="form-group">${label}<input id="${id}" name="${f.name}" type="${f.type === "number" ? "number" : "text"}"
     value="${escapeHtml(value)}" ${f.min !== undefined ? `min="${f.min}" max="${f.max}"` : ""}>${hint}</div>`;
@@ -1008,7 +1014,7 @@ export class PlannerApp extends foundry.applications.api.ApplicationV2 {
           <textarea name="characterNotes" rows="3" aria-label="Character notes">${escapeHtml(values.characterNotes ?? "")}</textarea>`,
         )}
         ${step("strongStart", `<textarea name="strongStart" rows="3" aria-label="Strong start">${escapeHtml(values.strongStart ?? "")}</textarea>`, creditHtml(["strongStart"], techniques))}
-        ${step("scenes", `<textarea name="scenes" rows="4" aria-label="Potential scenes">${escapeHtml((values.scenes ?? []).join("\n"))}</textarea>`)}
+        ${step("scenes", listEditorHtml({ name: "scenes", value: values.scenes ?? [], idPrefix: "dlcp-prep", ...LIST_FIELDS.scenes }))}
         ${step("secrets", checklist("secrets", unrevealed, "secrets"))}
         ${step("locations", checklist("locations", store.locations, "places") + maps)}
         ${step("npcs", checklist("npcs", store.npcs, "NPCs"))}

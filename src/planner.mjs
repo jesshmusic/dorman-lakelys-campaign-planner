@@ -28,6 +28,14 @@ const TABLE_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?RollTable\.[A-Za-z0-9]{16}$/
 export const MAX_ROLL_TABLES = 10;
 const ACTOR_UUID = /^(Compendium\.[\w-]+\.[\w-]+\.)?Actor\.[A-Za-z0-9]{16}$/;
 const LIMITS = { stakes: 10, features: 20, scenes: 20, portents: 10 };
+
+// The fields edited as a list, a row at a time: what one row is called, and how many there can be
+export const LIST_FIELDS = {
+  portents: { noun: "portent", max: LIMITS.portents, placeholder: "e.g. Villages go quiet along the river" },
+  stakes: { noun: "question", max: LIMITS.stakes, placeholder: "e.g. Will the bridge hold?" },
+  features: { noun: "feature", max: LIMITS.features, placeholder: "e.g. A rope bridge over the gorge" },
+  scenes: { noun: "scene", max: LIMITS.scenes, placeholder: "e.g. Ambush at the ford" },
+};
 // Foundry's token dispositions (CONST.TOKEN_DISPOSITIONS)
 const DISPOSITIONS = { secret: -2, hostile: -1, neutral: 0, friendly: 1 };
 
@@ -98,8 +106,8 @@ export const EDIT_FORMS = {
       { name: "goal", label: "What it wants", type: "text" },
       { name: "doom", label: "What happens if no one stops it", type: "text" },
       { name: "description", label: "Description", type: "textarea" },
-      { name: "portents", label: "Grim portents", type: "lines", hint: "Signs it's getting closer, one per line." },
-      { name: "stakes", label: "Stakes", type: "lines", hint: "Questions you want answered in play, one per line." },
+      { name: "portents", label: "Grim portents", type: "lines", hint: "Signs it's getting closer, in order." },
+      { name: "stakes", label: "Stakes", type: "lines", hint: "Questions you want answered in play." },
       { name: "clockSegments", label: "Clock segments", type: "number", min: 2, max: 12 },
       { name: "clockFilled", label: "Segments filled", type: "number", min: 0, max: 12 },
       { name: "npcId", label: "Villain", type: "records", collection: "npcs", blank: "None" },
@@ -163,7 +171,7 @@ export const EDIT_FORMS = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "description", label: "What it's like", type: "textarea" },
-      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing, one per line." },
+      { name: "features", label: "Features", type: "lines", hint: "A few things worth noticing." },
       { name: "parentId", label: "Inside", type: "records", collection: "locations", blank: "Nowhere (top level)" },
       { name: "notes", label: "Notes", type: "textarea" },
     ],

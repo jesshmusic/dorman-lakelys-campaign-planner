@@ -1,6 +1,8 @@
 import { ENCOUNTER_KIND_LABELS, clockSvg, currencyText, escapeHtml } from "../render.mjs";
 import { MODULE_ID, SETTINGS, SYNCED_HOOK } from "../constants.mjs";
 import { addForm } from "../local.mjs";
+import { LIST_FIELDS } from "../planner.mjs";
+import { listFieldHtml } from "../list-editor.mjs";
 import { currentTechniques } from "../technique-settings.mjs";
 import { LINKS } from "../welcome.mjs";
 import { giveReward } from "./give-reward.mjs";
@@ -543,9 +545,11 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
     if (!form) return;
     const field = (f) => {
       const id = `dlcp-add-${f.name}`;
+      // A few short lines (portents, features): a list built a row at a time
+      if (f.type === "lines") return listFieldHtml({ name: f.name, label: f.label, hint: f.hint, value: [], idPrefix: id, ...LIST_FIELDS[f.name] });
       const hint = f.hint ? `<p class="hint">${escapeHtml(f.hint)}</p>` : "";
       let control;
-      if (f.type === "textarea" || f.type === "lines") control = `<textarea id="${id}" name="${f.name}" rows="3"></textarea>`;
+      if (f.type === "textarea") control = `<textarea id="${id}" name="${f.name}" rows="3"></textarea>`;
       else if (f.type === "select")
         control = `<select id="${id}" name="${f.name}">${f.options
           .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
@@ -553,7 +557,7 @@ export class DashboardApp extends foundry.applications.api.ApplicationV2 {
       else
         control = `<input id="${id}" name="${f.name}" type="${f.type === "number" ? "number" : "text"}"
           value="${escapeHtml(f.value ?? "")}" ${f.min ? `min="${f.min}" max="${f.max}"` : ""}>`;
-      return `<div class="form-group ${f.type === "textarea" || f.type === "lines" ? "stacked" : ""}">
+      return `<div class="form-group ${f.type === "textarea" ? "stacked" : ""}">
         <label for="${id}">${escapeHtml(f.label)}${f.required ? " (required)" : ""}</label>${control}${hint}</div>`;
     };
     const values = await foundry.applications.api.DialogV2.prompt({
